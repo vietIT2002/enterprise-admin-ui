@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.6] — 2026-11-05
+
+### Added
+- `audit.js` 0.5.0 adds three warnings for checklist items a browser can check:
+  - `label-beside-field`: a form label to the left of its field instead of above it. Checked on form, settings and wizard pages.
+  - `input-type`: an email or phone field without `type="email"` or `type="tel"`. The field's purpose comes from its name, id, autocomplete, aria-label or label.
+  - `contact-link`: an email address or a formatted phone number in the main content that is not a `mailto:` or `tel:` link.
+
+### Docs
+- README links the live benchmark gallery, which shows the pages without and with the skill side by side.
+- README reports a blind re-review of 12 pages. It agreed with the open review on 97% of checklist items and gave the same gap (41% → 89% blind, 39% → 89% open).
+
 ## [0.5.5] — 2026-11-05
 
 ### Fixed
@@ -95,6 +107,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.6]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.6
 [0.5.5]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.5
 [0.5.4]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.4
 [0.5.3]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.3

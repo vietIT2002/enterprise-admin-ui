@@ -13,7 +13,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.4.0';
+  const VERSION = '0.5.0';
   const WEIGHTS = { error: 10, warn: 4 };
   const MAX_EXAMPLES = 5;
 
@@ -38,6 +38,9 @@
     'single-primary-action',
     'hidden-overridden',
     'sticky-inert',
+    'label-beside-field',
+    'input-type',
+    'contact-link',
   ]);
 
   // ------------------------------------------------------------------ pure helpers (unit-tested in Node)
@@ -54,6 +57,20 @@
   function isNumericText(text) {
     const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
     return t.length > 0 && t.length <= 32 && NUMERIC_RE.test(t);
+  }
+
+  // A phone number written for people: starts with +, 0 or (0, uses separators, and has 9–13 digits.
+  // Amounts (125.000.000), dates (05-11-2026), tax codes and ID numbers without separators do not match.
+  const PHONE_RE = /^(?:\+\d{1,3}[\s.-]?\(?\d{1,4}\)?|\(?0\d{1,4}\)?)(?:[\s.-]\d{2,4}){2,4}$/;
+  function looksLikePhone(text) {
+    const t = String(text == null ? '' : text).trim();
+    if (!PHONE_RE.test(t)) return false;
+    const digits = t.replace(/\D/g, '').length;
+    return digits >= 9 && digits <= 13;
+  }
+
+  function looksLikeEmail(text) {
+    return /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(String(text == null ? '' : text).trim());
   }
 
   // Fast path for rgb()/rgba()/hex/transparent. Returns null for other syntaxes (oklch, lab…).
@@ -1016,7 +1033,74 @@
     }
   }
 
-  const CHECKS = [checkTypography, checkRadius, checkTables, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden, checkSticky];
+  const FIELD_SELECTOR = 'input:not([type]), input[type="text"], input[type="email"], input[type="tel"], input[type="number"], input[type="date"], input[type="password"], input[type="url"], input[type="time"], input[type="datetime-local"], select, textarea';
+  const LABEL_PAGE_TYPES = ['form', 'settings', 'wizard'];
+
+  // A form label sits above its field. `<label>` is inline, so without `block` it ends up beside short fields.
+  // Checked on form, settings and wizard pages, or inside a <form> when no page type is given; tables, toolbars and
+  // search boxes keep side labels.
+  function checkLabelPosition(ctx) {
+    const type = ctx.opts.pageType;
+    let n = 0;
+    for (const el of ctx.all) {
+      if (!el.matches(FIELD_SELECTOR) || el.closest('table, [role="grid"], [role="toolbar"], [role="search"], nav')) continue;
+      if (type ? !LABEL_PAGE_TYPES.includes(type) : !el.closest('form')) continue;
+      const label = (el.labels ? Array.from(el.labels) : []).find((l) => !l.contains(el) && ctx.visible(l) && !isClippedAway(ctx, l));
+      if (!label) continue;
+      n++;
+      const a = label.getBoundingClientRect();
+      const b = el.getBoundingClientRect();
+      if (a.bottom > b.top + 4 && a.top < b.bottom - 4 && a.right <= b.left + 2) {
+        report(ctx, 'label-beside-field', 'warn', 'Form labels sit above their field: an inline <label> ends up beside short fields. Give it `block`, or wrap label and field in `grid gap-1.5`', el, 'label to the left', 'label above');
+      }
+    }
+    measured(ctx, 'label-beside-field', n);
+  }
+
+  const EMAIL_HINT = /e-?mail|thư điện tử/i;
+  const PHONE_HINT = /phone|mobile|\btel\b|điện thoại|dien.?thoai|\bsđt\b|\bsdt\b|hotline/i;
+
+  // An email or phone field uses type="email" or type="tel", which give autofill and the right mobile keyboard.
+  // The purpose is read from name, id, autocomplete, aria-label and the label text. Dates are not checked:
+  // a text field with a date picker is a valid pattern.
+  function checkInputTypes(ctx) {
+    let n = 0;
+    for (const el of ctx.all) {
+      // Read-only and disabled fields are not typed into, so their type changes nothing.
+      if (el.tagName !== 'INPUT' || el.readOnly || el.disabled || el.closest('[role="search"]')) continue;
+      const type = (el.getAttribute('type') || 'text').toLowerCase();
+      if (!['text', 'email', 'tel'].includes(type)) continue;
+      const label = el.labels ? Array.from(el.labels).map((l) => l.textContent).join(' ') : '';
+      const hints = [el.name, el.id, el.getAttribute('autocomplete'), el.getAttribute('aria-label'), label].filter(Boolean).join(' ');
+      const want = EMAIL_HINT.test(hints) ? 'email' : PHONE_HINT.test(hints) ? 'tel' : null;
+      if (!want) continue;
+      n++;
+      if (type !== want) {
+        report(ctx, 'input-type', 'warn', 'Email and phone fields use type="email" and type="tel": they give autofill and the right keyboard on phones', el, 'type="' + type + '"', 'type="' + want + '"');
+      }
+    }
+    measured(ctx, 'input-type', n);
+  }
+
+  // Contact values in the content are links: an email address as mailto:, a phone number as tel:. Only text that is
+  // entirely one address or number counts, and navigation, menus and the app header (the signed-in user) are skipped.
+  function checkContactLinks(ctx) {
+    const main = ctx.doc.querySelector('main, [role="main"]');
+    let n = 0;
+    for (const el of ctx.textEls) {
+      if (main ? !main.contains(el) : el.closest('nav, aside, [role="banner"], [role="navigation"], [role="menu"]')) continue;
+      if (el.closest('input, textarea, select, option, code, pre, [contenteditable="true"]')) continue;
+      const text = ownText(el);
+      const kind = looksLikeEmail(text) ? 'email' : looksLikePhone(text) ? 'phone' : null;
+      if (!kind) continue;
+      n++;
+      if (el.closest(kind === 'email' ? 'a[href^="mailto:"]' : 'a[href^="tel:"]')) continue;
+      report(ctx, 'contact-link', 'warn', 'Email addresses and phone numbers are links: `mailto:` and `tel:` (the tel: href in international form)', el, kind + ' as plain text', kind === 'email' ? 'a mailto: link' : 'a tel: link');
+    }
+    measured(ctx, 'contact-link', n);
+  }
+
+  const CHECKS = [checkTypography, checkRadius, checkTables, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden, checkSticky, checkLabelPosition, checkInputTypes, checkContactLinks];
 
   // ------------------------------------------------------------------ entry point
 
@@ -1067,6 +1151,8 @@
     gradientStops,
     isHardStopGradient,
     median,
+    looksLikePhone,
+    looksLikeEmail,
   };
   root.enterpriseAdminAudit = audit;
 })(typeof window !== 'undefined' ? window : globalThis);

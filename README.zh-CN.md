@@ -6,7 +6,7 @@
 
 ![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.5](https://img.shields.io/badge/version-0.5.5-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.6](https://img.shields.io/badge/version-0.5.6-blue)
 
 ## 安装
 
@@ -91,7 +91,7 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 skills/enterprise-admin-ui/
 ├─ SKILL.md            193 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         13 个文件，仅在任务需要时加载
-├─ scripts/audit.js    无依赖的浏览器审计脚本，19 条规则，评分 0–100
+├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
 └─ assets/
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
    └─ DESIGN.template.md   项目级决策文件（Google design.md 格式）
@@ -132,7 +132,9 @@ skills/enterprise-admin-ui/
 - 用 emoji 充当图标；
 - 每个页头中的主操作数量；
 - 被 `flex` 或 `grid` 类强制显示出来的隐藏元素；
-- 永远无法固定的 sticky 操作栏和表头：外层 `overflow` 容器随内容变高而不是自身滚动。
+- 永远无法固定的 sticky 操作栏和表头：外层 `overflow` 容器随内容变高而不是自身滚动；
+- 表单标签位于字段旁边而不是上方，以及邮箱或电话字段没有使用 `type="email"` 或 `type="tel"`；
+- 以纯文本显示、而不是 `mailto:` 和 `tel:` 链接的邮箱地址和电话号码。
 
 ## 效果
 
@@ -141,9 +143,9 @@ skills/enterprise-admin-ui/
 - **生成：** 同一模型（Claude Sonnet 5.5）根据同一组需求说明（英文和越南语）构建相同的界面，一次按常规方式生成，一次先要求它阅读 `SKILL.md`。输出为使用 Tailwind CDN 的单文件 HTML。
 - **评分：**
   - 页面由本技能自带的审计（`scripts/audit.js`）和一份验收清单评分；
-  - 每个页面由一个评审 Agent 评判，评审时知道页面属于哪一组（非盲评）；
+  - 每个页面由一个评审 Agent 评判，评审时知道页面属于哪一组。对其中 12 个页面的盲评复核与原评审在 97% 的清单项上一致，差距相同；
   - 验收清单评审覆盖每份需求说明的第 1–2 次运行。
-- **数据：** 所有生成的页面、截图、审计与评审结果，以及题目、提示词和工具，均在 [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。
+- **数据：** 所有生成的页面、截图、审计与评审结果，以及题目、提示词和工具，均在 [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。可在[对比画廊](https://vietit2002.github.io/enterprise-admin-ui-benchmark/)中并排浏览这些页面。
 
 | | 不使用 | 使用本技能 |
 |---|---|---|
