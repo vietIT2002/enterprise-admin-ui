@@ -158,10 +158,11 @@ skills/enterprise-admin-ui/
 
 ![发票表单：未使用与使用本技能的对比](docs/img/before-after-03-invoice-form.png)
 
+**自动触发**（Claude Code，Sonnet 5.5，2026-11-05）：在不点名的情况下，技能在 20/20 个管理界面提示词（10 个英文、10 个越南语）中自动加载，在 0/10 个落地页提示词中均未加载。
+
 **尚未测量：**
 - 其他 Agent（Codex、Cursor、Copilot）；
-- 真实的 React/shadcn 代码库；
-- 不点名调用时技能被自动触发的频率。
+- 真实的 React/shadcn 代码库。
 
 ## 与同类技能对比
 

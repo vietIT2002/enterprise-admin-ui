@@ -158,10 +158,11 @@ skills/enterprise-admin-ui/
 
 ![Invoice form without and with the skill](docs/img/before-after-03-invoice-form.png)
 
+**Triggering on its own** (Claude Code, Sonnet 5.5, 2026-11-05): without being named, the skill loaded for 20/20 management-screen prompts (10 EN, 10 VI) and for 0/10 landing-page prompts.
+
 **Not measured yet:**
 - other agents (Codex, Cursor, Copilot);
-- real React/shadcn codebases;
-- how often the skill triggers without being named.
+- real React/shadcn codebases.
 
 ## How it compares
 

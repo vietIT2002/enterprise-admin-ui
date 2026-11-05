@@ -158,10 +158,11 @@ skills/enterprise-admin-ui/
 
 ![Form hóa đơn không có và có skill](docs/img/before-after-03-invoice-form.png)
 
+**Tự kích hoạt** (Claude Code, Sonnet 5.5, 2026-11-05): khi không được gọi tên, skill tự nạp ở 20/20 prompt màn hình quản lý (10 EN, 10 VI) và 0/10 prompt landing page.
+
 **Chưa đo:**
 - các agent khác (Codex, Cursor, Copilot);
-- codebase React/shadcn thực tế;
-- tần suất skill tự kích hoạt khi không được gọi tên.
+- codebase React/shadcn thực tế.
 
 ## So sánh với các skill khác
 
