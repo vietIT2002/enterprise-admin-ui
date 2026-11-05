@@ -1,0 +1,22 @@
+name: Bug or documentation error
+description: Something in the skill, audit.js or the docs is wrong or broken
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong
+      description: The file and line (for example skills/enterprise-admin-ui/references/forms.md:42) and what it says or does.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Agent and version, install channel, error output or screenshot if any.

@@ -1,4 +1,4 @@
-<!-- Paste into .github/copilot-instructions.md. Generated from skills/enterprise-admin-ui/SKILL.md by scripts/build-adapters.mjs. Do not edit by hand. -->
+<!-- Paste into .github/copilot-instructions.md. Generated from skills/enterprise-admin-ui/SKILL.md. Do not edit by hand. -->
 
 ## Management screens (enterprise-admin-ui)
 
@@ -17,7 +17,7 @@ For admin panels, back-office, ERP, CRM, HRM, accounting, inventory and B2B SaaS
 
 Replace these template tells:
 
-- ALL-CAPS tracked labels and table headers (`uppercase tracking-wide`) → Sentence case, normal tracking, sizes from the Font row
+- ALL-CAPS tracked labels and table headers (`uppercase tracking-wide`) → Sentence case, normal tracking, sizes from Font above
 - Dark navy sidebar with an indigo accent → Light neutral sidebar; accent only on primary actions and selection
 - A different colour for every status → The five-tone status vocabulary
 

@@ -2,7 +2,7 @@
  * enterprise-admin-ui tokens — MIT License
  * Variable names follow shadcn/ui, so this file can replace the colour block of a shadcn globals.css.
  * Plain CSS: the :root/.dark variables work everywhere; the @theme block is read only by Tailwind v4.
- * Change the accent in DESIGN.md, then update --primary, --ring and --sidebar-primary together and run `npm run validate`.
+ * Change the accent in DESIGN.md, then update --primary, --ring and --sidebar-primary together and re-check their contrast (references/tokens.md).
  */
 :root {
   --font-sans: system-ui, "Segoe UI", -apple-system, "SF Pro Text", Roboto, "Helvetica Neue", Arial, sans-serif;

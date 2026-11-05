@@ -27,7 +27,7 @@ Read this when you build a create/edit form, a settings section, a line-item edi
 
 ## Validation timing
 
-RED: 0 of 2 reviewed forms had a blur-plus-submit flow with an error summary and focus management (F4).
+Baseline without this skill: 0 of 2 reviewed forms had a blur-plus-submit flow with an error summary and focus management.
 
 1. **Before the first blur** no errors show; a field the user is still typing in is not flagged.
 2. **On blur:** validate that field, including a required field left empty, and show its message under it. In react-hook-form this is `mode: 'onTouched'` [Primer, NN/g].
@@ -41,7 +41,7 @@ RED: 0 of 2 reviewed forms had a blur-plus-submit flow with an error summary and
 
 ## Save model
 
-RED: Save was disabled until the form was valid in the reviewed forms (F4). Users cannot tell why a disabled button is disabled.
+Baseline without this skill: Save was disabled until the form was valid in the reviewed forms. Users cannot tell why a disabled button is disabled.
 
 - **Explicit save is the default.** One Save button per form, one edit mode at a time, one save model per form: never mix an autosaving toggle with a Save button in the same section [Primer].
 - **Save is never disabled before submit.** An empty or invalid form can still be submitted; the validation then explains what is wrong [Primer, Atlassian].
@@ -55,7 +55,7 @@ RED: Save was disabled until the form was valid in the reviewed forms (F4). User
 
 - Every full-page form and editable matrix keeps Save and Cancel in a bar fixed to the bottom of the content area, right-aligned: `sticky bottom-0 flex justify-end gap-3 border-t border-border bg-card px-6 py-3`. No shadow; the top border separates it.
 - Make sure the sticky bar never covers the focused field: add `scroll-pb-20` to the scroll container [WCAG 2.4.11].
-- **Unsaved-changes indicator:** when the form is dirty (`isDirty`), show "Unsaved changes" in the bar beside Cancel and Save (not pushed to the far left), in `text-sm text-muted-foreground` with a 6px dot `bg-warning`. Render its live region (`role="status"`) always and change only its content. It disappears after a successful save. Permission matrices and settings sections use the same indicator [F4].
+- **Unsaved-changes indicator:** when the form is dirty (`isDirty`), show "Unsaved changes" in the bar beside Cancel and Save (not pushed to the far left), in `text-sm text-muted-foreground` with a 6px dot `bg-warning`. Render its live region (`role="status"`) always and change only its content. It disappears after a successful save. Permission matrices and settings sections use the same indicator.
 - **Navigation guard** has two parts, both required:
   1. `beforeunload` for reload, tab close and address-bar navigation. The browser shows its own text; set `e.preventDefault(); e.returnValue = ''` only while dirty and remove the listener when clean.
   2. An in-app guard for router links, breadcrumbs and the sidebar. React Router: `useBlocker(isDirty)`. Next.js App Router has no blocker; intercept clicks on your `Link` wrapper and on `popstate` `[inferred]`.
@@ -85,7 +85,7 @@ RED: Save was disabled until the form was valid in the reviewed forms (F4). User
 
 For invoices, orders, quotes. It is a table, so `tables.md` rules apply (single-line rows, aligned numbers); this section adds the editing behaviour.
 
-- Columns: Item (lookup) · Description · Qty · Unit price (VND) · Tax rate · Amount (VND) · remove button. Qty, price, tax and amount are numeric: `text-right tabular-nums` on both header and input [F11].
+- Columns: Item (lookup) · Description · Qty · Unit price (VND) · Tax rate · Amount (VND) · remove button. Qty, price, tax and amount are numeric: `text-right tabular-nums` on both header and input.
 - Row: inputs at 32px inside 40px rows. The Amount cell is computed text, not an input.
 - **Add row:** a ghost button "Add line" under the table. It appends a row and focuses its first input. Tab from the last cell of the last row also adds a row `[inferred]`.
 - **Remove row:** an icon button, 24×24px minimum, `aria-label="Remove line 3"`. Removing the only row clears it instead. Removing a filled row shows an Undo toast rather than a confirm dialog.

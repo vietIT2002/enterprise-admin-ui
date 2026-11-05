@@ -145,7 +145,7 @@ Use these values when the project has no design system; `assets/tokens.css` impl
 
 | Seen in AI-built admin screens | Build instead |
 |---|---|
-| ALL-CAPS tracked labels and table headers (`uppercase tracking-wide`) | Sentence case, normal tracking, sizes from the Font row |
+| ALL-CAPS tracked labels and table headers (`uppercase tracking-wide`) | Sentence case, normal tracking, sizes from Font above |
 | Dark navy sidebar with an indigo accent | Light neutral sidebar; accent only on primary actions and selection |
 | A different colour for every status | The five-tone status vocabulary |
 

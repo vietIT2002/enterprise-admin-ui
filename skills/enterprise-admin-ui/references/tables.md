@@ -21,10 +21,10 @@ Read this when you build any data table: a list page, a related list on a detail
 
 - Default rows are single-line at 40px (`--row-height`) with 14px text. Compact mode is 32px with the same 14px text (`--row-height-compact`). Offer the toggle on large lists and remember the choice per user. Carbon defaults to 40px; Fiori compact is 32px [Carbon, Fiori].
 - The header row, toolbar, bulk bar and pagination use the same height as the rows, so the table reads as one block [Carbon].
-- Put secondary data (email, phone, item count, created by) in its own column, or leave it for the detail page. RED showed 100% of generated order lists stacking two lines in the first column and a 61px median row height (F5).
+- Put secondary data (email, phone, item count, created by) in its own column, or leave it for the detail page. Without this skill, agents showed 100% of generated order lists stacking two lines in the first column and a 61px median row height.
 - Every row is one line. In Tailwind: `h-10` or `py-2.5` on text cells; `py-1` on cells that hold a 32px input or button (a `py-2` or `py-3` cell around a 32px control makes a 52px+ row). A SKU, description or tax code gets its own column or lives on the detail page, never a second line under the name.
 - Do: a `Customer` column with the name, plus `Phone` and `City` columns. Don't: name, phone, email and city stacked inside one cell.
-- Avatars only for people (employees, users, contacts). Companies, orders and products show a small logo or no image; initials in a circle for a company is a template tell (F8). A logo beside its visible name has `alt=""`; a logo shown alone has `alt` with the name.
+- Avatars only for people (employees, users, contacts). Companies, orders and products show a small logo or no image; initials in a circle for a company is a template tell. A logo beside its visible name has `alt=""`; a logo shown alone has `alt` with the name.
 - Rows always have a hover background (`hover:bg-muted`). A selected row also has a checked checkbox, so colour is never the only signal [Atlassian].
 
 ## Alignment and numbers
@@ -35,7 +35,7 @@ Read this when you build any data table: a list page, a related list on a detail
 - Units go in the header, not in each cell: "Amount (VND)", "Weight (kg)". Keep the same decimals within a column [Polaris].
 - Format through `@/lib/format` (`data-formatting.md`) with the `locale` prop: `formatNumber(1250000, locale)` gives `1.250.000` and `formatMoney(1250000, 'VND', locale)` gives `1.250.000 ₫`. In a single-currency column whose header names the currency, `formatAmount(value, currency, locale)` prints the currency's decimals without the symbol: `1.250.000` for VND, `54,20` for USD. Do not hand-build separators [Polaris, Fiori].
 - Negative numbers put the minus first, as `Intl` prints it (hyphen-minus: `-4,20`). An empty value shows `—`, the same mark everywhere.
-- This applies to every table. RED found right-aligned numbers in lists but unaligned ones in detail-page tables and invoice line items (F11). Line items, related lists, permission counts and summary tables follow the same rule.
+- This applies to every table. Without this skill, agents produced right-aligned numbers in lists but unaligned ones in detail-page tables and invoice line items. Line items, related lists, permission counts and summary tables follow the same rule.
 - Do: `<TableHead className="text-right">Total (VND)</TableHead>` over `<TableCell className="text-right tabular-nums">`. Don't: right-aligned cells under a left-aligned header.
 
 ## Columns
@@ -45,7 +45,7 @@ Read this when you build any data table: a list page, a related list on a detail
 3. Show 6–8 columns by default at 1440px. Extra columns go behind a "Columns" menu.
 4. The "Columns" menu is a popover with a checkbox per column plus Move up / Move down buttons. Drag is never the only way to reorder [WCAG 2.5.7]. When columns are hidden, the trigger reads "Columns (2 hidden)" [NN/g].
 5. When the table is wider or taller than the viewport, freeze the header row (`sticky top-0 bg-card`) and the first column (`sticky left-0 bg-card`). The table container scrolls sideways (`overflow-x-auto`), not the page [NN/g, WCAG 1.4.10].
-6. Header labels are sentence case with normal letter spacing, 12–14px medium. No `uppercase tracking-wide` (F6).
+6. Header labels are sentence case with normal letter spacing, 12–14px medium. No `uppercase tracking-wide`.
 
 ## Sorting
 
@@ -63,7 +63,7 @@ Read this when you build any data table: a list page, a related list on a detail
 - Selecting a row opens a bulk bar in place of the toolbar, at the same height. Left to right: the count "3 selected" in `tabular-nums` · "Select all 1.284 matching" when offered · the `actions` slot (at most 3 buttons, the rest under "More") · Cancel at the far right [Carbon].
 - Cancel clears the selection and moves focus to the header checkbox (keep a ref to it), because the bar and its Cancel button unmount `[inferred]`.
 - The count is announced by a visually hidden `role="status"` element outside the bar, rendered with the list before anything is selected; the bar's own count is plain text [WCAG 4.1.3].
-- When results span several pages and the whole page is selected, the bar adds a link button "Select all 1.284 matching". After the click it reads "All 1.284 matching selected" with "Clear selection". RED: 0 of 2 reviewed lists offered this (F2) [NN/g].
+- When results span several pages and the whole page is selected, the bar adds a link button "Select all 1.284 matching". After the click it reads "All 1.284 matching selected" with "Clear selection". Without this skill, agents failed here: 0 of 2 reviewed lists offered this [NN/g].
 - **Reset rule**, the same in `bulk-import-export.md` and `react-shadcn.md`:
   - any change of page, page size, sort, filter or search clears the whole selection;
   - unticking a row ends "all matching" and keeps the other selected rows;
@@ -95,7 +95,7 @@ Read this when you build any data table: a list page, a related list on a detail
 
 ## Table states
 
-Keep the table header visible in every state and put the message in the body, spanning all columns. Ant does it this way; Carbon replaces the whole table, which loses the column context [Ant, Carbon]. RED: states were missing on 4 of 8 briefs (F3).
+Keep the table header visible in every state and put the message in the body, spanning all columns. Ant does it this way; Carbon replaces the whole table, which loses the column context [Ant, Carbon]. Without this skill, agents failed here: states were missing on 4 of 8 briefs.
 
 | State | Body shows |
 |---|---|
@@ -131,7 +131,7 @@ Keep the table header visible in every state and put the message in the body, sp
 
 ## Status column
 
-- Use a pill badge with text, from the five-tone vocabulary only: neutral, info, success, warning, danger. Never add a sixth colour (F13).
+- Use a pill badge with text, from the five-tone vocabulary only: neutral, info, success, warning, danger. Never add a sixth colour.
 - Classes: neutral `bg-neutral-subtle text-neutral-subtle-foreground`; info `bg-info-subtle text-info-subtle-foreground`; success `bg-success-subtle text-success-subtle-foreground`; warning `bg-warning-subtle text-warning-subtle-foreground`; danger `bg-danger-subtle text-danger-subtle-foreground`. All pass 4.5:1.
 - Shape: `inline-flex h-6 items-center rounded-full px-2 text-xs leading-5 font-medium` (`leading-5` keeps Vietnamese marks inside the fixed height). Sentence case, text always present, optionally a 16px icon so colour is never the only signal [Carbon, Atlassian].
 - Map each entity's statuses to tones once, in DESIGN.md (Pending → info, Paid → success, Overdue → danger), and render them from one `StatusBadge` component. Do not choose colours per page.

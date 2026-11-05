@@ -1,6 +1,6 @@
 name: Rule proposal
 description: Propose a new rule or a change to an existing one
-labels: [rule-proposal]
+labels: [enhancement]
 body:
   - type: textarea
     id: problem

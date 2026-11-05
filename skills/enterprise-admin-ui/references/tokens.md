@@ -26,11 +26,11 @@ One file, three parts. The variable names follow shadcn/ui, so the file can repl
 | Status, solid | `--success`, `--warning`, `--info` (+ `-foreground`), `--destructive` | Backgrounds with white text: buttons, solid badges, progress fills |
 | Status, subtle | `--neutral-subtle`, `--info-subtle`, `--success-subtle`, `--warning-subtle`, `--danger-subtle`, each with `-foreground` | Badges and inline messages: tinted background plus readable text |
 | Charts | `--chart-1` to `--chart-5` | `--chart-1` focus colour, `--chart-5` grey for context |
-| Sidebar | `--sidebar`, `--sidebar-foreground`, `--sidebar-primary`, `--sidebar-accent`, `--sidebar-border`, `--sidebar-ring` | Light neutral sidebar (slate-50) with a subtle active background (F7) |
+| Sidebar | `--sidebar`, `--sidebar-foreground`, `--sidebar-primary`, `--sidebar-accent`, `--sidebar-border`, `--sidebar-ring` | Light neutral sidebar (slate-50) with a subtle active background |
 
 The `:root` block is the light theme; the `.dark` block redefines the same names for the dark theme. An `@theme inline` block at the end maps the variables to Tailwind v4 colour utilities (`bg-card`, `text-muted-foreground`, `bg-success-subtle` …) and sets the radius scale.
 
-Cards are border-only: `border border-border bg-card`, no `shadow-*` (F12). Shadows belong to menus, popovers, dialogs and toasts.
+Cards are border-only: `border border-border bg-card`, no `shadow-*`. Shadows belong to menus, popovers, dialogs and toasts.
 
 ## Using it
 
@@ -74,13 +74,13 @@ Things to know:
 
 1. Pick the new colour in `DESIGN.md` (`colors.primary`), checking white text on it reaches 4.5:1.
 2. In `tokens.css` update `--primary`, `--ring` and `--sidebar-primary` together in `:root`, and their lighter dark-theme values in `.dark` (`--primary`, `--ring`, `--sidebar-primary`, plus `--accent` and `--accent-foreground` if the tint changes). `--info` and `--chart-1` follow the accent when the product uses blue for "info".
-3. Run `npm run validate`. It computes the contrast of the token pairs in `tokens.css` and reports any pair below its minimum. Keep DESIGN.md in step by hand.
+3. Re-check every changed pair with the formula under [Contrast rules](#contrast-rules): 4.5:1 for text, 3:1 for boundaries and focus. Keep DESIGN.md in step by hand.
 
-A different accent changes buttons, links, focus and selection. The sidebar stays light and neutral; a coloured sidebar surface comes back as the navy-and-indigo template look (F7).
+A different accent changes buttons, links, focus and selection. The sidebar stays light and neutral; a coloured sidebar surface comes back as the navy-and-indigo template look.
 
 ## Contrast rules
 
-RED (F1): in 68% of generated pages muted text fell below 4.5:1 (slate-400 on white, slate-500 on tinted or dark surfaces).
+Baseline without this skill: in 68% of generated pages muted text fell below 4.5:1 (slate-400 on white, slate-500 on tinted or dark surfaces).
 
 - **Muted text.** Light theme `--muted-foreground` is `#475569` (slate-600): 7.6:1 on white and `--card`, 7.2:1 on `--muted`, 6.9:1 on `--secondary` [WCAG ratios computed with the formula below; inferred]. Slate-500 is acceptable only on white or slate-50; slate-400 and lighter never carry text. Dark theme `#a5b4c8` gives 8.5:1 on `--background` and 6.9:1 on `--muted` [inferred].
 - **Solid status colours are backgrounds.** `--success`, `--warning`, `--info` and `--destructive` are tuned for a solid fill with white (foreground) text. As text or icons on the dark page background they reach only about 3.6:1, below 4.5:1. For status text or icons on page surfaces use the `-subtle-foreground` tokens on their `-subtle` backgrounds: `bg-success-subtle text-success-subtle-foreground` (6.8:1 in light, 12.3:1 in dark) [inferred].
@@ -89,7 +89,7 @@ RED (F1): in 68% of generated pages muted text fell below 4.5:1 (slate-400 on wh
 - **Focus ring.** `--ring` equals the accent; keep a 2px ring visible on every focusable element.
 - **Re-check on tinted surfaces.** Muted text on `--accent`, on `-subtle` backgrounds, in dark mode and on hover rows needs its own 4.5:1 check.
 
-How to check: run `npm run validate` (it checks the text and boundary pairs of `tokens.css` against 4.5:1 and 3:1), or use the WCAG formula. Relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` with each channel `c/255` linearised (`c ≤ 0.03928 ? c/12.92 : ((c+0.055)/1.055)^2.4`); the ratio is `(L1 + 0.05) / (L2 + 0.05)` with the lighter colour first. The WebAIM contrast checker applies the same formula.
+How to check: use the WCAG formula. Relative luminance `L = 0.2126 R + 0.7152 G + 0.0722 B` with each channel `c/255` linearised (`c ≤ 0.03928 ? c/12.92 : ((c+0.055)/1.055)^2.4`); the ratio is `(L1 + 0.05) / (L2 + 0.05)` with the lighter colour first. The WebAIM contrast checker applies the same formula.
 
 ## Mapping to existing design systems
 

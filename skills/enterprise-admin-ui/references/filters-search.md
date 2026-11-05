@@ -14,7 +14,7 @@ Read this when you build the area above a table: search, filters, applied chips,
 
 ## Filter bar anatomy
 
-RED: every generated list lacked at least one of chips, Clear all, or a no-results state, and most put a row of KPI cards above the table (F2). Build the area above the table in this order:
+Baseline without this skill: every generated list lacked at least one of chips, Clear all, or a no-results state, and most put a row of KPI cards above the table. Build the area above the table in this order:
 
 1. Status tabs or saved views with counts (see below).
 2. Filter row, left to right:
@@ -55,7 +55,7 @@ Systems disagree: Fiori updates live, NN/g batches behind Apply when results tak
 - "Clear all" is a text button after the last chip, and resets filters and the search term to the defaults of the current view, and keeps sort, view and page size. Show the search term as a chip too ("Search: minh phat") and let Clear all remove it, so the user sees everything applied.
 - With many chips, show the first five then "+3 more", which expands the row [Fiori].
 - Removing a chip or Clear all keeps focus inside the chip row (move it to the next chip, or to the filter row when none are left).
-- Do: chips with remove and Clear all. Don't: filters that change the table but leave no visible trace (F2).
+- Do: chips with remove and Clear all. Don't: filters that change the table but leave no visible trace.
 
 ## Saved views and status tabs
 
@@ -87,12 +87,12 @@ Keep filters, search, sort, page, page size and view in the query string, so Bac
 - A change of page, page size, sort, filter or search also clears the row selection (`bulk-import-export.md`).
 - Use `router.replace` for typing and quick filters (no history entry per keystroke); use `router.push` for page changes and tab switches so Back works.
 - Dates use ISO (`from=2026-11-01&to=2026-11-04`), never the display format.
-- Dashboard drill-down links use the same parameters: "7 late shipments" links to `/shipments?status=late` and the list opens with the chip shown (F10).
+- Dashboard drill-down links use the same parameters: "7 late shipments" links to `/shipments?status=late` and the list opens with the chip shown.
 - Validate params on read: unknown status values are ignored, not rendered; a non-numeric `page` falls back to 1.
 
 ## No-results state
 
-RED: no list had a distinct no-results state (F2, F3).
+Baseline without this skill: no list had a distinct no-results state.
 
 - First use means the entity has no records at all: "No orders yet" and the primary action `Create order`. No filters are applied, so there is no Clear filters button.
 - No results means records exist but the filters hide them: "No orders match these filters" (or the search term) and a `Clear filters` button. A hint line lists what to try: "Check the spelling or widen the date range."

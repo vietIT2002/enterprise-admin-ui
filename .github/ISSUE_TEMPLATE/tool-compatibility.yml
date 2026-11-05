@@ -1,6 +1,6 @@
 name: Tool compatibility
 description: The skill does not install, load or trigger in an agent or editor
-labels: [compatibility]
+labels: [bug]
 body:
   - type: input
     id: tool

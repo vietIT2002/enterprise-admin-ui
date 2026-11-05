@@ -1,6 +1,6 @@
 name: Audit false positive or wrong rule
 description: audit.js flags something that is correct, or a rule gives bad advice
-labels: [false-positive]
+labels: [bug]
 body:
   - type: input
     id: rule

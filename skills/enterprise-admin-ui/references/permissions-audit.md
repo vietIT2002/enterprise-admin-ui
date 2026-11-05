@@ -16,7 +16,7 @@ Read this when a screen depends on the user's role, has an approval flow, shows 
 
 ## Hide, disable or explain
 
-RED: permission screens passed 36% of the checklist, and approver-only actions with a reason passed 1 of 2 reviews. Pick one of three treatments per control.
+Baseline without this skill: permission screens passed 36% of the checklist, and approver-only actions with a reason passed 1 of 2 reviews. Pick one of three treatments per control.
 
 | Situation | Treatment | Example |
 |---|---|---|
@@ -34,7 +34,7 @@ RED: permission screens passed 36% of the checklist, and approver-only actions w
 
 - The current approver sees `Approve` (primary) and `Reject` (`variant="outline"`, with `text-destructive` for Reject), next to each other at the top of the record or in its sticky action bar.
 - `Reject` opens an `AlertDialog` with a required reason field (min 1 character; show the counter only for long limits). The dialog title names the record: "Reject purchase request PR-2041?". `AlertDialogCancel` (`Cancel`) comes first and Radix focuses it on open; `AlertDialogAction` (`Reject request`) comes last with `className={buttonVariants({ variant: 'destructive' })}`. The action's `onClick` calls `e.preventDefault()` first, so an empty reason keeps the dialog open with its message under the field, and a valid one keeps it open until the request succeeds.
-- Everyone else sees, in the same place, one line of text: "Waiting for Trần Minh Quân (Finance manager)". Name the person and the role; when a group can approve, name the group and list up to 3 members: "Waiting for any of Finance managers (3)" [RED: 04, 06].
+- Everyone else sees, in the same place, one line of text: "Waiting for Trần Minh Quân (Finance manager)". Name the person and the role; when a group can approve, name the group and list up to 3 members: "Waiting for any of Finance managers (3)".
 - The requester sees `Withdraw request` while the status is Submitted or In approval, plus the line above.
 - After a decision the action area is replaced by the outcome: "Approved by Trần Minh Quân on 04/11/2026 15:58" or "Rejected by … — Reason: …".
 - An approver cannot approve their own request when the policy says so; show "You requested this, so another approver must decide" `[inferred]`.
@@ -48,7 +48,7 @@ RED: permission screens passed 36% of the checklist, and approver-only actions w
 
 ## Roles and permission matrix
 
-RED: the matrix brief had no explicit save with a dirty indicator (0/2), delete without the affected users (0/2) and matrix accessible names at 1/2 (F4, F9).
+Baseline without this skill: the matrix brief had no explicit save with a dirty indicator (0/2), delete without the affected users (0/2) and matrix accessible names at 1/2.
 
 **Structure.** A role page has a header (role name, description, user count "12 users"), the matrix, and a sticky bar.
 
@@ -66,7 +66,7 @@ RED: the matrix brief had no explicit save with a dirty indicator (0/2), delete 
 
 ## Audit trail
 
-RED: "last changed by / audit history" failed 0 of 2 (F9). The digest found no system that specifies audit UI, so everything here is `[inferred]` from the checklist and common practice.
+Baseline without this skill: "last changed by / audit history" failed 0 of 2. The digest found no system that specifies audit UI, so everything here is `[inferred]` from the checklist and common practice.
 
 1. **Stamp on every record, role and settings page**, directly under the title or at the foot of the form: "Last changed by Lê Hoa on 04/11/2026 15:58". The user name is a link to the user; the stamp links to the History tab or page.
 2. **Absolute timestamps** in audit surfaces, format `dd/MM/yyyy HH:mm` for the project locale via `formatDateTime` from `@/lib/format` (`data-formatting.md`), in the user's time zone. Relative time ("2 hours ago") may follow the absolute value in `text-muted-foreground`, never replace it [Ant, Primer; `[inferred]` for audit].
@@ -88,7 +88,7 @@ RED: "last changed by / audit history" failed 0 of 2 (F9). The digest found no s
 
 ## Approval workflows
 
-RED: approval step details and Approve/Reject-with-reason passed 2 of 2; attachments with type, size, preview and download failed (0/2).
+Baseline without this skill: approval step details and Approve/Reject-with-reason passed 2 of 2; attachments with type, size, preview and download failed (0/2).
 
 1. **Steps** form a vertical list on the record page (a timeline), one block per step. Each shows: step name and approver (name + role), the decision (Approved, Rejected, Waiting, Skipped) as a status badge, the timestamp `dd/MM/yyyy HH:mm` once decided, and the comment. A rejected step always shows the reason.
 2. **Current step** is marked with the info tone and the text "Current step"; future steps are neutral ("Not started"). Parallel approvers within a step each have their own line.
@@ -119,7 +119,7 @@ RED: approval step details and Approve/Reject-with-reason passed 2 of 2; attachm
 
 ## Status vocabulary
 
-RED: rainbow status palettes appeared in 4 of 16 reviews and a shared status vocabulary passed 1 of 2 (F13). Fix one vocabulary for the whole app and write it in DESIGN.md.
+Baseline without this skill: rainbow status palettes appeared in 4 of 16 reviews and a shared status vocabulary passed 1 of 2. Fix one vocabulary for the whole app and write it in DESIGN.md.
 
 **Five tones.** Every status maps to one:
 

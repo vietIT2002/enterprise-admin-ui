@@ -40,7 +40,7 @@ Rules:
 - 4–6 tiles per dashboard; more turns the top of the page into noise [inferred].
 - Tiles carry no decorative icons or coloured icon squares; the label already says what the number is.
 - A tile with a drill-down is one link to the filtered list, and the whole tile is the target (80px or more high, far above the 24px minimum).
-- Cards use a 1px border and no shadow: `border border-border bg-card` (F12).
+- Cards use a 1px border and no shadow: `border border-border bg-card`.
 
 ## Choosing a chart
 
@@ -54,7 +54,7 @@ Rules:
 
 Sorted bars, lines and bullet charts come from [NN/g].
 
-RED (F10): the generated dashboards used a pie and a donut and left axes unlabeled. Build this instead:
+Baseline without this skill: the generated dashboards used a pie and a donut and left axes unlabeled. Build this instead:
 - Use no pie, donut, gauge, 3D or treemap [NN/g]. The part-to-whole a donut would show becomes one stacked bar with direct labels.
 - Every axis has a label and a unit ("Orders per day", "Revenue (VND millions)"). Prefer direct labels at the end of a line or bar over a legend [inferred].
 - One hue plus grey: draw the series that matters in `--chart-1` and the rest in `--chart-5`. Status colours (`--success`, `--warning`, `--destructive`) mark status only; semantic colours are never decorative [Fluent].
@@ -66,7 +66,7 @@ RED (F10): the generated dashboards used a pie and a donut and left axes unlabel
 
 ## Needs attention list
 
-RED (F10): items such as "7 late shipments" were plain text that linked nowhere.
+Baseline without this skill: items such as "7 late shipments" were plain text that linked nowhere.
 
 - Each item is a row with a count, a plain-language label and a link to the pre-filtered list: "7 late shipments" → `/shipments?status=late`. The count in the row equals the row total on the target page.
 - Order by urgency, then count. Show at most 5 and add "View all" beyond that [inferred].
@@ -76,7 +76,7 @@ RED (F10): items such as "7 late shipments" were plain text that linked nowhere.
 
 ## Widget states
 
-RED (F3): the generated dashboards had no loading, empty or error state per widget. Each widget handles all of them on its own, so one failing query does not blank the page.
+Baseline without this skill: the generated dashboards had no loading, empty or error state per widget. Each widget handles all of them on its own, so one failing query does not blank the page.
 
 | State | Show |
 |---|---|

@@ -16,7 +16,7 @@ Read this when you build the app shell (sidebar, header), a page header, breadcr
 
 ## App shell
 
-RED: 8 of 16 reviews showed a dark navy sidebar with an indigo accent (F7). Build the shell in neutral surfaces instead; the single accent colour stays for primary actions, links, focus and selection.
+Baseline without this skill: 8 of 16 reviews showed a dark navy sidebar with an indigo accent. Build the shell in neutral surfaces instead; the single accent colour stays for primary actions, links, focus and selection.
 
 | Part | Value |
 |---|---|
@@ -33,7 +33,7 @@ RED: 8 of 16 reviews showed a dark navy sidebar with an indigo accent (F7). Buil
 - **Order:** by frequency of use, then by workflow. Group names are nouns; item names are the plural objects ("Orders", "Customers"). Do not nest an item under a group of the same name.
 - **Side navigation** suits multi-level, operation-heavy apps; top navigation fits only 2–7 short first-level items [Ant, Carbon]. ERP/CRM/HRM apps use the sidebar.
 - **Header content:** left: collapse button and, on small screens, the logo; right: global search or the palette trigger, help, notifications, user menu [Carbon header utilities]. The header carries no page title; the page header does.
-- **Do / don't (RED F7).**
+- **Do / don't.**
   - Do: `bg-sidebar` with `bg-sidebar-accent` active rows; the primary button is the only large block of accent colour on the page.
   - Don't: a navy or black sidebar with indigo active pills, or a gradient logo block. Selection and primary actions are the accent's job.
 - **Dark mode** is a token switch (`.dark` sets the sidebar tokens); build the layout with tokens only and it follows.
@@ -57,7 +57,7 @@ Order, top to bottom [Polaris, Atlassian, Primer]:
 
 ## Breadcrumbs
 
-RED: the record name was missing from breadcrumbs (F8).
+Baseline without this skill: the record name was missing from breadcrumbs.
 
 - Show them whenever a page has a parent. Each crumb is the title of the page it links to [Polaris, Ant].
 - **The trail ends with the record's name:** "Customers / Công ty Minh Phát", "Sales / Orders / DH-1043". The last crumb is the current page: plain text with `aria-current="page"`, not a link.
@@ -70,7 +70,7 @@ RED: the record name was missing from breadcrumbs (F8).
 
 ## Record pages
 
-RED: secondary actions outside an overflow menu, initials avatars for companies, and empty sections without a next step (F8).
+Baseline without this skill: secondary actions outside an overflow menu, initials avatars for companies, and empty sections without a next step.
 
 1. **Record header** (below the breadcrumb): composition as in SKILL.md; up to 4 key fields as label/value pairs in one row [SLDS]. The overflow menu (⋯) is named after the record: "More actions for Công ty Minh Phát".
 2. **Image rule:** see SKILL.md (avatars for people only).
@@ -84,7 +84,7 @@ RED: secondary actions outside an overflow menu, initials avatars for companies,
 
 ## Settings navigation
 
-RED: grouped left navigation was missing on settings pages (RED section 3, 08 settings 0/2).
+Baseline without this skill: grouped left navigation was missing on settings pages.
 
 - **Layout:** two columns under the app header: left navigation 240px, content at most 720px wide `[inferred]`. The left navigation groups the sections under short labels: General · Localization · Notifications · Users & roles · Billing · Integrations · Danger zone.
 - **Each section is one page with one form** and its own Save button (see `forms.md`). Sections are separate URLs (`/settings/localization`), so links and Back work. A section may instead hold a set of toggles that apply instantly, each showing "Saved" beside it in a persistent `role="status"` region; one save model per section, never both [Primer].

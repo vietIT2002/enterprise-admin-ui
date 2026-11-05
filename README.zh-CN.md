@@ -4,9 +4,9 @@
 
 **为登录后的应用提供企业级界面。** 这个 Agent Skill 教 AI 编程 Agent（Claude Code、Codex、Cursor、Antigravity、Copilot 等）像成熟的商业软件那样构建管理系统界面：信息密集且易读的表格；完整的各类状态；不会丢失已填内容的保存机制；也没有那种“AI 模板”味。
 
-![同一模型、同一提示词生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
+![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.1](https://img.shields.io/badge/version-0.5.1-blue)
 
 ## 安装
 
@@ -14,47 +14,48 @@
 npx skills add vietIT2002/enterprise-admin-ui
 ```
 
-`skills` CLI 会检测你机器上已安装的 Agent，并把技能复制到对应的目录。
-在 Windows 上请加上 `--copy`，让 CLI 复制文件而不是创建符号链接。
-
+`skills` CLI 会检测你机器上已安装的 Agent，并把技能安装到对应的目录。在 Windows 上请加上 `--copy`，让它复制文件而不是创建符号链接。
 
 <details>
 <summary><b>手动安装（适用于任何 Agent）</b></summary>
 
-把 `skills/enterprise-admin-ui` 文件夹复制到项目级或用户级的 skills 目录中。请直接复制，不要使用符号链接，因为符号链接在 Windows 上会失效。
+把 `skills/enterprise-admin-ui` 文件夹复制到项目目录或你的用户目录中。请直接复制，不要使用符号链接，因为符号链接在 Windows 上不可靠。
 
-| Agent | 项目目录 |
-|---|---|
-| Claude Code | `.claude/skills/enterprise-admin-ui` |
-| Codex、Cursor、Antigravity、OpenCode、Amp、Cline | `.agents/skills/enterprise-admin-ui` |
-| GitHub Copilot | `.github/skills/enterprise-admin-ui`（也会读取 `.agents/skills`） |
-| Kiro | `.kiro/skills/enterprise-admin-ui` |
+| Agent | 项目目录 | 用户目录 |
+|---|---|---|
+| Claude Code | `.claude/skills/` | `~/.claude/skills/` |
+| Codex | `.agents/skills/` | `~/.agents/skills/` |
+| Cursor | `.agents/skills/` 或 `.cursor/skills/` | `~/.agents/skills/` 或 `~/.cursor/skills/` |
+| GitHub Copilot | `.github/skills/` 或 `.agents/skills/` | `~/.copilot/skills/` |
+| Antigravity | `.agents/skills/` | `~/.gemini/config/skills/` |
+| Kiro | `.kiro/skills/` | `~/.kiro/skills/` |
 
 </details>
 
 <details>
-<summary><b>通过插件市场安装（Claude Code、Antigravity、GitHub CLI、Kiro）</b></summary>
+<summary><b>插件及其他安装方式</b></summary>
 
-Claude Code：
+Claude Code 插件市场：
 
 ```text
 /plugin marketplace add vietIT2002/enterprise-admin-ui
 /plugin install enterprise-admin-ui@enterprise-admin-ui
 ```
 
-Antigravity：
-
-```bash
-agy plugin install https://github.com/vietIT2002/enterprise-admin-ui
-```
-
-GitHub CLI 2.90 及以上（`gh skill` 目前为公开预览版）：
+GitHub CLI 2.90 及以上（`gh skill` 目前为公开预览版）。默认安装给 GitHub Copilot；如需安装给其他 Agent，可加上 `--agent claude-code`、`--agent cursor` 等参数：
 
 ```bash
 gh skill install vietIT2002/enterprise-admin-ui enterprise-admin-ui
 ```
 
-Kiro：在 GitHub 导入时填写技能文件夹的 URL `https://github.com/vietIT2002/enterprise-admin-ui/tree/main/skills/enterprise-admin-ui`。
+Kiro：从 GitHub 导入，填写技能文件夹的 URL `https://github.com/vietIT2002/enterprise-admin-ui/tree/main/skills/enterprise-admin-ui`。
+
+以下方式尚未做过端到端测试（manifest 文件遵循已公布的格式）：
+
+```bash
+agy plugin install https://github.com/vietIT2002/enterprise-admin-ui
+codex plugin marketplace add vietIT2002/enterprise-admin-ui
+```
 
 </details>
 
@@ -66,12 +67,12 @@ Kiro：在 GitHub 导入时填写技能文件夹的 URL `https://github.com/viet
 | 文件 | 粘贴到 |
 |---|---|
 | [`adapters/AGENTS.snippet.md`](adapters/AGENTS.snippet.md) | `AGENTS.md` 或 `CLAUDE.md` |
-| [`adapters/cursor/enterprise-admin-ui.mdc`](adapters/cursor/enterprise-admin-ui.mdc) | `.cursor/rules/` |
+| [`adapters/cursor/enterprise-admin-ui.mdc`](adapters/cursor/enterprise-admin-ui.mdc) | `.cursor/rules/`（该文件使用 `alwaysApply: true`） |
 | [`adapters/copilot-instructions.snippet.md`](adapters/copilot-instructions.snippet.md) | `.github/copilot-instructions.md` |
 
 </details>
 
-使用时，直接让 Agent 做一个管理界面即可（例如“为我们的 ERP 做一个订单页面”）。也可以按名称调用技能：在 Claude Code 中用 `/enterprise-admin-ui`，在 Codex 中用 `$enterprise-admin-ui`。
+使用时，直接让 Agent 做一个管理界面即可（例如“为我们的 ERP 做一个订单页面”），也可以让 Agent 使用 enterprise-admin-ui 技能。在 Claude Code 中还可以输入 `/enterprise-admin-ui`；如果是以插件方式安装的，则输入 `/enterprise-admin-ui:enterprise-admin-ui`。
 
 ## 适用范围
 
@@ -123,21 +124,29 @@ skills/enterprise-admin-ui/
 - 圆角；
 - 行高与多行堆叠的行；
 - 数字对齐与等宽数字；
+- 列表页中被挤到首屏以下的表格；
 - 控件名称与点击目标尺寸；
 - 文字对比度；
 - 渐变、毛玻璃效果和卡片阴影；
 - 全大写标签；
 - 用 emoji 充当图标；
 - 每个页头中的主操作数量；
-- 被 `flex` 类强制显示出来的隐藏元素。
+- 被 `flex` 或 `grid` 类强制显示出来的隐藏元素。
 
 ## 效果
 
-使用同一模型（Claude Sonnet 5.5）和同一组提示词（英文和越南语），分别在不使用和使用本技能的情况下构建相同的界面，再由自动化审计和验收清单对页面进行评判。
+**测量方法：**
+- **版本：** 于 2026-11-04 使用 v0.1.0（8 个参考文档）测量。v0.5.0 的改动在 3 个新页面（审计得分中位数 100，验收清单 22/22）和 9 个修复轮次的页面上做了复查，没有在完整测试集上重新测量。
+- **生成：** 同一模型（Claude Sonnet 5.5）根据同一组需求说明（英文和越南语）构建相同的界面，一次按常规方式生成，一次先要求它阅读 `SKILL.md`。输出为使用 Tailwind CDN 的单文件 HTML。
+- **评分：**
+  - 页面由本技能自带的审计（`scripts/audit.js`）和一份验收清单评分；
+  - 每个页面由一个评审 Agent 评判，评审时知道页面属于哪一组（非盲评）；
+  - 验收清单评审覆盖每份需求说明的第 1–2 次运行。
+- **数据：** 基准测试数据尚未公开。
 
 | | 不使用 | 使用本技能 |
 |---|---|---|
-| 审计得分中位数（各 40 个页面） | 82 | **100** |
+| 本技能自带审计的得分中位数（各 40 个页面） | 82 | **100** |
 | 存在低对比度文字的页面 | 68% | **0%** |
 | 使用全大写标签的页面 | 73% | **0%** |
 | 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | **72%** |
@@ -156,11 +165,14 @@ skills/enterprise-admin-ui/
 
 ## 与同类技能对比
 
+以下对比基于各技能截至 2026-11-04 的代码仓库。
+
 | 技能 | 侧重点 | 管理界面工作流 |
 |---|---|---|
-| `frontend-design`（Anthropic） | 独特的视觉风格，“审美冒险” | 不是它的目标 |
-| `ui-ux-pro-max` | 风格与产品类型目录 | 较少（仅有一行提到批量操作） |
-| `taste-skill` | 艺术指导、应用界面、一张“痕迹”表 | 部分覆盖 |
+| `anthropics/skills` · `frontend-design` | 独特的视觉风格，“审美冒险” | 不是它的目标 |
+| `nextlevelbuilder/ui-ux-pro-max` | 风格与产品类型目录 | 较少（仅有一行提到批量操作） |
+| `Leonxlnx/taste-skill` | 艺术指导、应用界面、一张“痕迹”表 | 部分覆盖 |
+| `pbakaus/impeccable` | 设计检测器（62 条规则），面向应用界面的“Operate”模式 | 部分覆盖（没有审计日志和分页） |
 | **enterprise-admin-ui** | 刻意朴素的业务界面 | 列表、筛选、批量操作、带明细行的表单、权限、审计记录、审批、导入、按区域设置格式化、所有状态 |
 
 这些技能可以配合使用：营销网站用侧重美感的技能，登录后的应用用本技能。
@@ -169,7 +181,7 @@ skills/enterprise-admin-ui/
 
 **它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
 
-**会消耗多少 token？** `SKILL.md` 共 193 行。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+**会消耗多少 token？** `SKILL.md` 共 193 行（约 15 KB，大约 4k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
 
 **支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
 - `1.250.000 ₫`；
@@ -177,7 +189,13 @@ skills/enterprise-admin-ui/
 - `Asia/Ho_Chi_Minh`；
 - 忽略变音符号的搜索。
 
-**如何更新？** 重新运行 `npx skills add vietIT2002/enterprise-admin-ui`，或者重新复制一次文件夹。详见 [CHANGELOG.md](CHANGELOG.md)。
+**如何更新？** 取决于你的安装方式：
+- `npx skills add`：重新运行一次。
+- `gh skill`：运行 `gh skill update`。
+- 插件：插件版本更新时随之更新。
+- 手动复制：重新复制一次文件夹。
+
+详见 [CHANGELOG.md](CHANGELOG.md)。
 
 **不用 React 也能用吗？** 可以。规则本身与技术栈无关，示例使用的是 React、Tailwind 和 shadcn/ui。使用 Tailwind CDN 的单文件 HTML 同样适用。
 

@@ -14,7 +14,7 @@ Read this when you design the empty, loading, error and progress states of a dat
 
 ## State matrix per data region
 
-A data region is anything that loads data on its own: a table, a related list on a detail page, a dashboard widget, a chart, an activity feed, a select with remote options. RED: states were missing on 4 of 8 briefs, and 0 of 2 reviewed dashboards had per-widget loading or empty states (F3). Design every row of this matrix for every region, and use the region's own entity in the copy.
+A data region is anything that loads data on its own: a table, a related list on a detail page, a dashboard widget, a chart, an activity feed, a select with remote options. Without this skill, agents failed here: states were missing on 4 of 8 briefs, and 0 of 2 reviewed dashboards had per-widget loading or empty states. Design every row of this matrix for every region, and use the region's own entity in the copy.
 
 | State | Cause | Show | Example copy |
 |---|---|---|---|
@@ -26,7 +26,7 @@ A data region is anything that loads data on its own: a table, a related list on
 | Degraded / offline | A dependency is down or the browser is offline | Keep navigation and cached data; one banner names the effect; hide figures you cannot compute instead of showing 0 [Primer] | "Showing data from 15:40. Live updates are paused." |
 | No permission | The role cannot see the region | Say why and who can grant access | "You don't have access to payroll. Ask an administrator for the HR role." |
 
-- First use and no results are different states with different words and actions. A table that shows "No data" for both fails the user in one of them [Carbon, Ant; RED F2].
+- First use and no results are different states with different words and actions. A table that shows "No data" for both fails the user in one of them [Carbon, Ant].
 - Keep the region's frame (table header, card title, tab) visible in every state, and put the message in the body so the user keeps the column context [Ant].
 - Empty states are 1 sentence, a primary action and at most one secondary link to documentation. No illustration larger than 64px; this is an app, not a marketing page.
 - Related lists on a detail page have their own empty state with the next step: "No contacts yet · Add contact".
@@ -60,7 +60,7 @@ A data region is anything that loads data on its own: a table, a related list on
 | Dialog | A decision the user must make now: confirm a destructive action, leave unsaved work | Information, success, errors that need no choice |
 
 - Toasts: success only, one at a time, auto-dismiss after 5 seconds (10 seconds when they carry an action such as Undo), placed top-right, dismissible with a button, pausing on hover and focus [Polaris, Carbon; Fiori limits toasts to short successes]. Durations vary by system (3–10 s) [Ant, Polaris]; use 5 s.
-- Critical messages never auto-dismiss [all systems]. An error toast that vanishes is the failure RED saw (persistent inline errors passed 1 of 2).
+- Critical messages never auto-dismiss [all systems]. An error toast that vanishes is the failure seen in agents without this skill (persistent inline errors passed 1 of 2).
 - Errors are inline and persistent: next to the field, in the failed row, or in the region's error state, until the user fixes the cause or retries.
 - One banner at a time, at the top of the content, above the table on a list, not sticky, with a close button only for informational ones [Carbon, Ant]. If several apply, show the most severe and link "2 more issues".
 - Banner anatomy: icon + one sentence of what happened + one action. Tone classes: info `bg-info-subtle text-info-subtle-foreground`, warning `bg-warning-subtle text-warning-subtle-foreground`, error `bg-danger-subtle text-danger-subtle-foreground`.
@@ -69,7 +69,7 @@ A data region is anything that loads data on its own: a table, a related list on
 
 ## Destructive confirmation
 
-RED: bulk deletes confirmed with a count (2/2), but deleting a role did not say who is affected (0/2) (F9).
+Baseline without this skill: bulk deletes confirmed with a count (2/2), but deleting a role did not say who is affected (0/2).
 
 1. Confirm only actions that are serious or hard to undo. Deleting a draft line item needs no dialog; deleting an invoice, role or customer does [NN/g, Carbon].
 2. **Name the object and the impact count** in the title or first sentence: "Delete role Sales staff? 12 users will lose these permissions." "Delete 3 invoices? 1 is already paid and can't be restored." If the impact is unknown to the client, fetch it before opening the dialog.
@@ -83,7 +83,7 @@ RED: bulk deletes confirmed with a count (2/2), but deleting a role did not say 
 
 ## Long jobs
 
-Imports, exports, bulk updates, recalculations and report generation can run for minutes. RED: 0 of 2 reviewed import pages had progress, background continuation or a result summary (F3).
+Imports, exports, bulk updates, recalculations and report generation can run for minutes. Without this skill, agents failed here: 0 of 2 reviewed import pages had progress, background continuation or a result summary.
 
 1. **Start:** the confirm button starts the job and the dialog or page turns into a progress view. The user is told what happens next: "Importing 1.200 rows. You can leave this page." A job started from a selection clears it (`bulk-import-export.md`).
 2. **Progress:** a determinate bar with counts that say what is being processed: "Importing 340 of 1.200" and the percent. Update at least every 2 seconds `[inferred]`. When the total is unknown, show indeterminate progress and the count so far ("340 rows processed") [NN/g, Primer].
@@ -93,7 +93,7 @@ Imports, exports, bulk updates, recalculations and report generation can run for
    - full success: a success toast with a link, "Import finished: 1.200 created · View results";
    - any failure: never a toast. A persistent notification, or a banner when the user is on the job's page, that stays until opened: "Import finished: 1.100 created · 50 updated · 50 failed · View results".
 6. **Result summary** is a page or panel, not only a toast: three counts **created / updated / failed** (and skipped when relevant), each as a labelled figure, e.g. "1.100 created · 50 updated · 50 failed". Failures are never folded into a success message.
-7. **Failed rows:** a table of the failed rows with the row number, the field and a plain reason ("Row 18: Email is not valid"), and a **Download failed rows** button that exports a CSV in the original template format plus an Error column, so the user can fix and re-import [RED F3].
+7. **Failed rows:** a table of the failed rows with the row number, the field and a plain reason ("Row 18: Email is not valid"), and a **Download failed rows** button that exports a CSV in the original template format plus an Error column, so the user can fix and re-import.
 8. A finished job keeps its summary for at least 30 days at a stable URL `[inferred]`.
 9. The page title and tab show the state ("Importing 34%…") so a user on another tab can see it `[inferred]`.
 
