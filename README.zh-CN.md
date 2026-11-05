@@ -143,7 +143,7 @@ skills/enterprise-admin-ui/
   - 页面由本技能自带的审计（`scripts/audit.js`）和一份验收清单评分；
   - 每个页面由一个评审 Agent 评判，评审时知道页面属于哪一组（非盲评）；
   - 验收清单评审覆盖每份需求说明的第 1–2 次运行。
-- **数据：** 基准测试数据尚未公开。
+- **数据：** 所有生成的页面、截图、审计与评审结果，以及题目、提示词和工具，均在 [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。
 
 | | 不使用 | 使用本技能 |
 |---|---|---|

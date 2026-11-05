@@ -143,7 +143,7 @@ skills/enterprise-admin-ui/
   - các trang được chấm bằng audit của chính skill (`scripts/audit.js`) và một checklist nghiệm thu;
   - mỗi trang do một agent review đánh giá, và agent này biết trang thuộc nhóm có hay không có skill (không chấm mù);
   - các lượt review checklist áp dụng cho lượt chạy 1–2 của mỗi đề bài.
-- **Dữ liệu:** dữ liệu benchmark chưa được công bố.
+- **Dữ liệu:** toàn bộ trang đã sinh, ảnh chụp, kết quả audit và review, cùng đề bài, prompt và công cụ, nằm ở [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
 
 | | Không có skill | Có skill |
 |---|---|---|

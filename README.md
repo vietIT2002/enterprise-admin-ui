@@ -143,7 +143,7 @@ skills/enterprise-admin-ui/
   - the pages were scored with the skill's own audit (`scripts/audit.js`) and an acceptance checklist;
   - one reviewer agent judged each page, not blind to the condition;
   - checklist reviews cover runs 1–2 of each brief.
-- **Data:** the benchmark data is not published yet.
+- **Data:** every generated page, screenshot, audit and review, plus the briefs, prompts and tools, is in [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
 
 | | Without | With the skill |
 |---|---|---|
