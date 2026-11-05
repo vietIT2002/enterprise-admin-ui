@@ -1,0 +1,26 @@
+name: Audit false positive or wrong rule
+description: audit.js flags something that is correct, or a rule gives bad advice
+labels: [false-positive]
+body:
+  - type: input
+    id: rule
+    attributes:
+      label: Rule name
+      description: For example numeric-align or text-contrast.
+    validations:
+      required: true
+  - type: textarea
+    id: audit
+    attributes:
+      label: Audit output
+      description: Paste the violation from the audit JSON (selector, actual, expected).
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is correct
+      description: Include the markup or a screenshot of the element.
+    validations:
+      required: true

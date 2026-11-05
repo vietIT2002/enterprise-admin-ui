@@ -1,0 +1,186 @@
+# enterprise-admin-ui
+
+[English](README.md) · **Tiếng Việt** · [简体中文](README.zh-CN.md)
+
+**UI chuẩn doanh nghiệp cho các ứng dụng nằm sau màn hình đăng nhập.** Agent Skill này dạy các AI coding agent (Claude Code, Codex, Cursor, Antigravity, Copilot và các agent khác) xây màn hình quản lý theo cách phần mềm doanh nghiệp lâu năm vẫn làm: bảng dày thông tin nhưng dễ đọc; đủ mọi trạng thái; lưu không bao giờ làm mất dữ liệu đang nhập; và không còn kiểu "template AI".
+
+![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một prompt, không có và có skill](docs/img/before-after-01-orders-list.png)
+
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Phiên bản 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)
+
+## Cài đặt
+
+```bash
+npx skills add vietIT2002/enterprise-admin-ui
+```
+
+CLI `skills` tự phát hiện các agent có trên máy và chép skill vào đúng thư mục.
+Trên Windows, thêm `--copy` để CLI chép file thay vì tạo symlink.
+
+
+<details>
+<summary><b>Cài thủ công (mọi agent)</b></summary>
+
+Chép thư mục `skills/enterprise-admin-ui` vào thư mục skills của dự án hoặc của người dùng. Hãy chép thay vì tạo symlink, vì symlink bị lỗi trên Windows.
+
+| Agent | Thư mục trong dự án |
+|---|---|
+| Claude Code | `.claude/skills/enterprise-admin-ui` |
+| Codex, Cursor, Antigravity, OpenCode, Amp, Cline | `.agents/skills/enterprise-admin-ui` |
+| GitHub Copilot | `.github/skills/enterprise-admin-ui` (cũng đọc `.agents/skills`) |
+| Kiro | `.kiro/skills/enterprise-admin-ui` |
+
+</details>
+
+<details>
+<summary><b>Cài qua plugin marketplace (Claude Code, Antigravity, GitHub CLI, Kiro)</b></summary>
+
+Claude Code:
+
+```text
+/plugin marketplace add vietIT2002/enterprise-admin-ui
+/plugin install enterprise-admin-ui@enterprise-admin-ui
+```
+
+Antigravity:
+
+```bash
+agy plugin install https://github.com/vietIT2002/enterprise-admin-ui
+```
+
+GitHub CLI 2.90 trở lên (`gh skill` đang ở bản public preview):
+
+```bash
+gh skill install vietIT2002/enterprise-admin-ui enterprise-admin-ui
+```
+
+Kiro: import từ GitHub bằng URL của thư mục skill `https://github.com/vietIT2002/enterprise-admin-ui/tree/main/skills/enterprise-admin-ui`.
+
+</details>
+
+<details>
+<summary><b>Quy tắc luôn bật (AGENTS.md, Cursor, Copilot)</b></summary>
+
+Skill chỉ được nạp khi agent thấy cần dùng. Để các quy tắc cốt lõi có mặt trong mọi phiên làm việc, dán một snippet đã tạo sẵn vào dự án:
+
+| File | Dán vào |
+|---|---|
+| [`adapters/AGENTS.snippet.md`](adapters/AGENTS.snippet.md) | `AGENTS.md` hoặc `CLAUDE.md` |
+| [`adapters/cursor/enterprise-admin-ui.mdc`](adapters/cursor/enterprise-admin-ui.mdc) | `.cursor/rules/` |
+| [`adapters/copilot-instructions.snippet.md`](adapters/copilot-instructions.snippet.md) | `.github/copilot-instructions.md` |
+
+</details>
+
+Để dùng, chỉ cần yêu cầu một màn hình quản lý ("làm trang đơn hàng cho ERP của chúng tôi"). Hoặc gọi skill theo tên: `/enterprise-admin-ui` trong Claude Code, `$enterprise-admin-ui` trong Codex.
+
+## Phạm vi
+
+Skill dành cho các màn hình nằm sau màn hình đăng nhập:
+- trang quản trị và công cụ back-office;
+- back-office ERP, CRM, HRM, kế toán, kho và POS;
+- công cụ nội bộ và màn hình ứng dụng B2B SaaS.
+
+Skill không dành cho landing page hay website marketing. Với những trang đó, hãy dùng một skill về thẩm mỹ như `frontend-design`.
+
+Nếu dự án đã có design system hoặc thư viện component tùy biến, skill giữ nguyên component và token của bạn, chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi.
+
+## Bên trong có gì
+
+```
+skills/enterprise-admin-ui/
+├─ SKILL.md            193 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
+├─ references/         13 file, chỉ nạp khi tác vụ cần
+├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 18 quy tắc, điểm 0–100
+└─ assets/
+   ├─ tokens.css           token tương thích shadcn, sáng và tối, Tailwind v4 @theme
+   └─ DESIGN.template.md   file ghi quyết định riêng của từng dự án (định dạng design.md của Google)
+```
+
+**Công thức trang:** danh sách, chi tiết bản ghi, form tạo/sửa, dashboard, cài đặt, wizard và nhập CSV, cùng với vai trò, phân quyền và phê duyệt. Mỗi công thức nêu màn hình gồm những gì, và theo thứ tự nào.
+
+**Tài liệu tham khảo:**
+
+| File | Nội dung |
+|---|---|
+| `tables.md` | mật độ, căn lề, sắp xếp, chọn hàng, phân trang, sửa trực tiếp trên bảng |
+| `filters-search.md` | thanh bộ lọc, chip, view đã lưu, tìm kiếm, trạng thái trên URL |
+| `forms.md` | bố cục, kiểm tra dữ liệu, cách lưu, dòng hàng, thay đổi chưa lưu |
+| `feedback-states.md` | trạng thái trống, đang tải và lỗi, khi nào dùng toast hay banner, xác nhận, tác vụ chạy lâu |
+| `permissions-audit.md` | vai trò, phê duyệt, lịch sử thay đổi, bộ từ vựng trạng thái |
+| `navigation-layout.md` | khung ứng dụng, sidebar, header trang, breadcrumb, điều hướng trang cài đặt |
+| `dashboards-charts.md` | dashboard vận hành, ô KPI, chọn loại biểu đồ |
+| `tokens.md` | áp dụng token trong shadcn, Tailwind v3/v4 hoặc CSS thuần |
+| `data-formatting.md` | số, tiền, ngày, múi giờ, giá trị trống, bộ quy ước vi-VN |
+| `bulk-import-export.md` | chọn tất cả bản ghi khớp bộ lọc, lỗi một phần, nhập CSV, xuất dữ liệu |
+| `accessibility.md` | checklist WCAG 2.2 AA cho màn hình quản trị |
+| `anti-patterns.md` | 23 dấu hiệu "template AI", mỗi dấu hiệu kèm cách sửa và cách phát hiện |
+| `react-shadcn.md` | TanStack Table, react-hook-form + zod, trạng thái trên URL, shadcn Sidebar |
+
+**Review mode.** Yêu cầu agent "review màn hình này". Agent báo các vấn đề theo dạng `path:line — rule — fix`, nhóm theo cấp (`data`, `states`, `a11y`, `layout`, `tells`), và chỉ sửa code khi bạn yêu cầu.
+
+**Audit.** Khi có trình duyệt, chèn `scripts/audit.js` vào trang và chạy `enterpriseAdminAudit({ pageType: 'list' })`. Script đo:
+- cỡ chữ và thang cỡ chữ;
+- độ bo góc;
+- chiều cao hàng và hàng bị dồn thành nhiều dòng;
+- căn lề cột số và chữ số đều độ rộng (tabular figures);
+- tên của control và kích thước vùng bấm;
+- độ tương phản của chữ;
+- gradient, hiệu ứng kính và bóng đổ của card;
+- nhãn VIẾT HOA TOÀN BỘ;
+- icon emoji;
+- số thao tác chính trong mỗi header;
+- phần tử lẽ ra bị ẩn nhưng vẫn hiện vì class `flex`.
+
+## Kết quả
+
+Cùng một model (Claude Sonnet 5.5) dựng cùng các màn hình từ cùng các prompt, bằng tiếng Anh và tiếng Việt, không có và có skill. Các trang được chấm bằng audit tự động và một checklist nghiệm thu.
+
+| | Không có skill | Có skill |
+|---|---|---|
+| Điểm audit trung vị (mỗi bên 40 trang) | 82 | **100** |
+| Trang có chữ tương phản thấp | 68% | **0%** |
+| Trang có nhãn VIẾT HOA TOÀN BỘ | 73% | **0%** |
+| Checklist nghiệm thu, 3 màn hình không dùng khi viết skill (mỗi bên 6 trang) | 35% | **72%** |
+| Checklist nghiệm thu, 8 màn hình chính (mỗi bên 16 lượt review)\* | 56% | 100% |
+
+\* Các công thức trang của skill được viết từ chính những lỗi trên 8 màn hình này, nên dòng này cho kết quả cao hơn thực tế trên màn hình mới. Dòng phía trên là con số công bằng hơn.
+
+![Dashboard vận hành không có và có skill](docs/img/before-after-07-ops-dashboard.png)
+
+![Form hóa đơn không có và có skill](docs/img/before-after-03-invoice-form.png)
+
+**Chưa đo:**
+- các agent khác (Codex, Cursor, Copilot);
+- codebase React/shadcn thực tế;
+- tần suất skill tự kích hoạt khi không được gọi tên.
+
+## So sánh với các skill khác
+
+| Skill | Trọng tâm | Quy trình cho màn hình quản lý |
+|---|---|---|
+| `frontend-design` (Anthropic) | Thẩm mỹ khác biệt, "chấp nhận rủi ro thẩm mỹ" | Không phải mục tiêu của skill này |
+| `ui-ux-pro-max` | Danh mục phong cách và loại sản phẩm | Ít (một dòng về thao tác hàng loạt) |
+| `taste-skill` | Định hướng nghệ thuật, màn hình ứng dụng, một bảng "dấu hiệu" (tells) | Một phần |
+| **enterprise-admin-ui** | Màn hình nghiệp vụ, cố ý không hào nhoáng | Danh sách, bộ lọc, thao tác hàng loạt, form có dòng hàng, phân quyền, lịch sử thay đổi, phê duyệt, nhập dữ liệu, định dạng theo locale, đủ mọi trạng thái |
+
+Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm mỹ cho website marketing và skill này cho ứng dụng sau màn hình đăng nhập.
+
+## Câu hỏi thường gặp
+
+**Skill có xung đột với design system của tôi không?** Không. Design system hoặc thư viện component tùy biến của dự án luôn được ưu tiên; khi đó skill chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
+
+**Skill tốn bao nhiêu token?** `SKILL.md` dài 193 dòng. Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
+
+**Skill có hỗ trợ tiếng Việt và các locale khác không?** Có. Việc định dạng đi qua `Intl` với locale của dự án. `data-formatting.md` có sẵn bộ quy ước vi-VN:
+- `1.250.000 ₫`;
+- `dd/MM/yyyy HH:mm`;
+- `Asia/Ho_Chi_Minh`;
+- tìm kiếm không phân biệt dấu.
+
+**Cập nhật thế nào?** Chạy lại `npx skills add vietIT2002/enterprise-admin-ui`, hoặc chép lại thư mục. Xem [CHANGELOG.md](CHANGELOG.md).
+
+**Không dùng React thì có được không?** Được. Các quy tắc không phụ thuộc stack, còn ví dụ dùng React, Tailwind và shadcn/ui. HTML một file dùng Tailwind CDN cũng được hỗ trợ.
+
+## Giấy phép
+
+[MIT](LICENSE)

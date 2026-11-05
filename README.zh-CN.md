@@ -1,0 +1,186 @@
+# enterprise-admin-ui
+
+[English](README.md) · [Tiếng Việt](README.vi.md) · **简体中文**
+
+**为登录后的应用提供企业级界面。** 这个 Agent Skill 教 AI 编程 Agent（Claude Code、Codex、Cursor、Antigravity、Copilot 等）像成熟的商业软件那样构建管理系统界面：信息密集且易读的表格；完整的各类状态；不会丢失已填内容的保存机制；也没有那种“AI 模板”味。
+
+![同一模型、同一提示词生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
+
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)
+
+## 安装
+
+```bash
+npx skills add vietIT2002/enterprise-admin-ui
+```
+
+`skills` CLI 会检测你机器上已安装的 Agent，并把技能复制到对应的目录。
+在 Windows 上请加上 `--copy`，让 CLI 复制文件而不是创建符号链接。
+
+
+<details>
+<summary><b>手动安装（适用于任何 Agent）</b></summary>
+
+把 `skills/enterprise-admin-ui` 文件夹复制到项目级或用户级的 skills 目录中。请直接复制，不要使用符号链接，因为符号链接在 Windows 上会失效。
+
+| Agent | 项目目录 |
+|---|---|
+| Claude Code | `.claude/skills/enterprise-admin-ui` |
+| Codex、Cursor、Antigravity、OpenCode、Amp、Cline | `.agents/skills/enterprise-admin-ui` |
+| GitHub Copilot | `.github/skills/enterprise-admin-ui`（也会读取 `.agents/skills`） |
+| Kiro | `.kiro/skills/enterprise-admin-ui` |
+
+</details>
+
+<details>
+<summary><b>通过插件市场安装（Claude Code、Antigravity、GitHub CLI、Kiro）</b></summary>
+
+Claude Code：
+
+```text
+/plugin marketplace add vietIT2002/enterprise-admin-ui
+/plugin install enterprise-admin-ui@enterprise-admin-ui
+```
+
+Antigravity：
+
+```bash
+agy plugin install https://github.com/vietIT2002/enterprise-admin-ui
+```
+
+GitHub CLI 2.90 及以上（`gh skill` 目前为公开预览版）：
+
+```bash
+gh skill install vietIT2002/enterprise-admin-ui enterprise-admin-ui
+```
+
+Kiro：在 GitHub 导入时填写技能文件夹的 URL `https://github.com/vietIT2002/enterprise-admin-ui/tree/main/skills/enterprise-admin-ui`。
+
+</details>
+
+<details>
+<summary><b>常驻规则（AGENTS.md、Cursor、Copilot）</b></summary>
+
+技能只会在 Agent 判断适用时才加载。如果希望每个会话都带上核心规则，可以把已生成的片段粘贴到项目中：
+
+| 文件 | 粘贴到 |
+|---|---|
+| [`adapters/AGENTS.snippet.md`](adapters/AGENTS.snippet.md) | `AGENTS.md` 或 `CLAUDE.md` |
+| [`adapters/cursor/enterprise-admin-ui.mdc`](adapters/cursor/enterprise-admin-ui.mdc) | `.cursor/rules/` |
+| [`adapters/copilot-instructions.snippet.md`](adapters/copilot-instructions.snippet.md) | `.github/copilot-instructions.md` |
+
+</details>
+
+使用时，直接让 Agent 做一个管理界面即可（例如“为我们的 ERP 做一个订单页面”）。也可以按名称调用技能：在 Claude Code 中用 `/enterprise-admin-ui`，在 Codex 中用 `$enterprise-admin-ui`。
+
+## 适用范围
+
+本技能覆盖登录后的各类界面：
+- 管理后台和运营后台工具；
+- ERP、CRM、HRM、财务、库存和 POS 后台；
+- 内部工具和 B2B SaaS 应用界面。
+
+它不适用于落地页或营销网站。这类页面请使用 `frontend-design` 等侧重视觉美感的技能。
+
+如果项目已有设计系统或定制过的组件库，本技能会保留你的组件和设计 token，只应用布局、状态和交互行为方面的规则。
+
+## 包含内容
+
+```
+skills/enterprise-admin-ui/
+├─ SKILL.md            193 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
+├─ references/         13 个文件，仅在任务需要时加载
+├─ scripts/audit.js    无依赖的浏览器审计脚本，18 条规则，评分 0–100
+└─ assets/
+   ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
+   └─ DESIGN.template.md   项目级决策文件（Google design.md 格式）
+```
+
+**页面配方：** 列表、记录详情、新建/编辑表单、仪表盘、设置、向导和 CSV 导入，以及角色、权限和审批。每个配方都说明了页面包含哪些内容、按什么顺序排列。
+
+**参考文档：**
+
+| 文件 | 内容 |
+|---|---|
+| `tables.md` | 密度、对齐、排序、选择、分页、行内编辑 |
+| `filters-search.md` | 筛选栏、筛选标签、已保存的视图、搜索、URL 状态 |
+| `forms.md` | 布局、校验、保存方式、明细行、未保存的更改 |
+| `feedback-states.md` | 空状态、加载状态和错误状态，toast 与横幅提示的取舍，二次确认，耗时任务 |
+| `permissions-audit.md` | 角色、审批、审计记录、状态用语 |
+| `navigation-layout.md` | 应用外壳、侧边栏、页头、面包屑、设置页导航 |
+| `dashboards-charts.md` | 运营仪表盘、KPI 卡片、图表选型 |
+| `tokens.md` | 在 shadcn、Tailwind v3/v4 或纯 CSS 中应用 token |
+| `data-formatting.md` | 数字、金额、日期、时区、空值，以及一套 vi-VN 配置 |
+| `bulk-import-export.md` | 全选所有匹配项、部分失败、CSV 导入、导出 |
+| `accessibility.md` | 面向管理界面的 WCAG 2.2 AA 检查清单 |
+| `anti-patterns.md` | 23 个“AI 模板”痕迹，每个都附带修复方法和检测方式 |
+| `react-shadcn.md` | TanStack Table、react-hook-form + zod、URL 状态、shadcn Sidebar |
+
+**审查模式。** 让 Agent “审查这个界面”。它会按 `path:line — rule — fix` 的格式报告问题，并按级别分组（`data`、`states`、`a11y`、`layout`、`tells`），只有在你要求时才会修改代码。
+
+**审计。** 在浏览器中注入 `scripts/audit.js`，然后运行 `enterpriseAdminAudit({ pageType: 'list' })`。它会检测：
+- 字号与字号层级；
+- 圆角；
+- 行高与多行堆叠的行；
+- 数字对齐与等宽数字；
+- 控件名称与点击目标尺寸；
+- 文字对比度；
+- 渐变、毛玻璃效果和卡片阴影；
+- 全大写标签；
+- 用 emoji 充当图标；
+- 每个页头中的主操作数量；
+- 被 `flex` 类强制显示出来的隐藏元素。
+
+## 效果
+
+使用同一模型（Claude Sonnet 5.5）和同一组提示词（英文和越南语），分别在不使用和使用本技能的情况下构建相同的界面，再由自动化审计和验收清单对页面进行评判。
+
+| | 不使用 | 使用本技能 |
+|---|---|---|
+| 审计得分中位数（各 40 个页面） | 82 | **100** |
+| 存在低对比度文字的页面 | 68% | **0%** |
+| 使用全大写标签的页面 | 73% | **0%** |
+| 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | **72%** |
+| 验收清单：8 个主要界面（各 16 次评审）\* | 56% | 100% |
+
+\* 本技能的配方正是根据这 8 个界面上的失败问题编写的，因此这一行高估了它在新界面上的表现。上一行的数字更公允。
+
+![运营仪表盘：未使用与使用本技能的对比](docs/img/before-after-07-ops-dashboard.png)
+
+![发票表单：未使用与使用本技能的对比](docs/img/before-after-03-invoice-form.png)
+
+**尚未测量：**
+- 其他 Agent（Codex、Cursor、Copilot）；
+- 真实的 React/shadcn 代码库；
+- 不点名调用时技能被自动触发的频率。
+
+## 与同类技能对比
+
+| 技能 | 侧重点 | 管理界面工作流 |
+|---|---|---|
+| `frontend-design`（Anthropic） | 独特的视觉风格，“审美冒险” | 不是它的目标 |
+| `ui-ux-pro-max` | 风格与产品类型目录 | 较少（仅有一行提到批量操作） |
+| `taste-skill` | 艺术指导、应用界面、一张“痕迹”表 | 部分覆盖 |
+| **enterprise-admin-ui** | 刻意朴素的业务界面 | 列表、筛选、批量操作、带明细行的表单、权限、审计记录、审批、导入、按区域设置格式化、所有状态 |
+
+这些技能可以配合使用：营销网站用侧重美感的技能，登录后的应用用本技能。
+
+## 常见问题
+
+**它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
+
+**会消耗多少 token？** `SKILL.md` 共 193 行。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+
+**支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
+- `1.250.000 ₫`；
+- `dd/MM/yyyy HH:mm`；
+- `Asia/Ho_Chi_Minh`；
+- 忽略变音符号的搜索。
+
+**如何更新？** 重新运行 `npx skills add vietIT2002/enterprise-admin-ui`，或者重新复制一次文件夹。详见 [CHANGELOG.md](CHANGELOG.md)。
+
+**不用 React 也能用吗？** 可以。规则本身与技术栈无关，示例使用的是 React、Tailwind 和 shadcn/ui。使用 Tailwind CDN 的单文件 HTML 同样适用。
+
+## 许可证
+
+[MIT](LICENSE)

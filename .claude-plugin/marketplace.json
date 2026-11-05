@@ -1,0 +1,15 @@
+{
+  "name": "enterprise-admin-ui",
+  "description": "Enterprise-grade UI for the apps behind the login.",
+  "owner": {
+    "name": "vietIT2002",
+    "url": "https://github.com/vietIT2002"
+  },
+  "plugins": [
+    {
+      "name": "enterprise-admin-ui",
+      "source": "./",
+      "description": "Admin panels, ERP, CRM and back-office screens: tables, forms, filters, dashboards, permissions."
+    }
+  ]
+}

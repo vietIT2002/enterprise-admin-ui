@@ -1,0 +1,35 @@
+name: Rule proposal
+description: Propose a new rule or a change to an existing one
+labels: [rule-proposal]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do agents build today?
+      description: Describe the problem on a management screen built without the rule. Link or attach the page or a screenshot.
+    validations:
+      required: true
+  - type: textarea
+    id: rule
+    attributes:
+      label: Proposed rule
+      description: Write it as a recipe (what the screen contains), not as a prohibition.
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Design system, NN/g or WCAG reference. Write [inferred] if there is none.
+    validations:
+      required: true
+  - type: dropdown
+    id: check
+    attributes:
+      label: How can it be checked?
+      options:
+        - audit.js rule
+        - Acceptance-checklist item
+        - Not sure yet
+    validations:
+      required: true
