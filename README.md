@@ -6,7 +6,7 @@
 
 ![Orders list built by the same model from the same brief, without and with the skill](docs/img/before-after-01-orders-list.png)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Version 0.5.1](https://img.shields.io/badge/version-0.5.1-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Version 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
 
 ## Install
 
@@ -150,9 +150,12 @@ skills/enterprise-admin-ui/
 | Pages with low-contrast text | 68% | **0%** |
 | Pages with ALL-CAPS labels | 73% | **0%** |
 | Acceptance checklist, 3 screens the skill was never written against (6 pages each) | 35% | **72%** |
+| Acceptance checklist, 3 more new screens, with v0.5.2 (6 pages each)† | 39% | **89%** |
 | Acceptance checklist, 8 main screens (16 reviews each)\* | 56% | 100% |
 
-\* The skill's recipes were written from the failures on these 8 screens, so this row overstates how it does on new screens. The row above is the fairer number.
+\* The skill's recipes were written from the failures on these 8 screens, so this row overstates how it does on new screens. The held-out rows are the fairer numbers.
+
+† These screens were written after the v0.5.2 rules. 4 of their 27 checklist items test those rules (5/8 → 8/8); the other 23 went from 35% to 87%.
 
 ![Operations dashboard without and with the skill](docs/img/before-after-07-ops-dashboard.png)
 

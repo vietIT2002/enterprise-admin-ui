@@ -6,7 +6,7 @@
 
 ![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.1](https://img.shields.io/badge/version-0.5.1-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
 
 ## 安装
 
@@ -150,9 +150,12 @@ skills/enterprise-admin-ui/
 | 存在低对比度文字的页面 | 68% | **0%** |
 | 使用全大写标签的页面 | 73% | **0%** |
 | 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | **72%** |
+| 验收清单：另外 3 个新界面，使用 v0.5.2（各 6 个页面）† | 39% | **89%** |
 | 验收清单：8 个主要界面（各 16 次评审）\* | 56% | 100% |
 
-\* 本技能的配方正是根据这 8 个界面上的失败问题编写的，因此这一行高估了它在新界面上的表现。上一行的数字更公允。
+\* 本技能的配方正是根据这 8 个界面上的失败问题编写的，因此这一行高估了它在新界面上的表现。新界面那几行的数字更公允。
+
+† 这些界面是在 v0.5.2 规则之后编写的。27 个清单项中有 4 项直接检验这些规则（5/8 → 8/8）；其余 23 项从 35% 提升到 87%。
 
 ![运营仪表盘：未使用与使用本技能的对比](docs/img/before-after-07-ops-dashboard.png)
 

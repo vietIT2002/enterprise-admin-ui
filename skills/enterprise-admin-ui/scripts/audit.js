@@ -13,7 +13,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.3.1';
   const WEIGHTS = { error: 10, warn: 4 };
   const MAX_EXAMPLES = 5;
 
@@ -665,6 +665,8 @@
     if (!first) return;
     const top = first.getBoundingClientRect().top + ctx.win.scrollY;
     ctx.metrics.firstTableTop = Math.round(top);
+    // Forms, record pages, dashboards and settings put tables below the fold on purpose.
+    if (ctx.opts.pageType && ctx.opts.pageType !== 'list') return;
     measured(ctx, 'table-above-fold', 1);
     if (top > ctx.win.innerHeight) {
       report(

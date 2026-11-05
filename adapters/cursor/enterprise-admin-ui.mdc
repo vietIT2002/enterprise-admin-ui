@@ -29,6 +29,7 @@ Replace these template tells:
 Before you finish a screen, confirm:
 
 - Every list and related list has first-use, no-results, loading and error states
+- Form fields sit one per row, except a pair that reads as one value
 - Save stays enabled until submit; the error summary and unsaved-changes warning exist
 - Filters show as chips with Clear all; the bulk bar offers "Select all N matching"
 - Destructive actions name the object and the impact

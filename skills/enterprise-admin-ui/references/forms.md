@@ -16,10 +16,14 @@ Read this when you build a create/edit form, a settings section, a line-item edi
 
 ## Layout
 
-- One column in titled sections (`<h2>` 16px semibold, `border-b border-border`). Short related fields may share a row: City · Postal code, First name · Last name [Carbon, Primer].
+- One column in titled sections (`<h2>` 16px semibold, `border-b border-border`), one field per row [Carbon, Primer].
+  - The only exception is two short fields that read as one value: City · Postal code, First name · Last name.
+  - Never put three in a row, and never lay a section out on a `grid-cols-2` or 12-column grid: the eye zigzags and fields get skipped.
+  - Without the skill, onboarding forms paired unrelated fields (Preferred name · Date of birth) and put three per row.
 - Labels sit above the field in `text-sm font-medium` (14px, the size of shadcn `<Label>`), always visible, 1–3 words, sentence case, no colon. A placeholder is an example value ("name@company.com"), never the label [NN/g, Carbon].
 - Mark required fields with `*` after the label (`<span aria-hidden="true">*</span>`) and say "* Required" once under the form title. Side labels are acceptable only in dense read-only views [NN/g, Fiori] `[inferred]`.
 - Size each field to its content: postal code `w-28`, date `w-40`, phone `w-56`, name or email full column width (`max-w-xl`). Equal-width fields everywhere hide which input is short [Carbon].
+- Use the input type that matches the value: `type="email"`, `type="tel"`, `type="url"`, `type="date"` (or the project's date picker). `inputmode` alone does not give autofill or the right mobile keyboard everywhere.
 - Inputs are 32px high (`h-8`), 40px on touch. Space: 24px between fields on a page, 16px in panels, 32px before the action bar [Carbon].
 - Help text goes under the field in `text-sm text-muted-foreground`, linked with `aria-describedby`. Use it for format and consequence ("Used on invoices"), not for repeating the label.
 - Vietnamese and German run up to 50% longer than English [Polaris], so wrap labels instead of cutting them [Fiori].
@@ -47,6 +51,7 @@ Baseline without this skill: Save was disabled until the form was valid in the r
 - **Save is never disabled before submit.** An empty or invalid form can still be submitted; the validation then explains what is wrong [Primer, Atlassian].
 - **While the request runs** Save is disabled, shows a 16px spinner and the label stays ("Save"); the rest of the form stays editable only if the server tolerates it, otherwise set `fieldset disabled` [Carbon, Primer].
 - **Autosave only for toggles and segmented controls** that take effect alone (notifications on/off). Each shows "Saved" beside it for 2 seconds, in a `role="status"` region. A failed autosave reverts the control and shows the error beside it.
+- **Save draft for long forms.** A form with three or more sections gets "Save draft" (secondary) between Cancel and Save. A draft is stored with Draft status and skips required-field checks; Save runs every check. Show "Draft saved 15:58" beside the buttons, and list drafts in the index with a Draft badge so they can be resumed `[inferred]`.
 - Button order in a full-page form: in the sticky bottom bar, Cancel (secondary) then Save (primary) at the right. Dialogs and side panels use the same order, Save at the far right [Carbon].
 - Button labels are verbs with the object: "Save invoice", "Create customer". Plain "Save" is fine in a settings section.
 - After a successful save of a new record, go to its detail page. After editing, return to where the user came from with a toast naming the record ("Invoice INV-1043 saved").
@@ -55,6 +60,7 @@ Baseline without this skill: Save was disabled until the form was valid in the r
 
 - Every full-page form and editable matrix keeps Save and Cancel in a bar fixed to the bottom of the content area, right-aligned: `sticky bottom-0 flex justify-end gap-3 border-t border-border bg-card px-6 py-3`. No shadow; the top border separates it.
 - Make sure the sticky bar never covers the focused field: add `scroll-pb-20` to the scroll container [WCAG 2.4.11].
+- `sticky` sticks inside the nearest ancestor with `overflow` set. If `<main class="overflow-y-auto">` grows with its content (a `min-h-screen` shell), the document scrolls instead and the bar never sticks. Either let the document scroll, with no `overflow` on the shell, as in the app shell code in `navigation-layout.md`, or make the shell `h-screen` so `<main>` is the element that scrolls.
 - **Unsaved-changes indicator:** when the form is dirty (`isDirty`), show "Unsaved changes" in the bar beside Cancel and Save (not pushed to the far left), in `text-sm text-muted-foreground` with a 6px dot `bg-warning`. Render its live region (`role="status"`) always and change only its content. It disappears after a successful save. Permission matrices and settings sections use the same indicator.
 - **Navigation guard** has two parts, both required:
   1. `beforeunload` for reload, tab close and address-bar navigation. The browser shows its own text; set `e.preventDefault(); e.returnValue = ''` only while dirty and remove the listener when clean.

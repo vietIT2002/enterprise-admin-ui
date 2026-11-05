@@ -36,7 +36,7 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
 - **Looks like:** a `grid grid-cols-4 gap-4` row of stat cards ("Total orders", "Revenue") between the page header and the list's table.
 - **Why it reads as a template:** It pushes the table, the reason for the page, below the first viewport and repeats counts the status tabs already carry [SKILL.md List recipe].
 - **Build instead:** Counts in the status tabs ("All 96 · Pending 3 · Shipping 6") or one line above the table: `<p class="text-sm text-muted-foreground tabular-nums">96 orders · 596.722.000 ₫</p>`. KPI tiles belong on the dashboard.
-- **Detect:** audit `table-above-fold` (an error with `pageType: 'list'`).
+- **Detect:** audit `table-above-fold`: an error with `pageType: 'list'`, a warning when no page type is given, and not checked on other page types.
 
 ### kpi-icon-tiles
 - **Looks like:** each KPI tile leads with a tinted icon square, a different hue per tile: `<div class="rounded-lg bg-blue-100 p-3"><ShoppingCart class="text-blue-600" /></div>`.

@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] — 2026-11-05
+
+### Added
+- Record pages show contact values as links: email as `mailto:`, phone as `tel:`, and a website that opens in a new tab. The primary contact carries a "Primary" badge.
+- Tables whose rows carry a due or expiry date open with the rows that need attention first: expired or overdue, then due soon, then the rest. The status badge says which group a row is in ("Expires in 12 days"). Other tables open newest first.
+- Forms with three or more sections offer "Save draft" between Cancel and Save. A draft keeps the record in Draft status and skips the required-field checks until the final submit.
+
+### Changed
+- Forms are one field per row. The only exception is two short fields that read as one value (City · Postal code), and the Verify checklist and the adapters now include this rule. Before, agents read "short related fields may share a row" as permission to lay out forms on a grid.
+- Forms use the input type that matches the value (`email`, `tel`, `url`, `date`), not `inputmode` alone.
+- The sticky action bar section explains where `sticky` sticks. An `overflow-y-auto` main inside a `min-h-screen` shell never scrolls itself, so the bar never sticks.
+
+### Fixed
+- `audit.js` 0.3.1: `table-above-fold` no longer checks form, detail, dashboard, settings or wizard pages. Before, it gave a false-positive warning when a table sat below the fold on those pages.
+
 ## [0.5.1] — 2026-11-05
 
 ### Fixed
@@ -57,5 +72,6 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.2]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.0

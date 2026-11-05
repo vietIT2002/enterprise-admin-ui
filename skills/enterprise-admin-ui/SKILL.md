@@ -41,11 +41,13 @@ People use management software all day to find records, change them safely and s
 4. Related lists follow the Tables rules. Every section without data shows an empty state with its next step ("No contacts yet · Add contact").
 5. Activity: who did what, with absolute timestamps ("04/11/2026 15:58"); relative time appears only together with the absolute value.
 6. Avatars represent people only. Companies, orders and products show a logo or no image.
+7. Contact values are links: email `mailto:`, phone `tel:`, website opens in a new tab; the primary contact carries a "Primary" badge.
 
 ### Create / edit form
-1. One column in titled sections; short related fields (City · Postal code) may share a row. Visible labels above fields, `*` on required fields, field widths sized to their content.
+1. One column in titled sections: one field per row. The only exception is two short fields that read as one value (City · Postal code, First name · Last name). Never put three fields in a row or lay unrelated fields out on a grid. Visible labels above fields, `*` on required fields, field widths sized to their content, and the input type that matches the value (`email`, `tel`, `date`).
 2. Line items (invoice, order): a table with add/remove row, numbers right-aligned with tabular figures, subtotal, tax and total computed below and right-aligned.
-3. Every full-page form keeps Save and Cancel in a sticky bottom bar (`sticky bottom-0 border-t bg-card`, no shadow), Cancel then Save at the right; saving follows the Saving section.
+3. Every full-page form keeps Save and Cancel in a sticky bottom bar (`sticky bottom-0 border-t bg-card`, no shadow), Cancel then Save at the right; saving follows the Saving section. The bar only sticks if its scrolling ancestor is the one that scrolls: no `overflow-y-auto` on a `min-h-screen` shell.
+4. A form with three or more sections also offers "Save draft" in that bar, between Cancel and Save. A draft keeps the record in Draft status, skips the required-field checks until the final submit, and shows "Draft saved 15:58".
 
 ### Dashboard
 1. Header: title + date-range control + "Updated 16:30". The header has no greeting and no hero.
@@ -123,6 +125,10 @@ Design every state of every data region:
   - This applies to every table, including tables inside detail pages and forms.
 - **Text and headers:** text is left-aligned. Headers are in sentence case with normal letter spacing.
 - **Row actions:** one or two visible, the rest in an overflow menu named after the record ("Actions for order DH-1043").
+- **Default order:**
+  - When the rows carry a due or expiry date (certificates, contracts, invoices, inspections, tasks), the table opens with the rows that need attention first: expired or overdue, then due soon, then the rest, each group by date.
+  - The status badge says which group a row is in ("Expired", "Expires in 12 days").
+  - Other tables open newest first.
 
 ## Foundations
 
@@ -167,6 +173,7 @@ When the user asks to review or audit existing screens, report findings instead 
   - Fix every ✗ error and review every ! warning.
 - **Manual checklist:**
   - [ ] Every list and related list has first-use, no-results, loading and error states
+  - [ ] Form fields sit one per row, except a pair that reads as one value
   - [ ] Save stays enabled until submit; the error summary and unsaved-changes warning exist
   - [ ] Filters show as chips with Clear all; the bulk bar offers "Select all N matching"
   - [ ] Destructive actions name the object and the impact

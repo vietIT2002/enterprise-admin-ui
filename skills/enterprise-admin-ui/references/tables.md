@@ -50,6 +50,7 @@ Read this when you build any data table: a list page, a related list on a detail
 ## Sorting
 
 - Every table opens sorted by one column, usually newest first (`sort=-created_at`, the API field in snake case) or the identifier. Write the default into the code, not just the data.
+- When rows carry a due or expiry date (certificates, contracts, invoices, inspections, tasks), the default order is attention first: expired or overdue, then due soon, then the rest, each group by date (`sort=urgency,due_at`) `[inferred]`. The status badge names the group ("Expired", "Expires in 12 days").
 - First click sorts ascending, the next descending, the third returns to the default [Primer].
 - Show the sort icon (16px chevron) on the sorted column only; other sortable headers reveal a muted icon on hover and focus [Carbon].
 - A sortable header is a `<button>` inside the `<th>`. Set `aria-sort="ascending"` or `"descending"` on the `<th>` of the sorted column and omit it elsewhere [Polaris].

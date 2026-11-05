@@ -6,7 +6,7 @@
 
 ![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một đề bài, không có và có skill](docs/img/before-after-01-orders-list.png)
 
-![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Phiên bản 0.5.1](https://img.shields.io/badge/version-0.5.1-blue)
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Phiên bản 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
 
 ## Cài đặt
 
@@ -150,9 +150,12 @@ skills/enterprise-admin-ui/
 | Trang có chữ tương phản thấp | 68% | **0%** |
 | Trang có nhãn VIẾT HOA TOÀN BỘ | 73% | **0%** |
 | Checklist nghiệm thu, 3 màn hình không dùng khi viết skill (mỗi bên 6 trang) | 35% | **72%** |
+| Checklist nghiệm thu, thêm 3 màn hình mới, với v0.5.2 (mỗi bên 6 trang)† | 39% | **89%** |
 | Checklist nghiệm thu, 8 màn hình chính (mỗi bên 16 lượt review)\* | 56% | 100% |
 
-\* Các công thức trang của skill được viết từ chính những lỗi trên 8 màn hình này, nên dòng này cho kết quả cao hơn thực tế trên màn hình mới. Dòng phía trên là con số công bằng hơn.
+\* Các công thức trang của skill được viết từ chính những lỗi trên 8 màn hình này, nên dòng này cho kết quả cao hơn thực tế trên màn hình mới. Các dòng màn hình mới là con số công bằng hơn.
+
+† Các màn hình này được viết sau khi có quy tắc v0.5.2. 4 trong 27 mục checklist kiểm tra trực tiếp các quy tắc đó (5/8 → 8/8); 23 mục còn lại tăng từ 35% lên 87%.
 
 ![Dashboard vận hành không có và có skill](docs/img/before-after-07-ops-dashboard.png)
 
