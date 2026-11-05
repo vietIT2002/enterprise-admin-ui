@@ -13,7 +13,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.3.1';
+  const VERSION = '0.4.0';
   const WEIGHTS = { error: 10, warn: 4 };
   const MAX_EXAMPLES = 5;
 
@@ -37,6 +37,7 @@
     'emoji-icon',
     'single-primary-action',
     'hidden-overridden',
+    'sticky-inert',
   ]);
 
   // ------------------------------------------------------------------ pure helpers (unit-tested in Node)
@@ -965,7 +966,57 @@
     }
   }
 
-  const CHECKS = [checkTypography, checkRadius, checkTables, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden];
+  // `position: sticky` sticks inside the nearest ancestor whose overflow is not `visible` or `clip`. When that wrapper
+  // grows with its content (`<main class="overflow-y-auto">` in a `min-h-screen` shell, a table in `overflow-x-auto`)
+  // the page scrolls instead, and the element scrolls away with the content. Only vertical stickiness is checked.
+  function scrollParent(ctx, el) {
+    for (let n = el.parentElement; n && n !== ctx.doc.body && n !== ctx.doc.documentElement; n = n.parentElement) {
+      const s = ctx.style(n);
+      if (/auto|scroll|hidden|overlay/.test(s.overflowX + ' ' + s.overflowY)) return n;
+    }
+    return null;
+  }
+
+  function scrollRange(el) {
+    return el.scrollHeight - el.clientHeight;
+  }
+
+  function checkSticky(ctx) {
+    const sticky = ctx.all.filter((el) => {
+      const s = ctx.style(el);
+      return s.position === 'sticky' && (s.top !== 'auto' || s.bottom !== 'auto');
+    });
+    measured(ctx, 'sticky-inert', sticky.length);
+    const page = ctx.doc.scrollingElement || ctx.doc.documentElement;
+    for (const el of sticky) {
+      const box = scrollParent(ctx, el);
+      if (!box || scrollRange(box) > 1) continue;
+      // The first ancestor above the wrapper that does scroll, or the page.
+      let outer = scrollParent(ctx, box);
+      while (outer && scrollRange(outer) <= 1) outer = scrollParent(ctx, outer);
+      const range = outer ? scrollRange(outer) : page.scrollHeight - ctx.win.innerHeight;
+      const viewBottom = outer ? outer.getBoundingClientRect().bottom : ctx.win.innerHeight;
+      const viewTop = outer ? outer.getBoundingClientRect().top : 0;
+      const s = ctx.style(el);
+      const r = el.getBoundingClientRect();
+      const bottomBar = s.bottom !== 'auto';
+      // A bottom bar matters when it starts below the visible area; a top header when the scroll can carry it away.
+      const needed = bottomBar ? r.bottom > viewBottom + 1 : range > r.top - viewTop + 1;
+      if (!needed) continue;
+      const actions = bottomBar && el.querySelector('button, [role="button"], a[href], input[type="submit"]');
+      report(
+        ctx,
+        'sticky-inert',
+        actions ? 'error' : 'warn',
+        'A sticky element only sticks inside a container that scrolls. Its overflow wrapper grows with the content, so the page scrolls instead and the element scrolls away: let the page scroll (no overflow on the wrapper) or give the wrapper a fixed height',
+        el,
+        selectorFor(box) + ' does not scroll',
+        'its scroll container scrolls'
+      );
+    }
+  }
+
+  const CHECKS = [checkTypography, checkRadius, checkTables, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden, checkSticky];
 
   // ------------------------------------------------------------------ entry point
 

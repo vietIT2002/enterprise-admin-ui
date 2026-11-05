@@ -46,7 +46,7 @@ People use management software all day to find records, change them safely and s
 ### Create / edit form
 1. One column in titled sections: one field per row. The only exception is two short fields that read as one value (City · Postal code, First name · Last name). Never put three fields in a row or lay unrelated fields out on a grid. Visible labels above fields, `*` on required fields, field widths sized to their content, and the input type that matches the value (`email`, `tel`, `date`).
 2. Line items (invoice, order): a table with add/remove row, numbers right-aligned with tabular figures, subtotal, tax and total computed below and right-aligned.
-3. Every full-page form keeps Save and Cancel in a sticky bottom bar (`sticky bottom-0 border-t bg-card`, no shadow), Cancel then Save at the right; saving follows the Saving section. The bar only sticks if its scrolling ancestor is the one that scrolls: no `overflow-y-auto` on a `min-h-screen` shell.
+3. Every full-page form keeps Save and Cancel in a sticky bottom bar (`sticky bottom-0 border-t bg-card`, no shadow), Cancel then Save at the right; saving follows the Saving section. The bar only sticks if its scrolling ancestor is the one that scrolls: no `overflow-y-auto` on a `min-h-screen` shell (audit `sticky-inert`).
 4. A form with three or more sections also offers "Save draft" in that bar, between Cancel and Save. A draft keeps the record in Draft status, skips the required-field checks until the final submit, and shows "Draft saved 15:58".
 
 ### Dashboard

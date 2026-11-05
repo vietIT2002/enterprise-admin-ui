@@ -6,7 +6,7 @@
 
 ![Orders list built by the same model from the same brief, without and with the skill](docs/img/before-after-01-orders-list.png)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Version 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Version 0.5.3](https://img.shields.io/badge/version-0.5.3-blue)
 
 ## Install
 
@@ -91,7 +91,7 @@ If your project already has a design system or a customised component library, t
 skills/enterprise-admin-ui/
 ├─ SKILL.md            193 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         13 files, loaded only when the task needs them
-├─ scripts/audit.js    dependency-free browser audit, 18 rules, score 0–100
+├─ scripts/audit.js    dependency-free browser audit, 19 rules, score 0–100
 └─ assets/
    ├─ tokens.css           shadcn-compatible tokens, light and dark, Tailwind v4 @theme
    └─ DESIGN.template.md   per-project decision file (Google design.md format)
@@ -131,7 +131,8 @@ skills/enterprise-admin-ui/
 - ALL-CAPS labels;
 - emoji icons;
 - primary actions per header;
-- hidden elements that a `flex` or `grid` class keeps visible.
+- hidden elements that a `flex` or `grid` class keeps visible;
+- sticky bars and headers that never stick, because their overflow wrapper grows with the content instead of scrolling.
 
 ## Results
 

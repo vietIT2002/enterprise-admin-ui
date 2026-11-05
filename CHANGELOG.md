@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.3] — 2026-11-05
+
+### Added
+- `audit.js` 0.4.0 adds the `sticky-inert` rule: a `sticky` element whose overflow wrapper grows with the content, so the page scrolls instead and the element scrolls away. A bottom action bar with buttons is an error; a sticky header or totals row is a warning. Only vertical stickiness is checked.
+
+### Fixed
+- `tables.md` and `navigation-layout.md` no longer suggest a sticky header row inside an `overflow-x-auto` container that grows with its rows. A frozen header or totals row needs a container with a height that scrolls both ways.
+
 ## [0.5.2] — 2026-11-05
 
 ### Added
@@ -72,6 +80,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.3]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.3
 [0.5.2]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.0

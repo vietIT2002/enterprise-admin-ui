@@ -6,7 +6,7 @@
 
 ![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một đề bài, không có và có skill](docs/img/before-after-01-orders-list.png)
 
-![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 18](https://img.shields.io/badge/audit%20rules-18-blue) ![Phiên bản 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Phiên bản 0.5.3](https://img.shields.io/badge/version-0.5.3-blue)
 
 ## Cài đặt
 
@@ -91,7 +91,7 @@ Nếu dự án đã có design system hoặc thư viện component tùy biến, 
 skills/enterprise-admin-ui/
 ├─ SKILL.md            193 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
 ├─ references/         13 file, chỉ nạp khi tác vụ cần
-├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 18 quy tắc, điểm 0–100
+├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 19 quy tắc, điểm 0–100
 └─ assets/
    ├─ tokens.css           token tương thích shadcn, sáng và tối, Tailwind v4 @theme
    └─ DESIGN.template.md   file ghi quyết định riêng của từng dự án (định dạng design.md của Google)
@@ -131,7 +131,8 @@ skills/enterprise-admin-ui/
 - nhãn VIẾT HOA TOÀN BỘ;
 - icon emoji;
 - số thao tác chính trong mỗi header;
-- phần tử lẽ ra bị ẩn nhưng vẫn hiện vì class `flex` hoặc `grid`.
+- phần tử lẽ ra bị ẩn nhưng vẫn hiện vì class `flex` hoặc `grid`;
+- thanh thao tác hoặc tiêu đề bảng `sticky` không bao giờ dính, vì khung `overflow` bọc ngoài dài ra theo nội dung thay vì tự cuộn.
 
 ## Kết quả
 

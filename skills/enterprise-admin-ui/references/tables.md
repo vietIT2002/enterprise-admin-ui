@@ -44,7 +44,7 @@ Read this when you build any data table: a list page, a related list on a detail
 2. Order the other columns by how often the user needs them: status, the main party, the date, then amounts, then rarely used fields.
 3. Show 6–8 columns by default at 1440px. Extra columns go behind a "Columns" menu.
 4. The "Columns" menu is a popover with a checkbox per column plus Move up / Move down buttons. Drag is never the only way to reorder [WCAG 2.5.7]. When columns are hidden, the trigger reads "Columns (2 hidden)" [NN/g].
-5. When the table is wider or taller than the viewport, freeze the header row (`sticky top-0 bg-card`) and the first column (`sticky left-0 bg-card`). The table container scrolls sideways (`overflow-x-auto`), not the page [NN/g, WCAG 1.4.10].
+5. When the table is wider than the viewport, its container scrolls sideways (`overflow-x-auto`), not the page, and the first column stays frozen (`sticky left-0 bg-card`) [NN/g, WCAG 1.4.10]. A frozen header row (`sticky top-0 bg-card`) needs a container that also scrolls vertically, so give it a height: `max-h-[calc(100dvh-12rem)] overflow-auto`. In an `overflow-x-auto` container that grows with its rows, `sticky top-0` never sticks (audit `sticky-inert`).
 6. Header labels are sentence case with normal letter spacing, 12–14px medium. No `uppercase tracking-wide`.
 
 ## Sorting
@@ -125,7 +125,7 @@ Keep the table header visible in every state and put the message in the body, sp
 
 ## Totals row
 
-- Put totals in a `<TableFooter>` row that stays visible (`sticky bottom-0 bg-card font-medium`): "Total" in the first cell, figures in the numeric columns, right-aligned with `tabular-nums` [Polaris].
+- Put totals in a `<TableFooter>` row that stays visible (`sticky bottom-0 bg-card font-medium`, in a container with a height as in point 5): "Total" in the first cell, figures in the numeric columns, right-aligned with `tabular-nums` [Polaris].
 - Figures are computed values, not formulas in cells. Say what they cover: "Total (this page)" or "Total (1.284 matching)".
 - A line-items table puts subtotal, tax and total below the table in a narrow right block (`ml-auto w-72`), labels left and figures right.
 - Mixed currencies show the ISO code beside each total: `formatMoney(value, currency, locale, { currencyDisplay: 'code' })` prints "1.250.000 VND · 54,20 USD". Never add different currencies into one number.

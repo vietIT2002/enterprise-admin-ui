@@ -173,6 +173,6 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
    - `data`: lost or wrong data (saving, destructive actions; `save-disabled-before-submit`);
    - `states`: missing states (`hidden-overridden`);
    - `a11y`: contrast, names, targets (`text-contrast`, `icon-button-name`, `target-size`, `placeholder-label`);
-   - `layout`: density and alignment (`table-row-height`, `table-row-two-line`, `stacked-table-rows`, `numeric-align`, `tabular-nums`, `font-size-base`, `type-scale`, `table-above-fold`, `kpi-strip-above-table`, `single-primary-action`);
+   - `layout`: density and alignment (`table-row-height`, `table-row-two-line`, `stacked-table-rows`, `numeric-align`, `tabular-nums`, `font-size-base`, `type-scale`, `table-above-fold`, `kpi-strip-above-table`, `single-primary-action`, `sticky-inert`);
    - `tells`: template tells (every other entry and audit rule).
 5. **Report.** Write one finding per line, grouped by level: `path:line — <rule> — <fix>`, where the rule is an audit rule, an entry heading here or a SKILL.md section. For example: `app/orders/page.tsx:12 — kpi-strip-above-table — move the four counts into the status tabs ("All 96 · Pending 3")`. End with the count per level: `data 1 · states 2 · a11y 3 · layout 4 · tells 2`. Change code when the user asks for fixes.

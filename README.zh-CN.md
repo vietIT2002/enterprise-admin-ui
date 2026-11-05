@@ -6,7 +6,7 @@
 
 ![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：18](https://img.shields.io/badge/audit%20rules-18-blue) ![版本 0.5.2](https://img.shields.io/badge/version-0.5.2-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.3](https://img.shields.io/badge/version-0.5.3-blue)
 
 ## 安装
 
@@ -91,7 +91,7 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 skills/enterprise-admin-ui/
 ├─ SKILL.md            193 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         13 个文件，仅在任务需要时加载
-├─ scripts/audit.js    无依赖的浏览器审计脚本，18 条规则，评分 0–100
+├─ scripts/audit.js    无依赖的浏览器审计脚本，19 条规则，评分 0–100
 └─ assets/
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
    └─ DESIGN.template.md   项目级决策文件（Google design.md 格式）
@@ -131,7 +131,8 @@ skills/enterprise-admin-ui/
 - 全大写标签；
 - 用 emoji 充当图标；
 - 每个页头中的主操作数量；
-- 被 `flex` 或 `grid` 类强制显示出来的隐藏元素。
+- 被 `flex` 或 `grid` 类强制显示出来的隐藏元素；
+- 永远无法固定的 sticky 操作栏和表头：外层 `overflow` 容器随内容变高而不是自身滚动。
 
 ## 效果
 
