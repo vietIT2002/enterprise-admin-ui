@@ -6,7 +6,7 @@
 
 ![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một đề bài, không có và có skill](docs/img/before-after-01-orders-list.png)
 
-![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Phiên bản 0.5.4](https://img.shields.io/badge/version-0.5.4-blue)
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Phiên bản 0.5.5](https://img.shields.io/badge/version-0.5.5-blue)
 
 ## Cài đặt
 
@@ -164,9 +164,11 @@ skills/enterprise-admin-ui/
 
 **Tự kích hoạt** (Claude Code, Sonnet 5.5, 2026-11-05): khi không được gọi tên, skill tự nạp ở 20/20 prompt màn hình quản lý (10 EN, 10 VI) và 0/10 prompt landing page.
 
-**Chưa đo:**
-- các agent khác (Codex, Cursor, Copilot);
-- codebase React/shadcn thực tế.
+**Môi trường khác** (2026-11-05, cùng 3 màn hình mới, mỗi bên 1 trang mỗi màn hình):
+- Codex CLI (`gpt-6.1-sol`): checklist 33% → **96%**, điểm audit trung vị 62 → **100**.
+- Ứng dụng Next.js 16 + shadcn/ui (Sonnet 5.5): checklist 44% → **93%**.
+
+**Chưa đo:** Cursor và Copilot, và việc skill có tự nạp ở các agent ngoài Claude Code hay không.
 
 ## So sánh với các skill khác
 

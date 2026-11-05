@@ -6,7 +6,7 @@
 
 ![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.4](https://img.shields.io/badge/version-0.5.4-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.5](https://img.shields.io/badge/version-0.5.5-blue)
 
 ## 安装
 
@@ -164,9 +164,11 @@ skills/enterprise-admin-ui/
 
 **自动触发**（Claude Code，Sonnet 5.5，2026-11-05）：在不点名的情况下，技能在 20/20 个管理界面提示词（10 个英文、10 个越南语）中自动加载，在 0/10 个落地页提示词中均未加载。
 
-**尚未测量：**
-- 其他 Agent（Codex、Cursor、Copilot）；
-- 真实的 React/shadcn 代码库。
+**其他环境**（2026-11-05，同样的 3 个新界面，每个界面每种条件 1 个页面）：
+- Codex CLI（`gpt-6.1-sol`）：验收清单 33% → **96%**，审计中位分 62 → **100**。
+- Next.js 16 + shadcn/ui 应用（Sonnet 5.5）：验收清单 44% → **93%**。
+
+**尚未测量：** Cursor 和 Copilot，以及技能在 Claude Code 之外能否自动加载。
 
 ## 与同类技能对比
 

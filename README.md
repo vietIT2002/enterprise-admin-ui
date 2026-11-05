@@ -6,7 +6,7 @@
 
 ![Orders list built by the same model from the same brief, without and with the skill](docs/img/before-after-01-orders-list.png)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Version 0.5.4](https://img.shields.io/badge/version-0.5.4-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Version 0.5.5](https://img.shields.io/badge/version-0.5.5-blue)
 
 ## Install
 
@@ -164,9 +164,11 @@ skills/enterprise-admin-ui/
 
 **Triggering on its own** (Claude Code, Sonnet 5.5, 2026-11-05): without being named, the skill loaded for 20/20 management-screen prompts (10 EN, 10 VI) and for 0/10 landing-page prompts.
 
-**Not measured yet:**
-- other agents (Codex, Cursor, Copilot);
-- real React/shadcn codebases.
+**Other settings** (2026-11-05, the same 3 new screens, 1 page per side each):
+- Codex CLI (`gpt-6.1-sol`): checklist 33% → **96%**, median audit score 62 → **100**.
+- A Next.js 16 + shadcn/ui app (Sonnet 5.5): checklist 44% → **93%**.
+
+**Not measured yet:** Cursor and Copilot, and whether the skill loads on its own outside Claude Code.
 
 ## How it compares
 

@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.5] — 2026-11-05
+
+### Fixed
+- Next.js: SKILL.md (Mock data) and `react-shadcn.md` say to read `params`, `searchParams` and `?state=` in a client component under `<Suspense>`, and to run `next build` before calling a page done. With `cacheComponents`, the default for new Next 16 apps, a page that awaits them fails `next build` while `tsc` and `eslint` pass.
+
+### Docs
+- README results add Codex CLI (checklist 33% → 96%) and a Next.js 16 + shadcn/ui app (44% → 93%).
+
 ## [0.5.4] — 2026-11-05
 
 ### Changed
@@ -87,6 +95,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.5]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.5
 [0.5.4]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.4
 [0.5.3]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.3
 [0.5.2]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.2
