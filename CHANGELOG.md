@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.4] — 2026-11-05
+
+### Changed
+- Breadcrumbs end with the record's number when records are known by number (contracts, orders, invoices), and with its name otherwise.
+- Record pages list changes that need sign-off (amendments, revisions, price changes) with number, effective date, summary, status and who approved them, or "Pending approval" and who it is waiting for.
+- Form labels are `block`. Before, an inline `<label>` sat beside short fields such as dates and phone numbers.
+
 ## [0.5.3] — 2026-11-05
 
 ### Added
@@ -80,6 +87,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.4]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.4
 [0.5.3]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.3
 [0.5.2]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.1

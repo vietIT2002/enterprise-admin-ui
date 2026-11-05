@@ -6,7 +6,7 @@
 
 ![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.3](https://img.shields.io/badge/version-0.5.3-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：19](https://img.shields.io/badge/audit%20rules-19-blue) ![版本 0.5.4](https://img.shields.io/badge/version-0.5.4-blue)
 
 ## 安装
 

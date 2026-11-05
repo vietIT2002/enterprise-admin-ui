@@ -6,7 +6,7 @@
 
 ![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một đề bài, không có và có skill](docs/img/before-after-01-orders-list.png)
 
-![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Phiên bản 0.5.3](https://img.shields.io/badge/version-0.5.3-blue)
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 19](https://img.shields.io/badge/audit%20rules-19-blue) ![Phiên bản 0.5.4](https://img.shields.io/badge/version-0.5.4-blue)
 
 ## Cài đặt
 

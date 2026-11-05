@@ -60,7 +60,7 @@ Order, top to bottom [Polaris, Atlassian, Primer]:
 Baseline without this skill: the record name was missing from breadcrumbs.
 
 - Show them whenever a page has a parent. Each crumb is the title of the page it links to [Polaris, Ant].
-- **The trail ends with the record's name:** "Customers / Công ty Minh Phát", "Sales / Orders / DH-1043". The last crumb is the current page: plain text with `aria-current="page"`, not a link.
+- **The trail ends with what people call the record:** its number when records are known by number (contracts, orders, invoices), otherwise its name. Examples: "Customers / Công ty Minh Phát", "Sales / Orders / DH-1043", "Contracts / HĐ-2026-0187". The last crumb is the current page: plain text with `aria-current="page"`, not a link.
 - Aim for about 3 levels; at most 5 [Polaris, Ant]. When a trail is longer, collapse the middle crumbs into "…" with a menu, keeping the first and the last two.
 - Crumb text uses a human-readable identifier (name or number), never a UUID. If the record has no name, use its type and number ("Invoice INV-1043").
 - Separator is `/` or a chevron icon (`aria-hidden`); the container is `<nav aria-label="Breadcrumb">` with an ordered list.
@@ -81,7 +81,8 @@ Baseline without this skill: secondary actions outside an overflow menu, initial
 7. **Edit model:** view mode by default, `Edit` as the primary action opens the form page or an edit state; do not mix view and inline edit fields on one record `[inferred]`.
 8. **Activity** shows who did what with absolute timestamps; see `permissions-audit.md`.
 9. **Contact values are links:** `<a href="mailto:…">` for email, `<a href="tel:+84903123456">0903 123 456</a>` for phone (the `href` in international form), websites with `target="_blank" rel="noopener"`. The primary contact carries a "Primary" badge with text `[inferred]`.
-9. A record the role cannot open shows the no-permission state; a deleted record shows "This order no longer exists" with a link back to the list.
+10. **Changes that need sign-off** (amendments, revisions, price changes) are a related list with these columns: number ("PL-03"), effective date, a one-line summary, status, and approved by with the date ("Lê Thu Hà · 12/10/2026"). A pending change shows "Pending approval" and who it is waiting for. The author is not the approver: show both when they differ `[inferred]`.
+11. A record the role cannot open shows the no-permission state; a deleted record shows "This order no longer exists" with a link back to the list.
 
 ## Settings navigation
 

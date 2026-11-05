@@ -20,7 +20,7 @@ Read this when you build a create/edit form, a settings section, a line-item edi
   - The only exception is two short fields that read as one value: City · Postal code, First name · Last name.
   - Never put three in a row, and never lay a section out on a `grid-cols-2` or 12-column grid: the eye zigzags and fields get skipped.
   - Without the skill, onboarding forms paired unrelated fields (Preferred name · Date of birth) and put three per row.
-- Labels sit above the field in `text-sm font-medium` (14px, the size of shadcn `<Label>`), always visible, 1–3 words, sentence case, no colon. A placeholder is an example value ("name@company.com"), never the label [NN/g, Carbon].
+- Labels sit above the field in `text-sm font-medium` (14px, the size of shadcn `<Label>`), always visible, 1–3 words, sentence case, no colon. `<label>` is inline by default, so give it `block`, or wrap label and field in `grid gap-1.5`. Otherwise a short field (date, ID, phone) ends up beside its label. A placeholder is an example value ("name@company.com"), never the label [NN/g, Carbon].
 - Mark required fields with `*` after the label (`<span aria-hidden="true">*</span>`) and say "* Required" once under the form title. Side labels are acceptable only in dense read-only views [NN/g, Fiori] `[inferred]`.
 - Size each field to its content: postal code `w-28`, date `w-40`, phone `w-56`, name or email full column width (`max-w-xl`). Equal-width fields everywhere hide which input is short [Carbon].
 - Use the input type that matches the value: `type="email"`, `type="tel"`, `type="url"`, `type="date"` (or the project's date picker). `inputmode` alone does not give autofill or the right mobile keyboard everywhere.
