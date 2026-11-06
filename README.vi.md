@@ -4,7 +4,7 @@
 
 **UI chuẩn doanh nghiệp cho các ứng dụng nằm sau màn hình đăng nhập.** Agent Skill này dạy các AI coding agent (Claude Code, Codex, Cursor, Antigravity, Copilot và các agent khác) xây màn hình quản lý theo cách phần mềm doanh nghiệp lâu năm vẫn làm: bảng dày thông tin nhưng dễ đọc; đủ mọi trạng thái; lưu không bao giờ làm mất dữ liệu đang nhập; và không còn kiểu "template AI".
 
-![Màn hình danh sách đơn hàng do cùng một model dựng từ cùng một đề bài, không có và có skill](docs/img/before-after-01-orders-list.png)
+![Cùng một prompt do Codex CLI và Claude Code dựng, không có và có skill, kèm điểm audit và checklist](docs/img/demo.gif)
 
 ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
 

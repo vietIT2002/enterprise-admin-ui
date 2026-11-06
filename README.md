@@ -4,7 +4,7 @@
 
 **Enterprise-grade UI for the apps behind the login.** This Agent Skill teaches AI coding agents (Claude Code, Codex, Cursor, Antigravity, Copilot and others) to build management screens the way mature business software does: dense, readable tables; complete states; saving that never loses work; and none of the "AI template" look.
 
-![Orders list built by the same model from the same brief, without and with the skill](docs/img/before-after-01-orders-list.png)
+![The same prompt built by Codex CLI and by Claude Code, without and with the skill, with audit and checklist scores](docs/img/demo.gif)
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
 

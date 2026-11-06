@@ -4,7 +4,7 @@
 
 **为登录后的应用提供企业级界面。** 这个 Agent Skill 教 AI 编程 Agent（Claude Code、Codex、Cursor、Antigravity、Copilot 等）像成熟的商业软件那样构建管理系统界面：信息密集且易读的表格；完整的各类状态；不会丢失已填内容的保存机制；也没有那种“AI 模板”味。
 
-![同一模型、同一需求说明生成的订单列表：未使用与使用本技能的对比](docs/img/before-after-01-orders-list.png)
+![同一提示词分别由 Codex CLI 和 Claude Code 生成：未使用与使用本技能的对比，附审计与验收清单得分](docs/img/demo.gif)
 
 ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
 
