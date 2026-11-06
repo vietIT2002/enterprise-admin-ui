@@ -7,7 +7,19 @@ alwaysApply: true
 
 ## Management screens (enterprise-admin-ui)
 
-For admin panels, back-office, ERP, CRM, HRM, accounting, inventory and B2B SaaS screens behind a login, load the `enterprise-admin-ui` skill and follow its page recipes. Where the skill is not installed, build with these defaults:
+For admin panels, back-office, ERP, CRM, HRM, accounting, inventory and B2B SaaS screens behind a login, load the `enterprise-admin-ui` skill and follow its page recipes. Where the skill is not installed, build with these defaults.
+
+Every screen ships with:
+
+- **States:** every list and section that shows data has an empty state with its next action, a skeleton while loading, and an inline error with Retry, reachable through `?state=` (States).
+- **One primary action** in the header, for the main task: "Renew contract" on a contract, "Create order" on orders.
+- **Confirmation** for delete, terminate and cancel. The dialog names the record and the consequence, and focus starts on Cancel.
+- **Single-line rows:** name and code go in separate columns, never stacked in one cell.
+- **Dates that matter** show the absolute date and the time left in words ("Expires 28/02/2027 · in 56 days"). Overdue and due-soon items come first.
+- **Forms:** labels above fields, an error summary that moves focus to the first invalid field, a sticky Save/Cancel bar and an unsaved-changes warning. Uploads state the accepted types and size limit.
+- **Announcements:** success toasts name the record, and status and error messages use `role="status"` or `role="alert"`.
+
+Foundations:
 
 - **Font:** System UI stack; weights 400/500/600. 14px (`text-sm`): body, table cells, field labels (`text-sm font-medium`), help text and error messages. 12px (`text-xs`): captions, badges, nav group labels, timestamps under a title. 20–24px: page title
 - **Text colour:** Body `#0f172a`. Secondary text `#475569` (slate-600) or darker; slate-500 only on white or slate-50; slate-400 and lighter never carry text. Re-check 4.5:1 on tinted and dark surfaces. White text sits only on 700-shade fills (blue-600 and red-600 also pass), not on -500 fills or on green, emerald, amber, teal or sky-600. Badge text uses the 700–800 shade on the 50 background, or the `-subtle` token pair.

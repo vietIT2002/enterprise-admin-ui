@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.7] — 2026-11-06
+
+### Added
+- SKILL.md: an "Every screen ships with" list near the top. It names the parts agents most often leave out: states, one primary action, confirmation for destructive actions, single-line rows, dates with the time left, form essentials and announcements. In an A/B test at low reasoning effort on briefs that did not shape the list, the checklist pass rate went from 44% to 56%.
+- The rule snippets in `adapters/` (AGENTS.md, Cursor, Copilot) start with the same list.
+
+### Docs
+- Benchmark: the cost per page with and without the skill, and how reasoning effort trades cost for completeness. At default effort the skill reached 93% of the checklist for $1.43 per page; at low effort, 78% for $0.53. Without the skill it was 26% for $0.30.
+
 ## [0.5.6] — 2026-11-05
 
 ### Added
@@ -107,6 +116,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.7]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.7
 [0.5.6]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.6
 [0.5.5]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.5
 [0.5.4]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.4
@@ -114,3 +124,4 @@ All notable changes to this project are documented here. The format follows [Kee
 [0.5.2]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.2
 [0.5.1]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.1
 [0.5.0]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.0
+

@@ -6,7 +6,7 @@
 
 ![Orders list built by the same model from the same brief, without and with the skill](docs/img/before-after-01-orders-list.png)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.6](https://img.shields.io/badge/version-0.5.6-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
 
 ## Install
 

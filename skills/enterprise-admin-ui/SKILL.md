@@ -23,6 +23,17 @@ People use management software all day to find records, change them safely and s
 4. **Apply** States, Saving, Tables and Foundations.
 5. **Verify** with the audit and the checklist at the end.
 
+## Every screen ships with
+
+These are the parts most often left out. Build them even for a quick draft:
+- **States:** every list and section that shows data has an empty state with its next action, a skeleton while loading, and an inline error with Retry, reachable through `?state=` (States).
+- **One primary action** in the header, for the main task: "Renew contract" on a contract, "Create order" on orders.
+- **Confirmation** for delete, terminate and cancel. The dialog names the record and the consequence, and focus starts on Cancel.
+- **Single-line rows:** name and code go in separate columns, never stacked in one cell.
+- **Dates that matter** show the absolute date and the time left in words ("Expires 28/02/2027 · in 56 days"). Overdue and due-soon items come first.
+- **Forms:** labels above fields, an error summary that moves focus to the first invalid field, a sticky Save/Cancel bar and an unsaved-changes warning. Uploads state the accepted types and size limit.
+- **Announcements:** success toasts name the record, and status and error messages use `role="status"` or `role="alert"`.
+
 ## Page recipes
 
 ### List (index of records)
