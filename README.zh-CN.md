@@ -10,16 +10,64 @@
 
 ## 安装
 
+在项目目录中打开终端，运行与你的系统对应的命令。`skills` CLI 需要 Node.js 22.20 或更高版本。它会询问要为哪些 Agent 安装，并把技能放进各个 Agent 的目录。
+
+**macOS / Linux**（终端）：
+
 ```bash
 npx skills add vietIT2002/enterprise-admin-ui
 ```
 
-`skills` CLI 会检测你机器上已安装的 Agent，并把技能安装到对应的目录。在 Windows 上请加上 `--copy`，让它复制文件而不是创建符号链接。
+**Windows**（PowerShell）：
+
+```powershell
+npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
+```
+
+- 请用 `npx.cmd`，不要用 `npx`。PowerShell 的默认执行策略会阻止 `npx.ps1`，报错 "running scripts is disabled on this system"。在命令提示符（cmd）中可以直接用 `npx`。
+- `--copy` 会写入真实文件。不加它时，如果为多个 Agent 安装，CLI 会用指向绝对路径的 junction 链接它们，项目移动或被克隆后链接就会失效。
+
+常用参数，各系统相同：
+- `-a claude-code` 直接指定 Agent，不再询问（还有 `codex`、`cursor`、`github-copilot`、`antigravity` 等）；`-y` 跳过所有确认。
+- `-g` 安装到用户目录，供所有项目使用，而不只是当前项目。
+
+例如，为 Claude Code 安装到所有项目：
+
+```bash
+# macOS / Linux
+npx skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y
+```
+
+```powershell
+# Windows
+npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
+```
+
+以后更新时，运行 `npx skills update`（Windows 上为 `npx.cmd skills update`）。
 
 <details>
 <summary><b>手动安装（适用于任何 Agent）</b></summary>
 
-把 `skills/enterprise-admin-ui` 文件夹复制到项目目录或你的用户目录中。请直接复制，不要使用符号链接，因为符号链接在 Windows 上不可靠。
+把 `skills/enterprise-admin-ui` 文件夹复制到 Agent 的技能目录（见下表）。下面的命令为当前项目的 Claude Code 安装；如果是其他 Agent，请把 `.claude/skills` 换成对应的目录。
+
+macOS / Linux：
+
+```bash
+T=$(mktemp -d)
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git "$T"
+mkdir -p .claude/skills && cp -R "$T/skills/enterprise-admin-ui" .claude/skills/
+```
+
+Windows（PowerShell）：
+
+```powershell
+$t = Join-Path $env:TEMP ([guid]::NewGuid())
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git $t
+New-Item -ItemType Directory -Force .claude\skills | Out-Null
+Copy-Item -Recurse -Force "$t\skills\enterprise-admin-ui" .claude\skills\
+```
+
+请直接复制，不要使用符号链接，因为符号链接在 Windows 上不可靠。
 
 | Agent | 项目目录 | 用户目录 |
 |---|---|---|
@@ -72,7 +120,29 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 
 </details>
 
-使用时，直接让 Agent 做一个管理界面即可（例如“为我们的 ERP 做一个订单页面”），也可以让 Agent 使用 enterprise-admin-ui 技能。在 Claude Code 中还可以输入 `/enterprise-admin-ui`；如果是以插件方式安装的，则输入 `/enterprise-admin-ui:enterprise-admin-ui`。
+## 在项目中使用
+
+安装后，用 Agent 打开项目并开启一个新会话，让 Agent 识别到技能。然后输入：
+
+| Agent | 在对话框中输入 |
+|---|---|
+| Claude Code | `/enterprise-admin-ui` 加上你的需求（以插件方式安装时：`/enterprise-admin-ui:enterprise-admin-ui`） |
+| Codex | `$enterprise-admin-ui` 加上你的需求，或在 `/skills` 中选择 |
+| Cursor | 在 Agent 对话中输入 `/enterprise-admin-ui` |
+| VS Code 中的 GitHub Copilot | 在对话中输入 `/enterprise-admin-ui` |
+| Antigravity、Kiro 等 | 你的需求，再加一句“使用 enterprise-admin-ui 技能” |
+
+示例：
+
+```text
+/enterprise-admin-ui 为 ERP 做订单列表页：筛选、批量操作、分页
+/enterprise-admin-ui 做客户新建/编辑表单，带校验和“保存草稿”
+/enterprise-admin-ui Review app/orders/page.tsx
+```
+
+- **构建界面：** 说明界面名称和它的数据。在有多个界面的项目中，技能会先根据你的回答或代码创建 `DESIGN.md`（产品、角色、区域设置、状态名称），之后的界面都遵循它。
+- **审查：** 让它“review”或“audit”。它以 `path:line — rule — fix` 的形式列出问题并按级别分组，只有在你要求修复时才改代码。
+- **不必输入命令：** 只要提出管理界面的需求，技能就会自动加载（在 Claude Code 中 20/20 个提示词）。写明技能名可以确保加载。
 
 ## 适用范围
 
@@ -203,7 +273,7 @@ skills/enterprise-admin-ui/
 - 忽略变音符号的搜索。
 
 **如何更新？** 取决于你的安装方式：
-- `npx skills add`：重新运行一次。
+- `npx skills add`：运行 `npx skills update`（Windows 上为 `npx.cmd skills update`）。
 - `gh skill`：运行 `gh skill update`。
 - 插件：插件版本更新时随之更新。
 - 手动复制：重新复制一次文件夹。

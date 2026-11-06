@@ -10,16 +10,64 @@
 
 ## Install
 
+Open a terminal in your project folder and run the command for your system. The `skills` CLI needs Node.js 22.20 or later. It asks which agents to install for and puts the skill in each agent's folder.
+
+**macOS / Linux** (Terminal):
+
 ```bash
 npx skills add vietIT2002/enterprise-admin-ui
 ```
 
-The `skills` CLI detects the agents on your machine and installs the skill into the right folder. On Windows, add `--copy` so it copies the files instead of symlinking them.
+**Windows** (PowerShell):
+
+```powershell
+npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
+```
+
+- Use `npx.cmd`, not `npx`. PowerShell's default policy blocks `npx.ps1` with "running scripts is disabled on this system". In Command Prompt, `npx` works.
+- `--copy` writes real files. Without it, an install for several agents links them with a junction to an absolute path, which breaks when the project moves or is cloned.
+
+Useful flags, the same on every system:
+- `-a claude-code` picks the agent without the prompt (also `codex`, `cursor`, `github-copilot`, `antigravity` …), and `-y` skips confirmations.
+- `-g` installs into your user folder for every project, instead of this project only.
+
+For example, Claude Code in every project:
+
+```bash
+# macOS / Linux
+npx skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y
+```
+
+```powershell
+# Windows
+npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
+```
+
+To update later, run `npx skills update` (`npx.cmd skills update` on Windows).
 
 <details>
 <summary><b>Manual install (any agent)</b></summary>
 
-Copy the folder `skills/enterprise-admin-ui` into a project folder or your user folder. Copy rather than symlink, because symlinks are unreliable on Windows.
+Copy the folder `skills/enterprise-admin-ui` into your agent's skills folder (see the table). These commands install it for Claude Code in the current project; for another agent, replace `.claude/skills` with its folder.
+
+macOS / Linux:
+
+```bash
+T=$(mktemp -d)
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git "$T"
+mkdir -p .claude/skills && cp -R "$T/skills/enterprise-admin-ui" .claude/skills/
+```
+
+Windows (PowerShell):
+
+```powershell
+$t = Join-Path $env:TEMP ([guid]::NewGuid())
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git $t
+New-Item -ItemType Directory -Force .claude\skills | Out-Null
+Copy-Item -Recurse -Force "$t\skills\enterprise-admin-ui" .claude\skills\
+```
+
+Copy rather than symlink, because symlinks are unreliable on Windows.
 
 | Agent | Project folder | User folder |
 |---|---|---|
@@ -72,7 +120,29 @@ Skills load when the agent decides they apply. To keep the core rules in every s
 
 </details>
 
-To use it, ask for a management screen ("build the orders page for our ERP"), or ask the agent to use the enterprise-admin-ui skill. In Claude Code you can also type `/enterprise-admin-ui`, or `/enterprise-admin-ui:enterprise-admin-ui` when it was installed as a plugin.
+## Use it in your project
+
+After installing, open the project in your agent and start a new session so the agent finds the skill. Then type:
+
+| Agent | Type in the chat |
+|---|---|
+| Claude Code | `/enterprise-admin-ui` and your request (installed as a plugin: `/enterprise-admin-ui:enterprise-admin-ui`) |
+| Codex | `$enterprise-admin-ui` and your request, or pick it from `/skills` |
+| Cursor | `/enterprise-admin-ui` in Agent chat |
+| GitHub Copilot in VS Code | `/enterprise-admin-ui` in chat |
+| Antigravity, Kiro and others | Your request, plus "use the enterprise-admin-ui skill" |
+
+Examples:
+
+```text
+/enterprise-admin-ui Build the orders list page for our ERP: filters, bulk actions, pagination
+/enterprise-admin-ui Build the customer create/edit form with validation and Save draft
+/enterprise-admin-ui Review app/orders/page.tsx
+```
+
+- **Build a screen:** name the screen and its data. In a project with several screens, the skill first creates `DESIGN.md` (product, roles, locale, status names) from your answers or the code, and later screens follow it.
+- **Review:** ask it to "review" or "audit". It lists findings as `path:line — rule — fix`, grouped by level, and changes code only when you ask for fixes.
+- **No command needed:** a request for a management screen loads the skill on its own (20/20 prompts in Claude Code). Naming it makes sure.
 
 ## Scope
 
@@ -203,7 +273,7 @@ The skills work together. Use an aesthetics skill for the marketing site and thi
 - diacritic-insensitive search.
 
 **How do I update?** It depends on how you installed:
-- `npx skills add`: run it again.
+- `npx skills add`: run `npx skills update` (`npx.cmd skills update` on Windows).
 - `gh skill`: run `gh skill update`.
 - A plugin: it updates when the plugin version changes.
 - Manual copy: copy the folder again.

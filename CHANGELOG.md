@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Docs
+- README install gives separate commands for macOS/Linux and Windows. On Windows it uses `npx.cmd`, because PowerShell's default policy blocks `npx.ps1`, and `--copy`. It also lists the `-a`, `-y` and `-g` flags and manual `git clone` commands for both systems, and notes that the `skills` CLI needs Node.js 22.20 or later.
+- README "Use it in your project": what to type in Claude Code, Codex, Cursor and GitHub Copilot, with example requests for building and reviewing.
+
 ## [0.5.8] — 2026-11-06
 
 ### Added

@@ -10,16 +10,64 @@
 
 ## Cài đặt
 
+Mở terminal tại thư mục dự án rồi chạy lệnh dành cho hệ điều hành của bạn. CLI `skills` cần Node.js 22.20 trở lên. CLI sẽ hỏi bạn cài cho agent nào, rồi đặt skill vào thư mục của từng agent.
+
+**macOS / Linux** (Terminal):
+
 ```bash
 npx skills add vietIT2002/enterprise-admin-ui
 ```
 
-CLI `skills` tự phát hiện các agent có trên máy và cài skill vào đúng thư mục. Trên Windows, thêm `--copy` để CLI chép file thay vì tạo symlink.
+**Windows** (PowerShell):
+
+```powershell
+npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
+```
+
+- Dùng `npx.cmd` thay cho `npx`. Chính sách mặc định của PowerShell chặn `npx.ps1` với lỗi "running scripts is disabled on this system". Trong Command Prompt (cmd), `npx` chạy bình thường.
+- `--copy` chép file thật. Nếu thiếu tùy chọn này, khi cài cho nhiều agent CLI sẽ tạo junction trỏ tới đường dẫn tuyệt đối, và liên kết đó hỏng khi dự án bị chuyển chỗ hoặc được clone sang máy khác.
+
+Các tùy chọn hay dùng, giống nhau trên mọi hệ điều hành:
+- `-a claude-code` chọn agent mà không cần trả lời câu hỏi (có cả `codex`, `cursor`, `github-copilot`, `antigravity` …), còn `-y` bỏ qua các bước xác nhận.
+- `-g` cài vào thư mục người dùng để mọi dự án đều dùng được, thay vì chỉ dự án hiện tại.
+
+Ví dụ, cài cho Claude Code ở mọi dự án:
+
+```bash
+# macOS / Linux
+npx skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y
+```
+
+```powershell
+# Windows
+npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
+```
+
+Để cập nhật về sau, chạy `npx skills update` (trên Windows: `npx.cmd skills update`).
 
 <details>
 <summary><b>Cài thủ công (mọi agent)</b></summary>
 
-Chép thư mục `skills/enterprise-admin-ui` vào thư mục trong dự án hoặc thư mục người dùng của bạn. Hãy chép thay vì tạo symlink, vì symlink không ổn định trên Windows.
+Chép thư mục `skills/enterprise-admin-ui` vào thư mục skill của agent (xem bảng). Các lệnh dưới đây cài cho Claude Code trong dự án hiện tại; với agent khác, đổi `.claude/skills` thành thư mục tương ứng.
+
+macOS / Linux:
+
+```bash
+T=$(mktemp -d)
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git "$T"
+mkdir -p .claude/skills && cp -R "$T/skills/enterprise-admin-ui" .claude/skills/
+```
+
+Windows (PowerShell):
+
+```powershell
+$t = Join-Path $env:TEMP ([guid]::NewGuid())
+git clone --depth 1 https://github.com/vietIT2002/enterprise-admin-ui.git $t
+New-Item -ItemType Directory -Force .claude\skills | Out-Null
+Copy-Item -Recurse -Force "$t\skills\enterprise-admin-ui" .claude\skills\
+```
+
+Hãy chép thay vì tạo symlink, vì symlink không ổn định trên Windows.
 
 | Agent | Thư mục trong dự án | Thư mục người dùng |
 |---|---|---|
@@ -72,7 +120,29 @@ Skill chỉ được nạp khi agent thấy cần dùng. Để các quy tắc c�
 
 </details>
 
-Để dùng, chỉ cần yêu cầu một màn hình quản lý ("làm trang đơn hàng cho ERP của chúng tôi"), hoặc bảo agent dùng skill enterprise-admin-ui. Trong Claude Code, bạn cũng có thể gõ `/enterprise-admin-ui`, hoặc `/enterprise-admin-ui:enterprise-admin-ui` nếu skill được cài dưới dạng plugin.
+## Dùng trong dự án
+
+Sau khi cài, mở dự án bằng agent và bắt đầu một phiên mới để agent nhận ra skill. Sau đó gõ:
+
+| Agent | Gõ vào khung chat |
+|---|---|
+| Claude Code | `/enterprise-admin-ui` kèm yêu cầu (nếu cài dạng plugin: `/enterprise-admin-ui:enterprise-admin-ui`) |
+| Codex | `$enterprise-admin-ui` kèm yêu cầu, hoặc chọn skill trong `/skills` |
+| Cursor | `/enterprise-admin-ui` trong Agent chat |
+| GitHub Copilot trong VS Code | `/enterprise-admin-ui` trong chat |
+| Antigravity, Kiro và các agent khác | Yêu cầu của bạn, thêm câu "dùng skill enterprise-admin-ui" |
+
+Ví dụ:
+
+```text
+/enterprise-admin-ui Làm trang danh sách đơn hàng cho ERP: bộ lọc, thao tác hàng loạt, phân trang
+/enterprise-admin-ui Làm form tạo/sửa khách hàng có kiểm tra dữ liệu và nút Lưu nháp
+/enterprise-admin-ui Review app/orders/page.tsx
+```
+
+- **Xây màn hình:** nêu tên màn hình và dữ liệu của nó. Với dự án có nhiều màn hình, skill tạo `DESIGN.md` trước (sản phẩm, vai trò, locale, tên trạng thái) từ câu trả lời của bạn hoặc từ code, và các màn hình sau đều theo file này.
+- **Review:** yêu cầu "review" hoặc "audit". Skill liệt kê lỗi dạng `path:line — rule — fix`, nhóm theo mức độ, và chỉ sửa code khi bạn yêu cầu.
+- **Không bắt buộc gõ lệnh:** chỉ cần yêu cầu một màn hình quản lý là skill tự nạp (20/20 prompt trong Claude Code). Gọi tên skill để chắc chắn.
 
 ## Phạm vi
 
@@ -203,7 +273,7 @@ Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm 
 - tìm kiếm không phân biệt dấu.
 
 **Cập nhật thế nào?** Tùy vào cách bạn đã cài:
-- `npx skills add`: chạy lại lệnh này.
+- `npx skills add`: chạy `npx skills update` (trên Windows: `npx.cmd skills update`).
 - `gh skill`: chạy `gh skill update`.
 - Plugin: skill được cập nhật khi phiên bản plugin thay đổi.
 - Chép thủ công: chép lại thư mục.
