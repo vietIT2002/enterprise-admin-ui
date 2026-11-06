@@ -6,7 +6,7 @@
 
 ![The same prompt built by Codex CLI and by Claude Code, without and with the skill, with audit and checklist scores](docs/img/demo.gif)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 13](https://img.shields.io/badge/references-13-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 17](https://img.shields.io/badge/references-17-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.8](https://img.shields.io/badge/version-0.5.8-blue)
 
 ## Install
 
@@ -89,8 +89,8 @@ If your project already has a design system or a customised component library, t
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            193 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
-├─ references/         13 files, loaded only when the task needs them
+├─ SKILL.md            248 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
+├─ references/         17 files, loaded only when the task needs them
 ├─ scripts/audit.js    dependency-free browser audit, 22 rules, score 0–100
 └─ assets/
    ├─ tokens.css           shadcn-compatible tokens, light and dark, Tailwind v4 @theme
@@ -116,6 +116,10 @@ skills/enterprise-admin-ui/
 | `accessibility.md` | WCAG 2.2 AA checklist for admin screens |
 | `anti-patterns.md` | 23 "AI template" tells, each with its fix and a way to detect it |
 | `react-shadcn.md` | TanStack Table, react-hook-form + zod, URL state, shadcn Sidebar |
+| `reports-print.md` | reports (periods, comparisons, totals, export) and printable documents (invoices, payslips) |
+| `calendars.md` | leave, shift and booking calendars: week start, multi-day bars, coverage, keyboard grid |
+| `boards.md` | Kanban boards: columns and limits, moving cards without dragging, side-panel details |
+| `trees.md` | trees and split views: chart of accounts, org charts, categories |
 
 **Review mode.** Ask the agent to "review this screen". It reports findings as `path:line — rule — fix`, grouped by level (`data`, `states`, `a11y`, `layout`, `tells`), and changes code only when you ask.
 
@@ -190,7 +194,7 @@ The skills work together. Use an aesthetics skill for the marketing site and thi
 
 **Will it fight my design system?** No. A project design system or customised component library always wins; the skill then applies only layout, state and behaviour rules. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
 
-**How many tokens does it cost?** `SKILL.md` is 193 lines (about 15 KB, roughly 4k tokens). References load only when the task needs them, for example `tables.md` for a table.
+**How many tokens does it cost?** `SKILL.md` is 248 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
 
 **Does it handle Vietnamese and other locales?** Yes. Formatting goes through `Intl` with the project locale. `data-formatting.md` has a vi-VN profile:
 - `1.250.000 ₫`;

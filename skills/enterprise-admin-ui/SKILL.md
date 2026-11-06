@@ -95,6 +95,38 @@ These are the parts most often left out. Build them even for a quick draft:
   - Save is explicit, with an "Unsaved changes" indicator.
 - **Attachments** show name, type and size, with Preview and Download.
 
+### Report and printable document (`references/reports-print.md`)
+1. **Report:**
+   - the title states the measure and period ("Revenue · October 2026");
+   - a basis line gives currency, tax basis and "Updated …";
+   - period presets come first in the filters;
+   - every comparison names its base ("+12.4% vs Sep 2026") and a missing base shows "—";
+   - a totals row equals the sum of what is shown.
+2. **Document** (invoice, payslip, quotation):
+   - an A4 sheet on screen, with status and actions in the page header;
+   - a print stylesheet that hides the shell, repeats the table header and never splits rows;
+   - legible in black and white.
+
+### Calendar, board and tree
+- **Calendar** (`references/calendars.md`):
+  - weeks start on the locale's first day;
+  - today is marked with text;
+  - entries show person and type in text, with pending as dashed plus the word "Pending";
+  - multi-day entries are one bar per week row;
+  - daily counts ("3 of 8 off");
+  - a keyboard grid and a list view.
+- **Board** (`references/boards.md`):
+  - a bounded height, so columns scroll with sticky headers;
+  - counts and limits ("5 / 6");
+  - every card movable without dragging, with an announcement and Undo;
+  - details in a side panel;
+  - a Board · List switch.
+- **Tree and split view** (`references/trees.md`):
+  - tree or treegrid roles, arrows, Home/End;
+  - a parent equals the sum of its children;
+  - the expanded state persists and the selection lives in the URL;
+  - the detail panel shows the path.
+
 ## States
 
 Design every state of every data region:
@@ -144,7 +176,7 @@ Design every state of every data region:
 
 ## Foundations
 
-Use these values when the project has no design system; `assets/tokens.css` implements them. In a single HTML file with the Tailwind CDN, use the Tailwind palette classes named here (slate-600, blue-700 …) or inline the tokens and config from `references/tokens.md`; token class names such as `bg-sidebar` work only with that config. Add `[hidden] { display: none !important; }` to the page's `<style>` so the `hidden` attribute always wins over `flex` and `grid` classes.
+Use these values when the project has no design system; `assets/tokens.css` implements them. In a single HTML file with the Tailwind CDN, use the Tailwind palette classes named here (slate-600, blue-700 …); such a page needs neither `references/tokens.md` nor `assets/tokens.css`. Token class names such as `bg-sidebar` work only with the config in `tokens.md`. Add `[hidden] { display: none !important; }` to the page's `<style>` so the `hidden` attribute always wins over `flex` and `grid` classes.
 
 | Area | Value |
 |---|---|
@@ -210,3 +242,7 @@ When the user asks to review or audit existing screens, report findings instead 
 | `references/accessibility.md` | WCAG 2.2 AA checklist: keyboard, focus, names, live regions, targets |
 | `references/anti-patterns.md` | template tells with the fix for each; reviewing AI-built screens |
 | `references/react-shadcn.md` | React with shadcn/ui: TanStack Table, react-hook-form + zod, URL state, Sidebar |
+| `references/reports-print.md` | reports (periods, comparisons, totals, export) and printable documents (invoices, payslips) |
+| `references/calendars.md` | calendars and schedules: leave, shifts, bookings; week start, multi-day bars, coverage |
+| `references/boards.md` | Kanban boards: columns, cards, moving without drag, transitions, side-panel details |
+| `references/trees.md` | trees and split views: chart of accounts, org charts, categories; keyboard and persistence |

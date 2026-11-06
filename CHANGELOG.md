@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.5.8] — 2026-11-06
+
+### Added
+- Four references for new screen types, each written from the gaps measured on new briefs:
+  - `reports-print.md`: reports with periods, named comparisons and totals, and printable documents with a print stylesheet;
+  - `calendars.md`: the locale's week start, multi-day bars, daily coverage, a keyboard grid and a list view;
+  - `boards.md`: a bounded board with scrolling columns, limits, moves without dragging, Undo and side-panel details;
+  - `trees.md`: tree and treegrid roles and keys, parent totals, persisted state and split views.
+- SKILL.md recipes for these screen types.
+- `calendars.md` covers sizes and layering:
+  - entries and "+N more" are at least 24px tall with 12px text;
+  - other months' day numbers are slate-500;
+  - bars that share a grid with the day cells sit above them (`relative z-10`). A measured page drew every bar under its positioned day cells, so no leave was visible.
+
+### Changed
+- SKILL.md Foundations: a single HTML file with the Tailwind CDN uses the palette classes and needs neither `tokens.md` nor `tokens.css`. Traced agents had opened both, which added context but nothing to the page.
+- Status badges stay on one line with the whole word (`whitespace-nowrap`), and the column takes the width of the longest status instead of abbreviating it.
+
+### Fixed
+- `audit.js` 0.5.1 recognises a month grid (7 cells a row, consecutive days of the month) and no longer checks it as a data table. Before, each day number counted as a left-aligned number without tabular figures, and each week row as too tall. One calendar page went from 36 to 70.
+- `calendars.md`: `workingDays` used `toISOString()`, which gives the previous day east of UTC, so a holiday on a Friday was not excluded in Vietnam. It now uses local date parts.
+
+### Docs
+- README leads with a demo GIF: the same prompt built by Codex CLI and Claude Code, without and with the skill.
+- README gives the current size of `SKILL.md` (248 lines, about 5k tokens) and the number of references (17).
+- Benchmark: five briefs for the new screen types. Checklist pass rate: 33% without the skill, 50% with 0.5.7, 91% with the new references, which were written from these briefs' failures.
+
 ## [0.5.7] — 2026-11-06
 
 ### Added
@@ -116,6 +143,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.8]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.8
 [0.5.7]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.7
 [0.5.6]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.6
 [0.5.5]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.5

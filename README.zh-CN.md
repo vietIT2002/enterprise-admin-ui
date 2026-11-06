@@ -6,7 +6,7 @@
 
 ![同一提示词分别由 Codex CLI 和 Claude Code 生成：未使用与使用本技能的对比，附审计与验收清单得分](docs/img/demo.gif)
 
-![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：13](https://img.shields.io/badge/references-13-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
+![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.8](https://img.shields.io/badge/version-0.5.8-blue)
 
 ## 安装
 
@@ -89,8 +89,8 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            193 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
-├─ references/         13 个文件，仅在任务需要时加载
+├─ SKILL.md            248 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
+├─ references/         17 个文件，仅在任务需要时加载
 ├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
 └─ assets/
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
@@ -116,6 +116,10 @@ skills/enterprise-admin-ui/
 | `accessibility.md` | 面向管理界面的 WCAG 2.2 AA 检查清单 |
 | `anti-patterns.md` | 23 个“AI 模板”痕迹，每个都附带修复方法和检测方式 |
 | `react-shadcn.md` | TanStack Table、react-hook-form + zod、URL 状态、shadcn Sidebar |
+| `reports-print.md` | 报表（期间、对比、合计、导出）与可打印单据（发票、工资单） |
+| `calendars.md` | 请假、排班与预约日历：周起始日、跨天条、在岗人数、键盘网格 |
+| `boards.md` | 看板：列与上限、无需拖拽即可移动卡片、侧边详情面板 |
+| `trees.md` | 树与分栏视图：会计科目表、组织架构、分类 |
 
 **审查模式。** 让 Agent “审查这个界面”。它会按 `path:line — rule — fix` 的格式报告问题，并按级别分组（`data`、`states`、`a11y`、`layout`、`tells`），只有在你要求时才会修改代码。
 
@@ -190,7 +194,7 @@ skills/enterprise-admin-ui/
 
 **它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
 
-**会消耗多少 token？** `SKILL.md` 共 193 行（约 15 KB，大约 4k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+**会消耗多少 token？** `SKILL.md` 共 248 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
 
 **支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
 - `1.250.000 ₫`；

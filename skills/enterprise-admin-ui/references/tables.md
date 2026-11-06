@@ -134,7 +134,8 @@ Keep the table header visible in every state and put the message in the body, sp
 
 - Use a pill badge with text, from the five-tone vocabulary only: neutral, info, success, warning, danger. Never add a sixth colour.
 - Classes: neutral `bg-neutral-subtle text-neutral-subtle-foreground`; info `bg-info-subtle text-info-subtle-foreground`; success `bg-success-subtle text-success-subtle-foreground`; warning `bg-warning-subtle text-warning-subtle-foreground`; danger `bg-danger-subtle text-danger-subtle-foreground`. All pass 4.5:1.
-- Shape: `inline-flex h-6 items-center rounded-full px-2 text-xs leading-5 font-medium` (`leading-5` keeps Vietnamese marks inside the fixed height). Sentence case, text always present, optionally a 16px icon so colour is never the only signal [Carbon, Atlassian].
+- Shape: `inline-flex h-6 items-center whitespace-nowrap rounded-full px-2 text-xs leading-5 font-medium` (`leading-5` keeps Vietnamese marks inside the fixed height). Sentence case, text always present, optionally a 16px icon so colour is never the only signal [Carbon, Atlassian].
+- A badge is one line with the whole word. Give the column the width of its longest status ("Ngừng hoạt động") instead of wrapping the badge or abbreviating it ("Ngừng h.đ.").
 - Map each entity's statuses to tones once, in DESIGN.md (Pending → info, Paid → success, Overdue → danger), and render them from one `StatusBadge` component. Do not choose colours per page.
 - Keep the column left-aligned and near the front. Avoid showing more than 5–6 distinct statuses at once [Carbon].
 

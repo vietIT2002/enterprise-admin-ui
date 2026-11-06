@@ -13,7 +13,7 @@
 (function (root) {
   'use strict';
 
-  const VERSION = '0.5.0';
+  const VERSION = '0.5.1';
   const WEIGHTS = { error: 10, warn: 4 };
   const MAX_EXAMPLES = 5;
 
@@ -602,22 +602,51 @@
     return t.right >= cellInnerRight(ctx, cell) - 2;
   }
 
+  // A month grid is a calendar, not a data table: each row is a week of 7 cells, and each cell
+  // starts with its day of the month, one more than the cell before (or 1 where a month starts).
+  function isCalendarGrid(rows) {
+    if (rows.length < 2) return false;
+    let pairs = 0;
+    let steps = 0;
+    for (const { cells } of rows) {
+      const week = cells.length === 8 ? cells.slice(1) : cells; // a leading week-number column
+      if (week.length !== 7) return false;
+      const days = week.map((c) => {
+        const m = /^(\d{1,2})(?!\d)/.exec((c.innerText || c.textContent || '').trim());
+        return m && +m[1] >= 1 && +m[1] <= 31 ? +m[1] : null;
+      });
+      for (let i = 1; i < 7; i++) {
+        if (days[i - 1] === null || days[i] === null) continue;
+        pairs++;
+        if (days[i] === days[i - 1] + 1 || days[i] === 1) steps++;
+      }
+    }
+    return pairs >= 6 && steps >= pairs * 0.8;
+  }
+
   function bodyRows(ctx) {
-    const rows = [];
+    const groups = [];
     for (const table of ctx.doc.querySelectorAll('table')) {
       if (!ctx.visible(table)) continue;
+      const rows = [];
       for (const tr of table.querySelectorAll(':scope > tbody > tr')) {
         if (ctx.visible(tr)) rows.push({ row: tr, cells: Array.from(tr.cells), table });
       }
+      groups.push(rows);
     }
     for (const grid of ctx.doc.querySelectorAll('[role="grid"], [role="table"], [role="treegrid"]')) {
       if (grid.tagName === 'TABLE' || !ctx.visible(grid)) continue;
+      const rows = [];
       for (const r of grid.querySelectorAll('[role="row"]')) {
         if (!ctx.visible(r) || r.querySelector('[role="columnheader"]')) continue;
         rows.push({ row: r, cells: Array.from(r.querySelectorAll('[role="cell"], [role="gridcell"], [role="rowheader"]')), table: grid });
       }
+      groups.push(rows);
     }
-    return rows;
+    // Row height, stacking and numeric rules are for data tables; a month grid is checked as body text.
+    const calendars = groups.filter(isCalendarGrid);
+    if (calendars.length) ctx.metrics.calendarGrids = calendars.length;
+    return groups.filter((g) => !calendars.includes(g)).flat();
   }
 
   function headerCellsOf(table) {

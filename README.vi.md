@@ -6,7 +6,7 @@
 
 ![Cùng một prompt do Codex CLI và Claude Code dựng, không có và có skill, kèm điểm audit và checklist](docs/img/demo.gif)
 
-![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 13](https://img.shields.io/badge/references-13-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.7](https://img.shields.io/badge/version-0.5.7-blue)
+![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.8](https://img.shields.io/badge/version-0.5.8-blue)
 
 ## Cài đặt
 
@@ -89,8 +89,8 @@ Nếu dự án đã có design system hoặc thư viện component tùy biến, 
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            193 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
-├─ references/         13 file, chỉ nạp khi tác vụ cần
+├─ SKILL.md            248 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
+├─ references/         17 file, chỉ nạp khi tác vụ cần
 ├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 22 quy tắc, điểm 0–100
 └─ assets/
    ├─ tokens.css           token tương thích shadcn, sáng và tối, Tailwind v4 @theme
@@ -116,6 +116,10 @@ skills/enterprise-admin-ui/
 | `accessibility.md` | checklist WCAG 2.2 AA cho màn hình quản trị |
 | `anti-patterns.md` | 23 dấu hiệu "template AI", mỗi dấu hiệu kèm cách sửa và cách phát hiện |
 | `react-shadcn.md` | TanStack Table, react-hook-form + zod, trạng thái trên URL, shadcn Sidebar |
+| `reports-print.md` | báo cáo (kỳ, so sánh, tổng, xuất file) và chứng từ in (hoá đơn, phiếu lương) |
+| `calendars.md` | lịch nghỉ phép, lịch ca, đặt lịch: ngày đầu tuần, thanh nhiều ngày, số người nghỉ, bàn phím |
+| `boards.md` | bảng Kanban: cột và giới hạn, chuyển thẻ không cần kéo thả, chi tiết ở bảng bên |
+| `trees.md` | cây và màn hình chia đôi: hệ thống tài khoản, sơ đồ tổ chức, danh mục |
 
 **Review mode.** Yêu cầu agent "review màn hình này". Agent báo các vấn đề theo dạng `path:line — rule — fix`, nhóm theo cấp (`data`, `states`, `a11y`, `layout`, `tells`), và chỉ sửa code khi bạn yêu cầu.
 
@@ -190,7 +194,7 @@ Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm 
 
 **Skill có xung đột với design system của tôi không?** Không. Design system hoặc thư viện component tùy biến của dự án luôn được ưu tiên; khi đó skill chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
 
-**Skill tốn bao nhiêu token?** `SKILL.md` dài 193 dòng (khoảng 15 KB, tầm 4k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
+**Skill tốn bao nhiêu token?** `SKILL.md` dài 248 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
 
 **Skill có hỗ trợ tiếng Việt và các locale khác không?** Có. Việc định dạng đi qua `Intl` với locale của dự án. `data-formatting.md` có sẵn bộ quy ước vi-VN:
 - `1.250.000 ₫`;
