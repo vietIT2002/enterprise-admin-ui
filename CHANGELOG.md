@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Docs
 - README install gives separate commands for macOS/Linux and Windows. On Windows it uses `npx.cmd`, because PowerShell's default policy blocks `npx.ps1`, and `--copy`. It also lists the `-a`, `-y` and `-g` flags and manual `git clone` commands for both systems, and notes that the `skills` CLI needs Node.js 22.20 or later.
 - README "Use it in your project": what to type in Claude Code, Codex, Cursor and GitHub Copilot, with example requests for building and reviewing.
+- Benchmark HELDOUT3: six briefs written by an agent that never read the skill, reviewed blind. The checklist pass rate went from 22% without the skill to 48% with v0.5.8: from 16% to 58% on UI behaviour, and from 30% to 35% on domain rules the prompts did not state. README reports it as the fairest number.
+- `npm run bench -- --blind` reviews coded pages in neutral folders and keeps the key next to the runs.
 
 ## [0.5.8] — 2026-11-06
 
