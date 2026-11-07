@@ -226,7 +226,7 @@ skills/enterprise-admin-ui/
 | Median score on the skill's own audit (40 pages each) | 82 | **100** |
 | Pages with low-contrast text | 68% | **0%** |
 | Pages with ALL-CAPS labels | 73% | **0%** |
-| Acceptance checklist, 6 new screens whose checklists were written without reading the skill, blind review, v0.5.8 (6 pages each)‡ | 22% | **48%** |
+| Acceptance checklist, 12 new screens whose checklists were written without reading the skill, blind review, v0.5.8 (12 pages each)‡ | 19% | **44%** |
 | Acceptance checklist, 3 screens the skill was never written against (6 pages each) | 35% | **72%** |
 | Acceptance checklist, 3 more new screens, with v0.5.2 (6 pages each)† | 39% | **89%** |
 | Acceptance checklist, 8 main screens (16 reviews each)\* | 56% | 100% |
@@ -235,7 +235,7 @@ skills/enterprise-admin-ui/
 
 † These screens were written after the v0.5.2 rules. 4 of their 27 checklist items test those rules (5/8 → 8/8); the other 23 went from 35% to 87%.
 
-‡ The fairest number. A separate agent wrote these briefs without reading the skill, and reviewers saw randomly coded pages. On checklist items about UI behaviour (states, filters, formatting, accessibility, print, export) the pages went from 16% to **58%**. On domain requirements the prompts did not state, such as statutory payroll deductions or masking secrets in an audit log, they went from 30% to 35%. The skill teaches UI behaviour, not your business rules. See [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md).
+‡ The fairest number. A separate agent wrote these briefs without reading the skill, in two sets of six, and reviewers saw randomly coded pages. On checklist items about UI behaviour (states, filters, formatting, accessibility, print, export) the pages went from 14% to **51%**. On domain requirements the prompts did not state, such as statutory payroll deductions or masking secrets in an audit log, they went from 26% to 33%. The skill teaches UI behaviour, not your business rules. See [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) and [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
 
 ![Operations dashboard without and with the skill](docs/img/before-after-07-ops-dashboard.png)
 

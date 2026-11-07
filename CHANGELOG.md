@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format follows [Kee
 - README "Use it in your project": what to type in Claude Code, Codex, Cursor and GitHub Copilot, with example requests for building and reviewing.
 - Benchmark HELDOUT3: six briefs written by an agent that never read the skill, reviewed blind. The checklist pass rate went from 22% without the skill to 48% with v0.5.8: from 16% to 58% on UI behaviour, and from 30% to 35% on domain rules the prompts did not state. README reports it as the fairest number.
 - `npm run bench -- --blind` reviews coded pages in neutral folders and keeps the key next to the runs.
+- Benchmark HELDOUT4: six more independent briefs, reviewed blind. v0.5.8 went from 15% without the skill to 39%; over the 12 screens of HELDOUT3 and HELDOUT4, from 19% to 44%. README now reports this pooled number: 14% to 51% on UI behaviour, and 26% to 33% on domain rules the prompts did not state.
+- A tested candidate was reverted and is not in any release. It added a domain-rules step, references named in every recipe and a check-before-finish pass. Over two runs it scored 40% against 38% for v0.5.8, with UI behaviour the same, cost 1.41× per page, and wrote all 12 of its pages to the wrong folder.
+- Benchmark tools:
+  - `blind-review.mjs` reviews several run folders in one blind pool, optionally only some runs;
+  - bench recovers pages written to a sibling folder;
+  - a later session adds to `bench-usage.json` instead of replacing it.
 
 ## [0.5.8] — 2026-11-06
 

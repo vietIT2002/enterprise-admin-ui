@@ -226,7 +226,7 @@ skills/enterprise-admin-ui/
 | Điểm trung vị trên audit của chính skill (mỗi bên 40 trang) | 82 | **100** |
 | Trang có chữ tương phản thấp | 68% | **0%** |
 | Trang có nhãn VIẾT HOA TOÀN BỘ | 73% | **0%** |
-| Checklist nghiệm thu, 6 màn hình mới có checklist được viết mà không đọc skill, chấm mù, v0.5.8 (mỗi bên 6 trang)‡ | 22% | **48%** |
+| Checklist nghiệm thu, 12 màn hình mới có checklist được viết mà không đọc skill, chấm mù, v0.5.8 (mỗi bên 12 trang)‡ | 19% | **44%** |
 | Checklist nghiệm thu, 3 màn hình không dùng khi viết skill (mỗi bên 6 trang) | 35% | **72%** |
 | Checklist nghiệm thu, thêm 3 màn hình mới, với v0.5.2 (mỗi bên 6 trang)† | 39% | **89%** |
 | Checklist nghiệm thu, 8 màn hình chính (mỗi bên 16 lượt review)\* | 56% | 100% |
@@ -235,7 +235,7 @@ skills/enterprise-admin-ui/
 
 † Các màn hình này được viết sau khi có quy tắc v0.5.2. 4 trong 27 mục checklist kiểm tra trực tiếp các quy tắc đó (5/8 → 8/8); 23 mục còn lại tăng từ 35% lên 87%.
 
-‡ Con số công bằng nhất. Một agent riêng viết các brief này mà không đọc skill, và reviewer chỉ thấy các trang được mã hóa ngẫu nhiên. Với các mục về hành vi UI (trạng thái, bộ lọc, định dạng, accessibility, in, xuất file), các trang tăng từ 16% lên **58%**. Với các yêu cầu nghiệp vụ mà prompt không nêu, như các khoản khấu trừ bắt buộc trên phiếu lương hay che thông tin bí mật trong nhật ký kiểm toán, các trang chỉ tăng từ 30% lên 35%. Skill dạy hành vi UI, không dạy quy tắc nghiệp vụ của bạn. Xem [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md).
+‡ Con số công bằng nhất. Một agent riêng viết các brief này mà không đọc skill, thành hai bộ, mỗi bộ sáu brief. Reviewer chỉ thấy các trang được mã hóa ngẫu nhiên. Với các mục về hành vi UI (trạng thái, bộ lọc, định dạng, accessibility, in, xuất file), các trang tăng từ 14% lên **51%**. Với các yêu cầu nghiệp vụ mà prompt không nêu, như các khoản khấu trừ bắt buộc trên phiếu lương hay che thông tin bí mật trong nhật ký kiểm toán, các trang chỉ tăng từ 26% lên 33%. Skill dạy hành vi UI, không dạy quy tắc nghiệp vụ của bạn. Xem [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) và [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
 
 ![Dashboard vận hành không có và có skill](docs/img/before-after-07-ops-dashboard.png)
 

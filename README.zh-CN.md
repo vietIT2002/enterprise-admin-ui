@@ -226,7 +226,7 @@ skills/enterprise-admin-ui/
 | 本技能自带审计的得分中位数（各 40 个页面） | 82 | **100** |
 | 存在低对比度文字的页面 | 68% | **0%** |
 | 使用全大写标签的页面 | 73% | **0%** |
-| 验收清单：6 个新界面，其清单由未读过本技能的 Agent 编写，盲评，v0.5.8（各 6 个页面）‡ | 22% | **48%** |
+| 验收清单：12 个新界面，其清单由未读过本技能的 Agent 编写，盲评，v0.5.8（各 12 个页面）‡ | 19% | **44%** |
 | 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | **72%** |
 | 验收清单：另外 3 个新界面，使用 v0.5.2（各 6 个页面）† | 39% | **89%** |
 | 验收清单：8 个主要界面（各 16 次评审）\* | 56% | 100% |
@@ -235,7 +235,7 @@ skills/enterprise-admin-ui/
 
 † 这些界面是在 v0.5.2 规则之后编写的。27 个清单项中有 4 项直接检验这些规则（5/8 → 8/8）；其余 23 项从 35% 提升到 87%。
 
-‡ 最公允的数字。这些需求由一个未读过本技能的独立 Agent 编写，评审者只看到随机编码的页面。在关于界面行为的清单项上（状态、筛选、格式、无障碍、打印、导出），页面从 16% 提升到 **58%**；在提示词没有说明的业务要求上（例如工资单上的法定扣款、审计日志中隐藏敏感信息），只从 30% 提升到 35%。本技能教的是界面行为，而不是你的业务规则。详见 [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md)。
+‡ 最公允的数字。这些需求由一个未读过本技能的独立 Agent 编写，共两组，每组六个；评审者只看到随机编码的页面。在关于界面行为的清单项上（状态、筛选、格式、无障碍、打印、导出），页面从 14% 提升到 **51%**；在提示词没有说明的业务要求上（例如工资单上的法定扣款、审计日志中隐藏敏感信息），只从 26% 提升到 33%。本技能教的是界面行为，而不是你的业务规则。详见 [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) 和 [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md)。
 
 ![运营仪表盘：未使用与使用本技能的对比](docs/img/before-after-07-ops-dashboard.png)
 
