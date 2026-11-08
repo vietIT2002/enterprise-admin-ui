@@ -14,12 +14,16 @@ npm test
 
 On Windows PowerShell, use `npm.cmd` and `npx.cmd`.
 
+To try the audit on a page: `npm run audit -- tests/fixtures/list-clean.html --type list`.
+
 ## What the tests check
 
 | File | Checks |
 |---|---|
 | `tests/audit-internals.test.mjs` | The DOM-free helpers in `audit.js`: numbers, phone numbers, colours, contrast, shadows, gradients |
 | `tests/audit-fixtures.test.mjs` | `audit.js` in Chromium at 1440×900 on every page in `tests/fixtures/` |
+| `tests/audit-cli-unit.test.mjs` | The CLI's argument parsing, browser lookup, file URLs and exit codes |
+| `tests/audit-cli.test.mjs` | `scripts/audit-cli.mjs` run as a command on the fixtures and on pages served locally: redirects, HTTP errors, refused connections, skeletons, pages that never settle |
 | `tests/adapters.test.mjs` | `adapters/` is what `tools/build-adapters.mjs` builds from `SKILL.md` |
 | `tests/repo-facts.test.mjs` | The numbers and names in the three READMEs, the plugin manifests and `CHANGELOG.md` match the files |
 

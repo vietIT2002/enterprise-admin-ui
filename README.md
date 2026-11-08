@@ -162,6 +162,7 @@ skills/enterprise-admin-ui/
 ├─ SKILL.md            248 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         17 files, loaded only when the task needs them
 ├─ scripts/audit.js    dependency-free browser audit, 22 rules, score 0–100
+├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies
 └─ assets/
    ├─ tokens.css           shadcn-compatible tokens, light and dark, Tailwind v4 @theme
    └─ DESIGN.template.md   per-project decision file (Google design.md format)
@@ -193,7 +194,13 @@ skills/enterprise-admin-ui/
 
 **Review mode.** Ask the agent to "review this screen". It reports findings as `path:line — rule — fix`, grouped by level (`data`, `states`, `a11y`, `layout`, `tells`), and changes code only when you ask.
 
-**Audit.** With a browser, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })`. It measures:
+**Audit.** Run it from a terminal, with no dependencies:
+
+```bash
+node scripts/audit-cli.mjs http://localhost:3000/orders --type list
+```
+
+Run the command in the skill's folder. The target can be a URL or an HTML file. The CLI opens the page at 1440×900 in an installed Chrome, Edge or Chromium and prints the score. It exits with 1 on an ✗ error, so an agent or a CI job can act on it. In a browser console or with Playwright, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` instead. The audit measures:
 - type size and scale;
 - radius;
 - row height and stacked rows;

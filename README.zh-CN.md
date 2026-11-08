@@ -162,6 +162,7 @@ skills/enterprise-admin-ui/
 ├─ SKILL.md            248 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         17 个文件，仅在任务需要时加载
 ├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
+├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖
 └─ assets/
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
    └─ DESIGN.template.md   项目级决策文件（Google design.md 格式）
@@ -193,7 +194,13 @@ skills/enterprise-admin-ui/
 
 **审查模式。** 让 Agent “审查这个界面”。它会按 `path:line — rule — fix` 的格式报告问题，并按级别分组（`data`、`states`、`a11y`、`layout`、`tells`），只有在你要求时才会修改代码。
 
-**审计。** 在浏览器中注入 `scripts/audit.js`，然后运行 `enterpriseAdminAudit({ pageType: 'list' })`。它会检测：
+**审计。** 在终端中运行，无需任何依赖：
+
+```bash
+node scripts/audit-cli.mjs http://localhost:3000/orders --type list
+```
+
+在技能目录中运行该命令。目标可以是 URL，也可以是 HTML 文件。CLI 会用本机已安装的 Chrome、Edge 或 Chromium 以 1440×900 打开页面并输出评分；存在 ✗ 错误时退出码为 1，便于 Agent 或 CI 据此处理。在浏览器控制台或 Playwright 中，也可以注入 `scripts/audit.js` 并运行 `enterpriseAdminAudit({ pageType: 'list' })`。审计会检测：
 - 字号与字号层级；
 - 圆角；
 - 行高与多行堆叠的行；

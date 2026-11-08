@@ -95,6 +95,17 @@ test('SKILL.md: every file it names under references/, assets/ or scripts/ exist
   for (const name of names) assert.doesNotThrow(() => readFileSync(join(ROOT, SKILL_DIR, name)), name);
 });
 
+test('SKILL.md and every README name each file in scripts/ and assets/', () => {
+  const shipped = ['scripts', 'assets'].flatMap((dir) => readdirSync(join(ROOT, SKILL_DIR, dir)).map((f) => `${dir}/${f}`));
+  for (const file of ['SKILL.md', ...Object.keys(READMES)]) {
+    const text = file === 'SKILL.md' ? skill : read(file);
+    for (const path of shipped) {
+      const name = path.startsWith('assets/') && file !== 'SKILL.md' ? path.slice('assets/'.length) : path; // README trees nest assets
+      assert.ok(text.includes(name), `${file} does not mention ${name}`);
+    }
+  }
+});
+
 test('plugin manifests agree on name and version', () => {
   const agentPlugin = json('plugin.json');
   const claudePlugin = json('.claude-plugin/plugin.json');
