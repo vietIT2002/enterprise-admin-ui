@@ -5,14 +5,16 @@
  *
  *   node audit-cli.mjs <url | file.html>... [--type <type>] [--json] [--strict] [--browser <path>]
  *
- * Each page opens at 1440×900 and settles the way the enterprise-admin-ui benchmark does (no DOM change for 800 ms,
- * loading skeletons gone, fonts loaded, animations finished, scrolled to the top; at most 8 s) before the audit runs.
- * The browser is driven over the DevTools protocol on a pipe, with a throwaway profile.
+ * Each page opens the way the enterprise-admin-ui benchmark opens it: a light colour scheme on a 1440×900 screen, then
+ * load, network idle for 500 ms (at most 15 s), and the benchmark's settle (no DOM change for 800 ms, loading skeletons
+ * gone, fonts loaded, animations finished, scrolled to the top; at most 8 s) before the audit runs. Dialogs are
+ * dismissed, and a page that stops responding is reported instead of waited for. The browser is driven over the
+ * DevTools protocol on a pipe, with a throwaway profile; on Linux it runs without the sandbox, as Playwright does.
  *
  * Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -169,20 +171,36 @@ export function formatText(pages, pageType = null) {
 
 const AUDIT_JS = fileURLToPath(new URL('./audit.js', import.meta.url));
 const START_TIMEOUT_MS = 15000;
+const CALL_TIMEOUT_MS = 15000;
 const LOAD_TIMEOUT_MS = 30000;
+const NETWORK_IDLE = { quietMs: 500, timeoutMs: 15000 };
 const SETTLE = { quietMs: 800, capMs: 8000 };
-const BROWSER_ARGS = [
-  '--headless=new',
-  '--remote-debugging-pipe',
-  '--hide-scrollbars',
-  '--mute-audio',
-  '--no-first-run',
-  '--no-default-browser-check',
-  '--disable-extensions',
-  '--disable-background-networking',
-  '--disable-component-update',
-  '--disable-sync',
-];
+const SETTLE_TIMEOUT_MS = SETTLE.capMs + 10000;
+const AUDIT_TIMEOUT_MS = 30000;
+const VIEWPORT = { width: 1440, height: 900 };
+
+// Launch flags. Beside headless-over-a-pipe, the flags Playwright passes for the same platforms: Linux containers and
+// root (Docker agents, CI) cannot start Chrome's sandbox or have a small /dev/shm; macOS would prompt for the keychain;
+// on Windows, Edge's compatibility relaunch and Chrome's de-elevation relaunch would lose the pipe.
+export function browserArgs({ platform = process.platform } = {}) {
+  const args = [
+    '--headless=new',
+    '--remote-debugging-pipe',
+    '--hide-scrollbars',
+    '--mute-audio',
+    '--no-first-run',
+    '--no-default-browser-check',
+    '--disable-extensions',
+    '--disable-background-networking',
+    '--disable-component-update',
+    '--disable-sync',
+    '--disable-dev-shm-usage',
+  ];
+  if (platform === 'linux') args.push('--no-sandbox');
+  if (platform === 'darwin') args.push('--use-mock-keychain', '--password-store=basic');
+  if (platform === 'win32') args.push('--edge-skip-compat-layer-relaunch', '--disable-features=AutoDeElevate');
+  return args;
+}
 
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 
@@ -203,29 +221,21 @@ class Browser {
     const profile = mkdtempSync(join(tmpdir(), 'eaui-audit-'));
     let child;
     try {
-      child = spawn(executable, [...BROWSER_ARGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
+      child = spawn(executable, [...browserArgs(), `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
     } catch (err) {
       rmSync(profile, { recursive: true, force: true });
       throw new Error(`Browser could not start (${err.code || err.message}): ${executable}`);
     }
     const browser = new Browser(child, profile);
-    let timer;
     try {
-      const version = browser.send('Browser.getVersion');
-      version.catch(() => {}); // handled by the race below, or rejected later by close()
-      const timeout = new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error('timed out after 15 s')), START_TIMEOUT_MS);
-      });
-      await Promise.race([version, timeout]);
+      await browser.send('Browser.getVersion', {}, undefined, START_TIMEOUT_MS);
       return browser;
     } catch (err) {
       await delay(100); // let the last stderr lines arrive
-      const reason = browser.exitCode ?? err.code ?? err.message;
+      const reason = browser.exitCode ?? (err.timeout ? 'no answer in 15 s' : err.message);
       const tail = browser.stderr.trim().split(/\r?\n/).slice(-5).join('\n');
       await browser.close();
       throw new Error(`Browser could not start (${reason}): ${tail || executable}`);
-    } finally {
-      clearTimeout(timer);
     }
   }
 
@@ -288,11 +298,20 @@ class Browser {
     for (const listener of this.listeners) listener(message);
   }
 
-  send(method, params = {}, sessionId = undefined) {
+  // A protocol call. It rejects with err.timeout = true when the browser has not answered within timeoutMs.
+  send(method, params = {}, sessionId = undefined, timeoutMs = CALL_TIMEOUT_MS) {
     if (this.failure) return Promise.reject(this.failure);
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, method });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(Object.assign(new Error(`${method} did not respond within ${Math.round(timeoutMs / 1000)} s`), { timeout: true }));
+      }, timeoutMs);
+      const settle = (fn) => (value) => {
+        clearTimeout(timer);
+        fn(value);
+      };
+      this.pending.set(id, { resolve: settle(resolve), reject: settle(reject), method });
       this.child.stdio[3].write(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }) + '\0');
     });
   }
@@ -399,8 +418,36 @@ async function settleInPage({ quietMs, capMs }) {
   return left;
 }
 
-async function evaluate(send, expression, awaitPromise = false) {
-  const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true });
+// Runs in the page: whether it loads the Tailwind Play CDN, and whether that script ran.
+function tailwindInPage() {
+  return {
+    uses: [...document.scripts].some((s) => /cdn\.tailwindcss\.com/.test(s.src)),
+    loaded: typeof window.tailwind !== 'undefined',
+  };
+}
+
+// Resolves true once busy() has been false for quietMs, or false after timeoutMs.
+async function waitForQuiet(busy, quietMs, timeoutMs) {
+  const end = Date.now() + timeoutMs;
+  let since = null;
+  while (Date.now() < end) {
+    if (busy()) since = null;
+    else if (since === null) since = Date.now();
+    else if (Date.now() - since >= quietMs) return true;
+    await delay(50);
+  }
+  return false;
+}
+
+async function evaluate(send, expression, awaitPromise = false, timeoutMs = CALL_TIMEOUT_MS) {
+  let reply;
+  try {
+    reply = await send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true }, timeoutMs);
+  } catch (err) {
+    if (err.timeout) throw new Error(`The page did not respond within ${Math.round(timeoutMs / 1000)} s; a script may be stuck in a loop`);
+    throw err;
+  }
+  const { result, exceptionDetails } = reply;
   if (exceptionDetails) {
     throw new Error(`Script in the page failed: ${(exceptionDetails.exception && exceptionDetails.exception.description) || exceptionDetails.text}`);
   }
@@ -412,41 +459,71 @@ async function auditPage(browser, url, pageType, auditSource) {
   const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
   try {
     const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
-    const send = (method, params) => browser.send(method, params, sessionId);
-    await send('Page.enable');
-    await send('Network.enable');
-    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    const send = (method, params, timeoutMs) => browser.send(method, params, sessionId, timeoutMs);
+    const ours = (message) => message.sessionId === sessionId;
 
     let navigating = false;
     let mainFrame = null;
     let response = null;
-    const ours = (message) => message.sessionId === sessionId;
-    const offResponse = browser.on((message) => {
-      if (!ours(message) || message.method !== 'Network.responseReceived' || message.params.type !== 'Document') return;
-      if (mainFrame === null || message.params.frameId === mainFrame) response = message.params.response;
+    const inflight = new Set();
+    const offEvents = browser.on((message) => {
+      if (!ours(message)) return;
+      const { method, params } = message;
+      if (method === 'Page.javascriptDialogOpening') {
+        send('Page.handleJavaScriptDialog', { accept: false }).catch(() => {}); // as Playwright does with no dialog handler
+      } else if (method === 'Network.requestWillBeSent') {
+        inflight.add(params.requestId);
+      } else if (method === 'Network.loadingFinished' || method === 'Network.loadingFailed') {
+        inflight.delete(params.requestId);
+      } else if (method === 'Network.responseReceived' && params.type === 'Document' && (mainFrame === null || params.frameId === mainFrame)) {
+        response = params.response;
+      }
     });
     const loaded = browser.waitFor((message) => navigating && ours(message) && message.method === 'Page.loadEventFired', LOAD_TIMEOUT_MS);
     try {
+      await send('Page.enable');
+      await send('Network.enable');
+      await send('Emulation.setDeviceMetricsOverride', { ...VIEWPORT, deviceScaleFactor: 1, mobile: false, screenWidth: VIEWPORT.width, screenHeight: VIEWPORT.height });
+      await send('Emulation.setEmulatedMedia', {
+        media: '',
+        features: [
+          { name: 'prefers-color-scheme', value: 'light' },
+          { name: 'prefers-reduced-motion', value: 'no-preference' },
+        ],
+      });
+      await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+
       navigating = true;
-      const nav = await send('Page.navigate', { url });
+      let nav;
+      try {
+        nav = await send('Page.navigate', { url }, LOAD_TIMEOUT_MS);
+      } catch (err) {
+        if (err.timeout) throw new Error(`Could not load ${url}: no response after 30 s`);
+        throw err;
+      }
       mainFrame = nav.frameId;
       if (nav.errorText) throw new Error(`Could not load ${url}: ${nav.errorText}`);
       if (!(await loaded.promise) && (await evaluate(send, 'document.readyState')) === 'loading') {
         throw new Error(`Could not load ${url}: no load event after 30 s`);
       }
+      if (response && response.status >= 400) throw new Error(`HTTP ${response.status} from ${response.url}`);
+      // Like the benchmark's goto(networkidle): no request in flight for 500 ms, or go on after 15 s.
+      await waitForQuiet(() => inflight.size > 0, NETWORK_IDLE.quietMs, NETWORK_IDLE.timeoutMs);
+
+      const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(SETTLE)})`, true, SETTLE_TIMEOUT_MS);
+      const tailwind = await evaluate(send, `(${tailwindInPage})()`);
+      if (tailwind.uses && !tailwind.loaded) {
+        throw new Error('Tailwind CDN did not load, so the page has none of its styles. Check the network and run the audit again');
+      }
+      await evaluate(send, auditSource);
+      const result = await evaluate(send, `enterpriseAdminAudit(${JSON.stringify({ pageType })})`, false, AUDIT_TIMEOUT_MS);
+      return { url: result.url, loadingPlaceholders, result };
     } finally {
       loaded.cancel();
-      offResponse();
+      offEvents();
     }
-    if (response && response.status >= 400) throw new Error(`HTTP ${response.status} from ${response.url}`);
-
-    const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(SETTLE)})`, true);
-    await evaluate(send, auditSource);
-    const result = await evaluate(send, `enterpriseAdminAudit(${JSON.stringify({ pageType })})`);
-    return { url: result.url, loadingPlaceholders, result };
   } finally {
-    await browser.send('Target.closeTarget', { targetId }).catch(() => {});
+    await browser.send('Target.closeTarget', { targetId }, undefined, 5000).catch(() => {});
   }
 }
 
@@ -526,4 +603,14 @@ export async function main(argv = process.argv.slice(2)) {
   return exitCode(pages, opts.strict);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await main();
+// Run as a command. Node gives import.meta.url the real path, so compare real paths: the skill folder is often a link
+// (npx skills add links agent folders unless --copy is passed).
+function isMain() {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+if (isMain()) process.exitCode = await main();

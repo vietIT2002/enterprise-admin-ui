@@ -3,8 +3,9 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { createServer as createTcpServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -20,10 +21,10 @@ try {
   // Playwright's Chromium is not installed: the CLI looks for a browser itself.
 }
 
-function run(args, { cwd = ROOT, timeout = 90000 } = {}) {
+function run(args, { cwd = ROOT, timeout = 90000, cli = CLI } = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
-    execFile(process.execPath, [CLI, ...args], { cwd, env: ENV, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(process.execPath, [cli, ...args], { cwd, env: ENV, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
       resolve({ code: err ? err.code : 0, stdout, stderr, output: stdout + stderr, ms: Date.now() - started });
     });
   });
@@ -47,6 +48,25 @@ const PAGES = {
   // Never settles: a skeleton that stays and a clock that ticks every 100 ms.
   '/never': () =>
     html('<h1>Đơn hàng</h1><div aria-busy="true" style="height:40px;background:#f1f5f9"></div><p id="clock">0</p><script>var n = 0; setInterval(function () { document.getElementById("clock").textContent = String(++n); }, 100);</script>'),
+  // Mock data behind a text placeholder, after 1 s: the benchmark waits for network idle (+500 ms) and sees the table.
+  '/late': () =>
+    html(
+      '<h1>Đơn hàng</h1><div id="slot"><p>Đang tải dữ liệu…</p></div>' +
+        `<script>setTimeout(function () { document.getElementById('slot').innerHTML = '<table><thead><tr><th>Khách hàng</th><th style="width:240px">Tổng tiền</th></tr></thead><tbody><tr><td>Minh Phát</td><td>1.250.000</td></tr><tr><td>An Bình</td><td>980.000</td></tr></tbody></table>'; }, 1000);</script>`,
+      'table{border-collapse:collapse} th,td{height:40px;padding:0 12px;text-align:left;white-space:nowrap}'
+    ),
+  // Clean in the benchmark's light 1440×900 screen; fails in dark mode (contrast) or on an 800×600 screen (ALL CAPS).
+  '/media': () =>
+    html(
+      '<h1>Tổng quan</h1><p>Mọi chỉ số của kho Hà Nội đều bình thường.</p>' +
+        `<script>if (screen.width < 1440) document.querySelector('main').insertAdjacentHTML('beforeend', '<p style="text-transform:uppercase">Màn hình hẹp</p>');</script>`,
+      '@media (prefers-color-scheme: dark) { html { background: #000; color: #1f2937 } }'
+    ),
+  '/alert': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số của kho Hà Nội đều bình thường.</p><script>alert("Xin chào");</script>'),
+  // A script that never yields once the page has loaded.
+  '/busy': () => html('<h1>Tổng quan</h1><p>Đang tính toán.</p><script>addEventListener("load", function () { setTimeout(function () { for (;;) {} }, 0); });</script>'),
+  // The Tailwind Play CDN fails to load (here: a 404), so the page has none of its styles.
+  '/tailwind': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><script src="/cdn.tailwindcss.com/3.4.17"></script>'),
 };
 
 let server;
@@ -178,6 +198,80 @@ test('a program that is not a browser exits 2', async () => {
   assert.equal(r.code, 2, r.output);
   assert.match(r.output, /Browser could not start/);
   assert.ok(r.ms < 20000, `took ${r.ms} ms`);
+});
+
+test('the CLI runs when the skill folder is a link, as npx skills add installs it', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eaui-link-'));
+  const link = join(dir, 'enterprise-admin-ui');
+  try {
+    symlinkSync(join(ROOT, 'skills/enterprise-admin-ui'), link, 'junction'); // a junction on Windows, a symlink elsewhere
+    const r = await run([join(FIXTURES, 'list-template-tells.html'), '--type', 'list'], { cli: join(link, 'scripts', 'audit-cli.mjs') });
+    assert.equal(r.code, 1, r.output || '(no output)');
+    assert.match(r.stdout, /✗ table-above-fold/);
+  } finally {
+    // Remove the link itself first, and only then the folder, so nothing is ever deleted through the link.
+    try {
+      unlinkSync(link);
+    } catch {
+      // not created
+    }
+    let linkGone = true;
+    try {
+      lstatSync(link);
+      linkGone = false;
+    } catch {
+      // gone
+    }
+    if (linkGone) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('data that arrives 1 s after load, behind a text placeholder, is audited', async () => {
+  const r = await run([`${base}/late`, '--type', 'list', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null);
+  assert.ok(page.result.violations.some((v) => v.rule === 'numeric-align'), page.result.summary);
+});
+
+test('the page sees a light colour scheme and a 1440×900 screen, as in the benchmark', async () => {
+  const r = await run([`${base}/media`]);
+  assert.equal(r.code, 0, r.output);
+  assert.match(r.stdout, /Score 100\/100/);
+});
+
+test('a page that opens an alert is audited', async () => {
+  const r = await run([`${base}/alert`]);
+  assert.equal(r.code, 0, r.output);
+  assert.match(r.stdout, /Score 100\/100/);
+  assert.ok(r.ms < 20000, `took ${r.ms} ms`);
+});
+
+test('a page whose script never yields exits 2', async () => {
+  const r = await run([`${base}/busy`]);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /did not respond/);
+  assert.ok(r.ms < 45000, `took ${r.ms} ms`);
+});
+
+test('a server that accepts the connection and never answers exits 2', async () => {
+  const sockets = new Set();
+  const silent = createTcpServer((socket) => sockets.add(socket));
+  await new Promise((resolve) => silent.listen(0, '127.0.0.1', resolve));
+  try {
+    const r = await run([`http://127.0.0.1:${silent.address().port}/orders`]);
+    assert.equal(r.code, 2, r.output);
+    assert.match(r.output, /no response after 30 s/);
+    assert.ok(r.ms < 45000, `took ${r.ms} ms`);
+  } finally {
+    for (const socket of sockets) socket.destroy();
+    await new Promise((resolve) => silent.close(resolve));
+  }
+});
+
+test('a page whose Tailwind CDN did not load exits 2', async () => {
+  const r = await run([`${base}/tailwind`]);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Tailwind CDN did not load/);
 });
 
 test('a browser path that does not exist exits 2', async () => {

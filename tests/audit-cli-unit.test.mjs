@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PAGE_TYPES, UsageError, exitCode, findBrowser, parseCli, toUrl } from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
+import { PAGE_TYPES, UsageError, browserArgs, exitCode, findBrowser, parseCli, toUrl } from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
 import { ROOT } from '../tools/build-adapters.mjs';
 
 const FIXTURES = join(ROOT, 'tests/fixtures');
@@ -81,6 +81,18 @@ test('toUrl: URLs unchanged, paths resolved against cwd and encoded, missing fil
     rmSync(dir, { recursive: true, force: true });
   }
   assert.throws(() => toUrl('no-such-page.html', FIXTURES), /File not found: .*no-such-page\.html/);
+});
+
+test('browserArgs: headless over a pipe, plus what each platform needs (as Playwright launches Chromium)', () => {
+  for (const platform of ['linux', 'darwin', 'win32']) {
+    const args = browserArgs({ platform });
+    for (const flag of ['--headless=new', '--remote-debugging-pipe', '--hide-scrollbars', '--disable-dev-shm-usage']) assert.ok(args.includes(flag), `${platform}: ${flag}`);
+  }
+  assert.ok(browserArgs({ platform: 'linux' }).includes('--no-sandbox'), 'containers and root (Docker agents, CI) cannot start the sandbox');
+  assert.ok(!browserArgs({ platform: 'win32' }).includes('--no-sandbox'));
+  assert.ok(!browserArgs({ platform: 'darwin' }).includes('--no-sandbox'));
+  for (const flag of ['--use-mock-keychain', '--password-store=basic']) assert.ok(browserArgs({ platform: 'darwin' }).includes(flag), `darwin: ${flag}`);
+  for (const flag of ['--edge-skip-compat-layer-relaunch', '--disable-features=AutoDeElevate']) assert.ok(browserArgs({ platform: 'win32' }).includes(flag), `win32: ${flag}`);
 });
 
 const page = (violations, error = null) => ({ target: 'p', url: 'u', error, loadingPlaceholders: 0, result: error ? null : { violations } });
