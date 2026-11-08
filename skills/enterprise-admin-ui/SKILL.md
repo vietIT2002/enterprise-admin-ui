@@ -211,7 +211,7 @@ When the user asks to review or audit existing screens, report findings instead 
 
 ## Verify
 
-- **Audit:** with a browser at 1440×900, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` (or `detail`, `form`, `dashboard`, `settings`, `wizard`).
+- **Audit:** with a browser at 1440×900, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`).
   - In a console, paste the file first.
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.

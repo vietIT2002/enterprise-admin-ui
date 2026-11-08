@@ -4,16 +4,22 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+- `audit.js` 0.5.2 no longer checks a bare integer of four or more digits as a number, so a year (`2026`) or an ID (`1043`) can stay left-aligned, as `tables.md` asks. Before, a left-aligned ID or year column failed `numeric-align` and `tabular-nums`. Where the page's `lang` leaves 1000 ungrouped (es-ES, pl-PL write `1500`), the limit is five digits.
+- SKILL.md Verify and the `audit.js` header list the page types for reports, printable documents, calendars, boards and trees (`report`, `document`, `calendar`, `board`, `tree`). Before, they named only the six older types, so agents ran these screens with no page type or as `list`.
+- `calendars.md`: `weekSegments` takes the number of week rows (default 6) and stops at the last one. Before, an entry that ran past the grid returned bars for rows that are not shown.
+- `audit.js` no longer carries a leftover development comment.
+
 ### Docs
 - README install gives separate commands for macOS/Linux and Windows. On Windows it uses `npx.cmd`, because PowerShell's default policy blocks `npx.ps1`, and `--copy`. It also lists the `-a`, `-y` and `-g` flags and manual `git clone` commands for both systems, and notes that the `skills` CLI needs Node.js 22.20 or later.
 - README "Use it in your project": what to type in Claude Code, Codex, Cursor and GitHub Copilot, with example requests for building and reviewing.
 - Benchmark HELDOUT3: six briefs written by an agent that never read the skill, reviewed blind. The checklist pass rate went from 22% without the skill to 48% with v0.5.8: from 16% to 58% on UI behaviour, and from 30% to 35% on domain rules the prompts did not state. README reports it as the fairest number.
-- `npm run bench -- --blind` reviews coded pages in neutral folders and keeps the key next to the runs.
+- In the [benchmark repository](https://github.com/vietIT2002/enterprise-admin-ui-benchmark), `benchmark/tools/bench.mjs --blind` reviews coded pages in neutral folders and keeps the key next to the runs.
 - Benchmark HELDOUT4: six more independent briefs, reviewed blind. v0.5.8 went from 15% without the skill to 39%; over the 12 screens of HELDOUT3 and HELDOUT4, from 19% to 44%. README now reports this pooled number: 14% to 51% on UI behaviour, and 26% to 33% on domain rules the prompts did not state.
 - A tested candidate was reverted and is not in any release. It added a domain-rules step, references named in every recipe and a check-before-finish pass. Over two runs it scored 40% against 38% for v0.5.8, with UI behaviour the same, cost 1.41× per page, and wrote all 12 of its pages to the wrong folder.
-- Benchmark tools:
+- Benchmark tools, in `benchmark/tools/` of the benchmark repository:
   - `blind-review.mjs` reviews several run folders in one blind pool, optionally only some runs;
-  - bench recovers pages written to a sibling folder;
+  - `bench.mjs` recovers pages written to a sibling folder;
   - a later session adds to `bench-usage.json` instead of replacing it.
 
 ## [0.5.8] — 2026-11-06

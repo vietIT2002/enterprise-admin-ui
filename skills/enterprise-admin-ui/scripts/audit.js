@@ -6,14 +6,16 @@
  * Playwright:      await page.addScriptTag({ path: 'skills/enterprise-admin-ui/scripts/audit.js' });
  *                  const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
  *
- * Options: { pageType: 'list' | 'detail' | 'form' | 'dashboard' | 'settings' | 'wizard' | null }
+ * Options: { pageType: 'list' | 'detail' | 'form' | 'dashboard' | 'settings' | 'wizard'
+ *                    | 'report' | 'document' | 'calendar' | 'board' | 'tree' | null }
+ *          'list' requires the main table in the first viewport; 'form', 'settings' and 'wizard' check label position.
  * Returns: { tool, version, url, viewport, options, score, metrics, violations, summary }
  * Run it at 1440×900 with the page scrolled to the top.
  */
 (function (root) {
   'use strict';
 
-  const VERSION = '0.5.1';
+  const VERSION = '0.5.2';
   const WEIGHTS = { error: 10, warn: 4 };
   const MAX_EXAMPLES = 5;
 
@@ -43,7 +45,7 @@
     'contact-link',
   ]);
 
-  // ------------------------------------------------------------------ pure helpers (unit-tested in Node)
+  // ------------------------------------------------------------------ pure helpers (no DOM; exported as audit._internals)
 
   // Amounts, percents and counts. Rejects ids, phone numbers (leading 0) and dates.
   // Currency: symbol or code before (USD 1,250.00, $151,000) or after (1.250.000 VNĐ, 1.250,00 €), any case.
@@ -54,9 +56,30 @@
     'i'
   );
 
-  function isNumericText(text) {
+  // Whether the locale writes 1000 with a group separator. es-ES and pl-PL write "1500", so there a bare four-digit
+  // integer can still be a quantity. A missing or invalid locale counts as grouping, like en, vi, de and fr.
+  const groupingCache = new Map();
+  function groupsFourDigits(locale) {
+    const key = String(locale || '').trim();
+    if (!key) return true;
+    if (!groupingCache.has(key)) {
+      let groups = true;
+      try {
+        groups = /\D/.test(new Intl.NumberFormat(key).format(1000));
+      } catch (e) {
+        // An invalid lang attribute keeps the default.
+      }
+      groupingCache.set(key, groups);
+    }
+    return groupingCache.get(key);
+  }
+
+  // A bare integer of four or more digits ("2026", "1043") is a year or an ID, which stays left-aligned (tables.md):
+  // Intl writes a quantity that size with a separator ("1.500"). Five digits where the locale leaves 1000 ungrouped.
+  function isNumericText(text, locale) {
     const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
-    return t.length > 0 && t.length <= 32 && NUMERIC_RE.test(t);
+    if (t.length === 0 || t.length > 32 || !NUMERIC_RE.test(t)) return false;
+    return !/^[1-9]\d*$/.test(t) || t.length < (groupsFourDigits(locale) ? 4 : 5);
   }
 
   // A phone number written for people: starts with +, 0 or (0, uses separators, and has 9–13 digits.
@@ -388,7 +411,6 @@
   }
 
   // ------------------------------------------------------------------ checks
-  // Later tasks insert check functions directly above the CHECKS line.
 
   function familyOf(s) {
     return s.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g, '').toLowerCase();
@@ -677,7 +699,8 @@
         if (text && text !== '—' && text !== '-') st.nonEmpty++;
         const line = cellLines(ctx, cell)[0];
         const first = line ? lineText(line) : '';
-        if (!isNumericText(first)) return;
+        const langEl = cell.closest('[lang]');
+        if (!isNumericText(first, langEl ? langEl.getAttribute('lang') : null)) return;
         st.numeric++;
         total++;
         if (Math.max(...line.boxes.map((b) => b.right)) < cellInnerRight(ctx, cell) - 2) {

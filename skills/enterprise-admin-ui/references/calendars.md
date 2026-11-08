@@ -108,15 +108,17 @@ export function workingDays(start: string, end: string, holidays: Set<string>, w
 }
 
 // Split an entry into one bar per visible week row: [{ row, startCol, span, continuesLeft, continuesRight }].
-export function weekSegments(start: Date, end: Date, gridStart: Date) {
+// `weeks` is the number of rows in the grid (5 or 6 for a month); an entry that runs past the grid stops at its last row.
+export function weekSegments(start: Date, end: Date, gridStart: Date, weeks = 6) {
   const day = 86400000
   const s = Math.max(0, Math.round((+start - +gridStart) / day))
-  const e = Math.round((+end - +gridStart) / day)
+  const endDay = Math.round((+end - +gridStart) / day)
+  const e = Math.min(endDay, weeks * 7 - 1)
   const segs = []
   for (let i = s; i <= e; i = (Math.floor(i / 7) + 1) * 7) {
     const row = Math.floor(i / 7)
     const last = Math.min(e, row * 7 + 6)
-    segs.push({ row, startCol: i % 7, span: last - i + 1, continuesLeft: i > s || +start < +gridStart, continuesRight: last < e })
+    segs.push({ row, startCol: i % 7, span: last - i + 1, continuesLeft: i > s || +start < +gridStart, continuesRight: last < endDay })
   }
   return segs
 }
