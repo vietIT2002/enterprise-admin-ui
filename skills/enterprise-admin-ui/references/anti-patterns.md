@@ -166,7 +166,7 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
 
 ## Reviewing an AI-built screen
 
-1. **Audit.** Run `node scripts/audit-cli.mjs <url or file.html> --type list` (or the screen's type), or in a browser at 1440×900 inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })`. Map every violation to its source line by searching for the reported element's classes or text.
+1. **Audit.** Run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or the screen's type), or in a browser at 1440×900 inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })`. Map every violation to its source line by searching for the reported element's classes or text.
 2. **Recipe and states.** Walk the SKILL.md page recipe for the screen type and the manual checklist. Reach each state through `?state=empty`, `?state=error`, `?state=loading` and a filter that matches nothing; submit the form empty. Each miss is a finding.
 3. **Tells.** Run every Detect command above over the screen's source, confirm each hit in context, and look at the first-viewport screenshot for tells no pattern catches (card-in-card, decorative-chart, sidebar-promo-card).
 4. **Rank.** Put each finding in one of five levels, most severe first:

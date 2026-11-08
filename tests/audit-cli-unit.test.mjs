@@ -1,11 +1,21 @@
 // Unit tests for the browser-free helpers of scripts/audit-cli.mjs.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { PAGE_TYPES, UsageError, browserArgs, exitCode, findBrowser, parseCli, toUrl } from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
+import {
+  PAGE_TYPES,
+  UsageError,
+  browserArgs,
+  createMessageReader,
+  exitCode,
+  findBrowser,
+  parseCli,
+  sweepStaleProfiles,
+  toUrl,
+} from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
 import { ROOT } from '../tools/build-adapters.mjs';
 
 const FIXTURES = join(ROOT, 'tests/fixtures');
@@ -83,6 +93,45 @@ test('toUrl: URLs unchanged, paths resolved against cwd and encoded, missing fil
   assert.throws(() => toUrl('no-such-page.html', FIXTURES), /File not found: .*no-such-page\.html/);
 });
 
+test('toUrl: a folder is not a page', () => {
+  assert.throws(() => toUrl(FIXTURES), /Not a file: .*fixtures/);
+});
+
+test('toUrl: a URL without http:// gets a hint, not just "File not found"', () => {
+  assert.throws(() => toUrl('localhost:3000/orders', FIXTURES), /write the URL with http:\/\/, e\.g\. http:\/\/localhost:3000\/orders/);
+  assert.throws(() => toUrl('127.0.0.1:8080', FIXTURES), /http:\/\/127\.0\.0\.1:8080/);
+  assert.throws(() => toUrl('pages/orders.html', FIXTURES), (err) => /File not found/.test(err.message) && !/http:\/\//.test(err.message));
+});
+
+test('createMessageReader: NUL-separated JSON, split anywhere; text that is not JSON is an error, not a throw', () => {
+  const messages = [];
+  const errors = [];
+  const read = createMessageReader((m) => messages.push(m), (e) => errors.push(e));
+  read('{"id":1,"result":{}}\0{"id":');
+  assert.deepEqual(messages, [{ id: 1, result: {} }]);
+  read('2,"result":{"a":"Hà Nội"}}\0');
+  assert.deepEqual(messages[1], { id: 2, result: { a: 'Hà Nội' } });
+  assert.doesNotThrow(() => read('this is not json\0'));
+  assert.equal(errors.length, 1);
+  assert.match(errors[0].message, /not JSON/);
+});
+
+test('sweepStaleProfiles removes only eaui-audit-* folders older than the limit', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eaui-sweep-'));
+  try {
+    const old = Date.now() / 1000 - 2 * 24 * 3600;
+    for (const name of ['eaui-audit-old', 'eaui-audit-new', 'other-old']) mkdirSync(join(dir, name));
+    utimesSync(join(dir, 'eaui-audit-old'), old, old);
+    utimesSync(join(dir, 'other-old'), old, old);
+    sweepStaleProfiles({ dir });
+    assert.equal(existsSync(join(dir, 'eaui-audit-old')), false, 'a profile older than a day is removed');
+    assert.equal(existsSync(join(dir, 'eaui-audit-new')), true, 'a recent profile may belong to a run in progress');
+    assert.equal(existsSync(join(dir, 'other-old')), true, 'other folders are never touched');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('browserArgs: headless over a pipe, plus what each platform needs (as Playwright launches Chromium)', () => {
   for (const platform of ['linux', 'darwin', 'win32']) {
     const args = browserArgs({ platform });
@@ -92,7 +141,21 @@ test('browserArgs: headless over a pipe, plus what each platform needs (as Playw
   assert.ok(!browserArgs({ platform: 'win32' }).includes('--no-sandbox'));
   assert.ok(!browserArgs({ platform: 'darwin' }).includes('--no-sandbox'));
   for (const flag of ['--use-mock-keychain', '--password-store=basic']) assert.ok(browserArgs({ platform: 'darwin' }).includes(flag), `darwin: ${flag}`);
-  for (const flag of ['--edge-skip-compat-layer-relaunch', '--disable-features=AutoDeElevate']) assert.ok(browserArgs({ platform: 'win32' }).includes(flag), `win32: ${flag}`);
+  assert.ok(browserArgs({ platform: 'win32' }).includes('--edge-skip-compat-layer-relaunch'));
+  const disabled = (platform) => (browserArgs({ platform }).find((a) => a.startsWith('--disable-features=')) || '').slice('--disable-features='.length).split(',');
+  assert.ok(disabled('win32').includes('AutoDeElevate'), 'win32: AutoDeElevate');
+});
+
+test('browserArgs: a fresh profile does no background work (default apps, model downloads, component extensions), as with Playwright', () => {
+  for (const platform of ['linux', 'darwin', 'win32']) {
+    const args = browserArgs({ platform });
+    for (const flag of ['--disable-default-apps', '--disable-component-extensions-with-background-pages', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-hang-monitor', '--disable-field-trial-config']) {
+      assert.ok(args.includes(flag), `${platform}: ${flag}`);
+    }
+    const features = args.filter((a) => a.startsWith('--disable-features='));
+    assert.equal(features.length, 1, 'one --disable-features flag: Chrome reads only the last one');
+    for (const feature of ['OptimizationHints', 'NetworkTimeServiceQuerying', 'Translate', 'MediaRouter']) assert.ok(features[0].split(/[=,]/).includes(feature), `${platform}: ${feature}`);
+  }
 });
 
 const page = (violations, error = null) => ({ target: 'p', url: 'u', error, loadingPlaceholders: 0, result: error ? null : { violations } });

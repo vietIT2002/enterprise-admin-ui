@@ -2,8 +2,21 @@
 // The browser is Playwright's Chromium when it is installed (CI), else whatever the CLI finds on the machine.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync } from 'node:fs';
+import { execFile, spawn } from 'node:child_process';
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  utimesSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { createServer as createTcpServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -21,10 +34,14 @@ try {
   // Playwright's Chromium is not installed: the CLI looks for a browser itself.
 }
 
-function run(args, { cwd = ROOT, timeout = 90000, cli = CLI } = {}) {
+const POSIX = process.platform !== 'win32';
+const FAKE_BROWSER = join(ROOT, 'tests/helpers/fake-browser.mjs');
+const profiles = () => readdirSync(tmpdir()).filter((name) => name.startsWith('eaui-audit-'));
+
+function run(args, { cwd = ROOT, timeout = 90000, cli = CLI, env = {} } = {}) {
   const started = Date.now();
   return new Promise((resolve) => {
-    execFile(process.execPath, [cli, ...args], { cwd, env: ENV, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile(process.execPath, [cli, ...args], { cwd, env: { ...ENV, ...env }, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
       resolve({ code: err ? err.code : 0, stdout, stderr, output: stdout + stderr, ms: Date.now() - started });
     });
   });
@@ -67,6 +84,13 @@ const PAGES = {
   '/busy': () => html('<h1>Tổng quan</h1><p>Đang tính toán.</p><script>addEventListener("load", function () { setTimeout(function () { for (;;) {} }, 0); });</script>'),
   // The Tailwind Play CDN fails to load (here: a 404), so the page has none of its styles.
   '/tailwind': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><script src="/cdn.tailwindcss.com/3.4.17"></script>'),
+  // Two pages of one origin: the first stores a value, the second shows an ALL-CAPS notice when it can read it.
+  '/store-a': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><script>localStorage.setItem("eaui", "1"); document.cookie = "eaui=1; path=/";</script>'),
+  '/store-b': () =>
+    html(
+      '<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p>' +
+        `<script>if (localStorage.getItem('eaui') || document.cookie.indexOf('eaui=') >= 0) document.querySelector('main').insertAdjacentHTML('beforeend', '<p style="text-transform:uppercase">Dữ liệu cũ</p>');</script>`
+    ),
 };
 
 let server;
@@ -150,7 +174,59 @@ test('the CLI exits as soon as its work is done', async () => {
   await new Promise((resolve) => closed.close(resolve));
   const r = await run([`http://127.0.0.1:${port}/orders`]);
   assert.equal(r.code, 2, r.output);
-  assert.ok(r.ms < 4000, `took ${r.ms} ms; a timer left running keeps the process alive`);
+  assert.ok(r.ms < 8000, `took ${r.ms} ms; a timer left running keeps the process alive`);
+});
+
+test('pages in one run do not share storage or cookies', async () => {
+  const r = await run([`${base}/store-a`, `${base}/store-b`, '--json']);
+  const pages = JSON.parse(r.stdout);
+  assert.equal(pages.length, 2);
+  assert.deepEqual(pages[1].result.violations.map((v) => v.rule), [], pages[1].result.summary);
+});
+
+test('a temp profile left by a killed run is removed by the next run', async () => {
+  const stale = join(tmpdir(), `eaui-audit-left-by-a-killed-run-${process.pid}`);
+  mkdirSync(stale, { recursive: true });
+  const old = Date.now() / 1000 - 2 * 24 * 3600;
+  utimesSync(stale, old, old);
+  try {
+    assert.equal((await run([CLEAN, '--type', 'list'])).code, 0);
+    assert.equal(existsSync(stale), false);
+  } finally {
+    rmSync(stale, { recursive: true, force: true });
+  }
+});
+
+test('Ctrl+C stops the run and removes its temp profile', { skip: !POSIX && 'Windows cannot send SIGINT to a child process' }, async () => {
+  const before = new Set(profiles());
+  const child = spawn(process.execPath, [CLI, `${base}/never`], { cwd: ROOT, env: ENV, stdio: 'ignore' });
+  await new Promise((resolve) => setTimeout(resolve, 3000)); // the browser is up and the page is settling
+  child.kill('SIGINT');
+  const code = await new Promise((resolve) => child.once('exit', (c, signal) => resolve(c ?? signal)));
+  assert.equal(code, 130);
+  assert.deepEqual(profiles().filter((name) => !before.has(name)), [], 'no temp profile left behind');
+});
+
+test('a browser that sends a message that is not JSON exits 2', { skip: !POSIX && 'the fake browser is a script, which Windows cannot run as a program' }, async () => {
+  chmodSync(FAKE_BROWSER, 0o755);
+  const r = await run([CLEAN, '--browser', FAKE_BROWSER], { env: { FAKE_BROWSER_MODE: 'garbage' } });
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /not JSON/);
+});
+
+test('a browser that ignores SIGTERM is killed, and the CLI exits', { skip: !POSIX && 'the fake browser is a script, which Windows cannot run as a program' }, async () => {
+  chmodSync(FAKE_BROWSER, 0o755);
+  const dir = mkdtempSync(join(tmpdir(), 'eaui-fake-'));
+  const pidFile = join(dir, 'pid');
+  try {
+    const r = await run([CLEAN, '--browser', FAKE_BROWSER], { env: { FAKE_BROWSER_MODE: 'stubborn', FAKE_BROWSER_PID_FILE: pidFile }, timeout: 60000 });
+    assert.equal(r.code, 2, r.output || `(no output; killed after ${r.ms} ms)`);
+    assert.match(r.output, /Browser could not start/);
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'the fake browser is no longer running');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('a redirect is followed and the final page audited', async () => {

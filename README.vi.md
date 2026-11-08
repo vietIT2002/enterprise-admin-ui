@@ -197,10 +197,10 @@ skills/enterprise-admin-ui/
 **Audit.** Chạy từ terminal, không cần thư viện ngoài:
 
 ```bash
-node scripts/audit-cli.mjs http://localhost:3000/orders --type list
+node <thư mục skill>/scripts/audit-cli.mjs http://localhost:3000/orders --type list
 ```
 
-Chạy lệnh trong thư mục của skill. Đầu vào có thể là URL hoặc file HTML. CLI mở trang ở kích thước 1440×900 bằng Chrome, Edge hoặc Chromium có sẵn trên máy và in điểm. Lệnh trả mã thoát 1 khi có lỗi ✗, nên agent hoặc CI có thể dựa vào đó. Trong console của trình duyệt hoặc với Playwright, bạn cũng có thể chèn `scripts/audit.js` vào trang và chạy `enterpriseAdminAudit({ pageType: 'list' })`. Audit đo:
+`<thư mục skill>` là nơi cài skill, ví dụ `.claude/skills/enterprise-admin-ui`. Đầu vào có thể là URL hoặc file HTML; đường dẫn file tương đối được tính từ thư mục bạn đang chạy lệnh. CLI mở trang ở kích thước 1440×900 bằng Chrome, Edge hoặc Chromium có sẵn trên máy và in điểm. Lệnh trả mã thoát 1 khi có lỗi ✗, nên agent hoặc CI có thể dựa vào đó. Trong console của trình duyệt hoặc với Playwright, bạn cũng có thể chèn `scripts/audit.js` vào trang và chạy `enterpriseAdminAudit({ pageType: 'list' })`. Audit đo:
 - cỡ chữ và thang cỡ chữ;
 - độ bo góc;
 - chiều cao hàng và hàng bị dồn thành nhiều dòng;
