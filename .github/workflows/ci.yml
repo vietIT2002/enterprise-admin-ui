@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium for the fixture tests
+        run: npx playwright install --with-deps chromium
+
+      # Unit tests for audit.js, the fixture pages in Chromium, adapters in step with SKILL.md,
+      # and the numbers the READMEs, manifests and CHANGELOG state.
+      - name: Test
+        run: npm run test:ci

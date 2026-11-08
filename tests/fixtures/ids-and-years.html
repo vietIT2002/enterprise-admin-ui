@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="vi-VN">
+<head>
+<meta charset="utf-8">
+<!-- Bare-integer IDs and years stay left-aligned, as tables.md asks: they are not numbers, so the audit must find
+     nothing. Audit 0.5.1 counted them as numbers and failed numeric-align and tabular-nums here. -->
+<meta name="audit-page-type" content="list">
+<meta name="audit-expect" content="">
+<title>Đơn hàng</title>
+<style>
+  [hidden] { display: none !important; }
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  main { padding: 16px 24px; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0 0 16px; }
+  table { border-collapse: collapse; }
+  th, td { height: 40px; padding: 0 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+  th { font-weight: 500; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Đơn hàng</h1>
+  <table>
+    <thead><tr><th>Mã</th><th>Năm</th><th class="num">Số lượng</th><th class="num">Tổng (VND)</th></tr></thead>
+    <tbody>
+      <tr><td>1043</td><td>2026</td><td class="num">1.500</td><td class="num">1.250.000</td></tr>
+      <tr><td>1044</td><td>2025</td><td class="num">980</td><td class="num">980.000</td></tr>
+      <tr><td>1045</td><td>2026</td><td class="num">12</td><td class="num">12.000</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

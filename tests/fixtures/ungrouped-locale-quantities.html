@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es-ES">
+<head>
+<meta charset="utf-8">
+<!-- es-ES writes a four-digit quantity without a group separator ("1500"), so a bare four-digit integer there is
+     still a number: left-aligned quantities without tabular figures must be caught. -->
+<meta name="audit-page-type" content="list">
+<meta name="audit-expect" content="numeric-align tabular-nums">
+<title>Pedidos</title>
+<style>
+  [hidden] { display: none !important; }
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  main { padding: 16px 24px; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0 0 16px; }
+  table { border-collapse: collapse; }
+  th, td { height: 40px; padding: 0 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+  th { font-weight: 500; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pedidos</h1>
+  <table>
+    <thead><tr><th>Producto</th><th>Cantidad</th></tr></thead>
+    <tbody>
+      <tr><td>Silla</td><td>1500</td></tr>
+      <tr><td>Mesa</td><td>2300</td></tr>
+      <tr><td>Lámpara</td><td>45</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

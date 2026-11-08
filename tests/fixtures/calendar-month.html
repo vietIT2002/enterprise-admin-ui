@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi-VN">
+<head>
+<meta charset="utf-8">
+<!-- A leave calendar month grid: tall week rows of day numbers. The audit must recognise the month grid and not
+     check it as a data table (row height, numeric alignment), so it finds nothing. -->
+<meta name="audit-page-type" content="calendar">
+<meta name="audit-expect" content="">
+<title>Lịch nghỉ phép</title>
+<style>
+  [hidden] { display: none !important; }
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  main { padding: 16px 24px; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0 0 8px; }
+  button { font: inherit; }
+  .btn { height: 32px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; color: #0f172a; }
+  .muted { color: #475569; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; margin-top: 12px; }
+  th { height: 32px; font-weight: 500; text-align: left; padding: 0 8px; }
+  td { height: 104px; vertical-align: top; padding: 4px 8px; border: 1px solid #e2e8f0; }
+  .other { color: #64748b; }
+  .entry { display: block; width: 100%; height: 24px; margin-top: 4px; padding: 0 6px; font-size: 12px; line-height: 24px; text-align: left; border: 1px solid #1e40af; border-radius: 4px; background: #eff6ff; color: #1e40af; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lịch nghỉ phép · Tháng 11/2026</h1>
+  <p class="muted">Phòng Kinh doanh có 8 người. Hôm nay là thứ Tư, 04/11/2026: 3 trong 8 người nghỉ. Chọn một ngày để xem ai nghỉ, hoặc chuyển sang dạng danh sách để xem tất cả đơn nghỉ trong tháng.</p>
+  <button class="btn" type="button">Tháng trước</button> <button class="btn" type="button">Tháng sau</button> <button class="btn" type="button">Dạng danh sách</button>
+  <table>
+    <thead><tr><th>T2</th><th>T3</th><th>T4</th><th>T5</th><th>T6</th><th>T7</th><th>CN</th></tr></thead>
+    <tbody>
+      <tr><td class="other">26</td><td class="other">27</td><td class="other">28</td><td class="other">29</td><td class="other">30</td><td class="other">31</td><td>1</td></tr>
+      <tr><td>2</td><td>3</td><td>4 · Hôm nay<button class="entry" type="button">Trần An · Nghỉ phép</button><button class="entry" type="button">Lê Hà · Nghỉ ốm</button></td><td>5</td><td>6<button class="entry" type="button">Phạm Quân · Nghỉ phép</button></td><td>7</td><td>8</td></tr>
+      <tr><td>9</td><td>10</td><td>11</td><td>12</td><td>13</td><td>14</td><td>15</td></tr>
+      <tr><td>16</td><td>17</td><td>18</td><td>19</td><td>20</td><td>21</td><td>22</td></tr>
+      <tr><td>23</td><td>24</td><td>25</td><td>26</td><td>27</td><td>28</td><td>29</td></tr>
+      <tr><td>30</td><td class="other">1</td><td class="other">2</td><td class="other">3</td><td class="other">4</td><td class="other">5</td><td class="other">6</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

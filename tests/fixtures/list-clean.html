@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="vi-VN">
+<head>
+<meta charset="utf-8">
+<!-- A list page that follows the skill. The audit must find nothing. -->
+<meta name="audit-page-type" content="list">
+<meta name="audit-expect" content="">
+<title>Đơn hàng</title>
+<style>
+  [hidden] { display: none !important; }
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  main { padding: 16px 24px; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
+  button, input { font: inherit; }
+  .btn { height: 32px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; color: #0f172a; }
+  .primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .actions { display: flex; gap: 8px; }
+  .muted { color: #475569; }
+  input { height: 32px; padding: 0 8px; border: 1px solid #8592a6; border-radius: 4px; width: 280px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+  th, td { height: 40px; padding: 0 12px; text-align: left; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
+  th { font-weight: 500; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  a { color: #1d4ed8; }
+  .badge { display: inline-block; padding: 0 8px; border-radius: 9999px; font-size: 12px; line-height: 20px; background: #f0fdf4; color: #166534; }
+  .badge.info { background: #eff6ff; color: #1e40af; }
+</style>
+</head>
+<body>
+<main>
+  <div class="header">
+    <h1>Đơn hàng</h1>
+    <div class="actions">
+      <button class="btn" type="button">Xuất CSV</button>
+      <button class="btn primary" type="button">Tạo đơn hàng</button>
+    </div>
+  </div>
+  <div role="search">
+    <input type="search" aria-label="Tìm đơn hàng theo mã hoặc khách hàng" placeholder="Tìm theo mã hoặc khách hàng">
+  </div>
+  <p class="muted">96 đơn hàng · 596.722.000 ₫</p>
+  <div hidden>Đã chọn 0 đơn hàng</div>
+  <table>
+    <thead>
+      <tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày đặt</th><th>Trạng thái</th><th class="num">Số lượng</th><th class="num">Tổng (VND)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><a href="#DH-1043">DH-1043</a></td><td>Công ty Minh Phát</td><td>04/11/2026</td><td><span class="badge">Đã thanh toán</span></td><td class="num">1.500</td><td class="num">1.250.000</td></tr>
+      <tr><td><a href="#DH-1042">DH-1042</a></td><td>Cửa hàng An Bình</td><td>03/11/2026</td><td><span class="badge info">Đang giao</span></td><td class="num">980</td><td class="num">980.000</td></tr>
+      <tr><td><a href="#DH-1041">DH-1041</a></td><td>Nhà thuốc Hoà Hảo</td><td>03/11/2026</td><td><span class="badge info">Chờ xác nhận</span></td><td class="num">12</td><td class="num">12.000</td></tr>
+      <tr><td><a href="#DH-1040">DH-1040</a></td><td>Siêu thị Sao Mai</td><td>02/11/2026</td><td><span class="badge">Đã thanh toán</span></td><td class="num">240</td><td class="num">4.320.000</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

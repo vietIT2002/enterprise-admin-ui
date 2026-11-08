@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="vi-VN">
+<head>
+<meta charset="utf-8">
+<!-- A create form with the usual mistakes: a sticky Save bar inside an overflow-y-auto main in a min-h-screen shell
+     (it never sticks), an inline label beside a date field, an email field without type="email", an email shown as
+     plain text, a hidden element that a display class keeps visible, an unnamed icon button and tiny stepper buttons. -->
+<meta name="audit-page-type" content="form">
+<meta name="audit-expect" content="contact-link hidden-overridden icon-button-name input-type label-beside-field sticky-inert target-size">
+<title>Tạo khách hàng</title>
+<style>
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  .shell { min-height: 100vh; display: flex; }
+  aside { width: 240px; padding: 16px; border-right: 1px solid #e2e8f0; background: #f8fafc; }
+  aside a { display: block; height: 32px; line-height: 32px; padding: 0 8px; color: #0f172a; text-decoration: none; }
+  main { flex: 1; overflow-y: auto; padding: 16px 24px 0; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0 0 16px; }
+  button, input { font: inherit; }
+  .block { display: block; font-weight: 500; margin-bottom: 4px; }
+  .field { margin-bottom: 16px; }
+  input { height: 32px; padding: 0 8px; border: 1px solid #8592a6; border-radius: 4px; width: 360px; box-sizing: border-box; }
+  input[type="date"] { width: 180px; }
+  .qty { width: 80px; }
+  .btn { height: 32px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 4px; background: #fff; color: #0f172a; }
+  .primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+  .icon { width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .tiny { width: 16px; height: 16px; padding: 0; border: 1px solid #8592a6; border-radius: 4px; background: #fff; color: #0f172a; line-height: 14px; }
+  .flex { display: flex; }
+  .notice { color: #475569; }
+  .spacer { height: 1200px; }
+  .bar { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: 8px; padding: 12px 0; border-top: 1px solid #e2e8f0; background: #fff; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside><nav aria-label="Chính"><a href="#customers">Khách hàng</a><a href="#orders">Đơn hàng</a><a href="#settings">Cài đặt</a></nav></aside>
+  <main>
+    <h1>Tạo khách hàng</h1>
+    <form>
+      <div class="field"><label class="block" for="name">Tên khách hàng *</label><input id="name" name="name" required></div>
+      <div class="field"><label for="dob">Ngày thành lập</label> <input id="dob" name="dob" type="date"></div>
+      <div class="field"><label class="block" for="email">Email</label><input id="email" name="email"></div>
+      <div class="field">
+        <label class="block" for="qty">Số chi nhánh</label>
+        <input id="qty" class="qty" name="qty" type="number" value="1"> <button class="tiny" type="button">−</button><button class="tiny" type="button">+</button>
+      </div>
+      <p>Hỗ trợ: <span>hotro@minhphat.vn</span></p>
+      <div hidden class="flex notice">Có thay đổi chưa lưu</div>
+      <button class="btn icon" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M6 4V2h4v2M5 4l1 10h4l1-10" fill="none" stroke="currentColor"></path></svg></button>
+      <div class="spacer"></div>
+      <div class="bar">
+        <button class="btn" type="button">Huỷ</button>
+        <button class="btn primary" type="submit">Lưu</button>
+      </div>
+    </form>
+  </main>
+</div>
+</body>
+</html>

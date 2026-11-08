@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+- Tests and CI. `npm test` runs:
+  - unit tests for the DOM-free helpers in `audit.js`;
+  - `audit.js` in Chromium on the pages in `tests/fixtures/`. Each page declares the rules it must fail, every rule fails on at least one page, and the clean pages must score 100;
+  - a check that `adapters/` matches `SKILL.md`. The snippets are now built by `tools/build-adapters.mjs` (`npm run build:adapters`);
+  - a check that the numbers and names in the three READMEs, the plugin manifests and `CHANGELOG.md` match the files.
+- GitHub Actions runs the tests on every push to `main` and every pull request, and failures show as annotations. The READMEs show the CI status.
+- `CONTRIBUTING.md`: setup, what the tests check, and how to change `SKILL.md`, `audit.js` and the references.
+
 ### Fixed
 - `audit.js` 0.5.2 no longer checks a bare integer of four or more digits as a number, so a year (`2026`) or an ID (`1043`) can stay left-aligned, as `tables.md` asks. Before, a left-aligned ID or year column failed `numeric-align` and `tabular-nums`. Where the page's `lang` leaves 1000 ungrouped (es-ES, pl-PL write `1500`), the limit is five digits.
 - SKILL.md Verify and the `audit.js` header list the page types for reports, printable documents, calendars, boards and trees (`report`, `document`, `calendar`, `board`, `tree`). Before, they named only the six older types, so agents ran these screens with no page type or as `list`.

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi-VN">
+<head>
+<meta charset="utf-8">
+<!-- A list page with the usual AI-template table: a greeting and KPI tiles push the table below the first viewport,
+     12px tracked ALL-CAPS headers, tall rows with stacked cells, and amounts left-aligned without tabular figures. -->
+<meta name="audit-page-type" content="list">
+<meta name="audit-expect" content="font-size-base numeric-align table-above-fold table-row-height table-row-two-line tabular-nums uppercase-text">
+<title>Đơn hàng</title>
+<style>
+  [hidden] { display: none !important; }
+  html { font: 14px/20px system-ui, sans-serif; color: #0f172a; background: #fff; }
+  body { margin: 0; }
+  main { padding: 16px 24px; }
+  h1 { font-size: 20px; line-height: 28px; font-weight: 600; margin: 0; }
+  button { font: inherit; }
+  .btn { height: 32px; padding: 0 12px; border: 1px solid #1d4ed8; border-radius: 4px; background: #1d4ed8; color: #fff; }
+  .hero { height: 320px; }
+  .hero-head { display: flex; align-items: center; justify-content: space-between; }
+  .muted { color: #475569; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; height: 600px; }
+  .kpi { border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; }
+  .kpi strong { display: block; font-size: 24px; line-height: 32px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+  th, td { height: 56px; padding: 0 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 12px; line-height: 16px; white-space: nowrap; }
+  th { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; color: #334155; }
+  .sub { color: #475569; }
+</style>
+</head>
+<body>
+<main>
+  <div class="hero">
+    <div class="hero-head">
+      <h1>Chào buổi sáng, Lan</h1>
+      <button class="btn" type="button">Tạo đơn hàng</button>
+    </div>
+    <p class="muted">Đây là tình hình kinh doanh của bạn hôm nay. Chúc bạn một ngày làm việc hiệu quả và nhiều đơn hàng mới.</p>
+  </div>
+  <div class="kpis">
+    <div class="kpi">Doanh thu<strong>596.722.000 ₫</strong></div>
+    <div class="kpi">Đơn hàng<strong>96</strong></div>
+    <div class="kpi">Khách hàng mới<strong>14</strong></div>
+    <div class="kpi">Tỷ lệ hoàn<strong>2,1%</strong></div>
+  </div>
+  <table>
+    <thead><tr><th>Khách hàng</th><th>Ngày đặt</th><th style="width: 240px">Tổng tiền</th></tr></thead>
+    <tbody>
+      <tr><td><div>Công ty Minh Phát</div><div class="sub">Hà Nội</div></td><td>04/11/2026</td><td>1.250.000 ₫</td></tr>
+      <tr><td><div>Cửa hàng An Bình</div><div class="sub">Đà Nẵng</div></td><td>03/11/2026</td><td>980.000 ₫</td></tr>
+      <tr><td>Nhà thuốc Hoà Hảo</td><td>03/11/2026</td><td>12.000 ₫</td></tr>
+      <tr><td>Siêu thị Sao Mai</td><td>02/11/2026</td><td>4.320.000 ₫</td></tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>
