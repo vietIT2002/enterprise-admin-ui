@@ -203,7 +203,7 @@ Use these values when the project has no design system; `assets/tokens.css` impl
 
 When the user asks to review or audit existing screens, report findings instead of rewriting code:
 
-1. Run the audit (see Verify) on each screen when a browser is available and map every violation to its source line.
+1. Run the audit (see Verify) on each screen and map every violation to its source line.
 2. Walk the page recipe for the screen type, the manual checklist and `references/anti-patterns.md`; each miss is a finding.
 3. Write one finding per line: `path/to/file.tsx:42 — <rule> — <fix>`, for example `app/orders/page.tsx:88 — numeric-align — add text-right tabular-nums to the Total header and cells`.
 4. Group the findings by level, most severe first: `data` (lost or wrong data: saving, destructive actions) → `states` (missing states) → `a11y` (contrast, names, targets) → `layout` (density and alignment) → `tells` (template tells).
@@ -211,8 +211,8 @@ When the user asks to review or audit existing screens, report findings instead 
 
 ## Verify
 
-- **Audit:** with a browser at 1440×900, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`).
-  - In a console, paste the file first.
+- **Audit:** run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`). It opens the page in an installed headless Chrome or Edge at 1440×900 and prints the score; exit code 1 means an ✗ error.
+  - In a browser console, paste `scripts/audit.js`, then run `enterpriseAdminAudit({ pageType: 'list' })`.
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.
 - **Manual checklist:**

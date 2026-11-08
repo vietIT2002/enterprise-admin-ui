@@ -5,6 +5,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- `scripts/audit-cli.mjs` runs the audit from a terminal, with no dependencies: `node scripts/audit-cli.mjs <url | file.html>... --type list`. It opens each page at 1440×900 in an installed headless Chrome, Edge or Chromium, waits for it to settle as the benchmark does, and prints the score, or JSON with `--json`. It exits 1 on an ✗ error (on any violation with `--strict`) and 2 when a page cannot be audited: a missing file, a refused connection, an HTTP error or no browser. SKILL.md Verify, the review steps in `anti-patterns.md` and the READMEs lead with it.
 - Tests and CI. `npm test` runs:
   - unit tests for the DOM-free helpers in `audit.js`;
   - `audit.js` in Chromium on the pages in `tests/fixtures/`. Each page declares the rules it must fail, every rule fails on at least one page, and the clean pages must score 100;
