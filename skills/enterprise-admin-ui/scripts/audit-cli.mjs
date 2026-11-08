@@ -14,7 +14,7 @@
  * Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.
  */
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from 'node:fs';
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, posix, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -140,11 +140,24 @@ export function findBrowser({ flag = null, env = process.env, platform = process
 
 // ------------------------------------------------------------------ targets and results
 
-// A URL as given, or a file path resolved against cwd as a file: URL.
+// localhost, an IP address or any host with a port: a URL written without http://.
+const SCHEMELESS_URL = /^(?:(?:localhost|\d{1,3}(?:\.\d{1,3}){3}|\[[\da-f:]+\])(?::\d+)?|[\w.-]+:\d+)(?:[/?#]|$)/i;
+
+// A URL as given, or the path of an HTML file resolved against cwd, as a file: URL.
 export function toUrl(target, cwd = process.cwd()) {
   if (/^(?:https?|file):/i.test(target)) return target;
   const path = resolve(cwd, target);
-  if (!existsSync(path)) throw new Error(`File not found: ${path}`);
+  let stat = null;
+  try {
+    stat = statSync(path);
+  } catch {
+    // missing
+  }
+  if (!stat) {
+    const hint = SCHEMELESS_URL.test(target) ? `. To audit a URL, write the URL with http://, e.g. http://${target}` : '';
+    throw new Error(`File not found: ${path}${hint}`);
+  }
+  if (!stat.isFile()) throw new Error(`Not a file: ${path}`);
   return pathToFileURL(path).href;
 }
 
@@ -178,27 +191,124 @@ const SETTLE = { quietMs: 800, capMs: 8000 };
 const SETTLE_TIMEOUT_MS = SETTLE.capMs + 10000;
 const AUDIT_TIMEOUT_MS = 30000;
 const VIEWPORT = { width: 1440, height: 900 };
+const PROFILE_PREFIX = 'eaui-audit-';
+const STALE_PROFILE_MS = 24 * 3600 * 1000;
 
-// Launch flags. Beside headless-over-a-pipe, the flags Playwright passes for the same platforms: Linux containers and
-// root (Docker agents, CI) cannot start Chrome's sandbox or have a small /dev/shm; macOS would prompt for the keychain;
-// on Windows, Edge's compatibility relaunch and Chrome's de-elevation relaunch would lose the pipe.
+// Browsers of this process, stopped and removed if the process is interrupted.
+const ACTIVE = new Set();
+
+// Removes temp profiles that a killed run left behind: eaui-audit-* folders older than a day. A folder still in use
+// is either recent or locked by its browser; anything else in dir is never touched.
+export function sweepStaleProfiles({ dir = tmpdir(), olderThanMs = STALE_PROFILE_MS, now = Date.now() } = {}) {
+  let names;
+  try {
+    names = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(PROFILE_PREFIX)) continue;
+    const path = join(dir, name);
+    try {
+      const stat = lstatSync(path); // a link is not followed
+      if (stat.isDirectory() && now - stat.mtimeMs >= olderThanMs) rmSync(path, { recursive: true, force: true });
+    } catch {
+      // in use, or another user's
+    }
+  }
+}
+
+// Reads NUL-separated JSON messages from text chunks split anywhere. A message that is not JSON, or a handler that
+// throws, goes to onError instead of throwing out of a stream callback.
+export function createMessageReader(onMessage, onError) {
+  let buffer = '';
+  return (text) => {
+    buffer += text;
+    for (let end = buffer.indexOf('\0'); end >= 0; end = buffer.indexOf('\0')) {
+      const raw = buffer.slice(0, end);
+      buffer = buffer.slice(end + 1);
+      let message;
+      try {
+        message = JSON.parse(raw);
+      } catch {
+        onError(new Error(`The browser sent a message that is not JSON: ${raw.slice(0, 80)}`));
+        continue;
+      }
+      try {
+        onMessage(message);
+      } catch (err) {
+        onError(err);
+      }
+    }
+  };
+}
+
+// Chrome features Playwright 1.64.1 turns off (chromiumSwitches.ts), minus the ones that only matter to its request
+// interception: background downloads and queries of a fresh profile, Translate, media routing, relaunches that lose
+// the pipe (AutoDeElevate on Windows, Edge's forced sign-in and updater).
+const DISABLED_FEATURES = [
+  'AvoidUnnecessaryBeforeUnloadCheckSync',
+  'DestroyProfileOnBrowserClose',
+  'DialMediaRouteProvider',
+  'GlobalMediaControls',
+  'HttpsUpgrades',
+  'LensOverlay',
+  'MediaRouter',
+  'PaintHolding',
+  'ThirdPartyStoragePartitioning',
+  'Translate',
+  'AutoDeElevate',
+  'OptimizationHints',
+  'NetworkTimeServiceQuerying',
+  'AimEnabled',
+  'msForceBrowserSignIn',
+  'msEdgeUpdateLaunchServicesPreferredVersion',
+];
+
+// Launch flags: headless over a pipe, with the switches Playwright 1.64.1 launches Chromium with, so pages render as
+// they do in the benchmark and a fresh profile does no background work (default apps, model downloads, component
+// extensions). On Linux also --no-sandbox, as Playwright does: containers, root (Docker agents) and Ubuntu 24.04 CI
+// cannot start Chrome's sandbox.
 export function browserArgs({ platform = process.platform } = {}) {
   const args = [
     '--headless=new',
     '--remote-debugging-pipe',
     '--hide-scrollbars',
     '--mute-audio',
-    '--no-first-run',
-    '--no-default-browser-check',
-    '--disable-extensions',
+    '--disable-field-trial-config',
     '--disable-background-networking',
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-back-forward-cache',
+    '--disable-breakpad',
+    '--disable-client-side-phishing-detection',
+    '--disable-component-extensions-with-background-pages',
     '--disable-component-update',
-    '--disable-sync',
+    '--no-default-browser-check',
+    '--disable-default-apps',
     '--disable-dev-shm-usage',
+    '--disable-edgeupdater',
+    '--disable-extensions',
+    `--disable-features=${DISABLED_FEATURES.join(',')}`,
+    '--allow-pre-commit-input',
+    '--disable-hang-monitor',
+    '--disable-ipc-flooding-protection',
+    '--disable-popup-blocking',
+    '--disable-prompt-on-repost',
+    '--disable-renderer-backgrounding',
+    '--disable-updater-scheduler',
+    '--force-color-profile=srgb',
+    '--metrics-recording-only',
+    '--no-first-run',
+    '--password-store=basic',
+    '--use-mock-keychain',
+    '--no-service-autorun',
+    '--disable-search-engine-choice-screen',
+    '--edge-skip-compat-layer-relaunch',
+    '--disable-infobars',
+    '--disable-sync',
   ];
   if (platform === 'linux') args.push('--no-sandbox');
-  if (platform === 'darwin') args.push('--use-mock-keychain', '--password-store=basic');
-  if (platform === 'win32') args.push('--edge-skip-compat-layer-relaunch', '--disable-features=AutoDeElevate');
   return args;
 }
 
@@ -218,7 +328,7 @@ async function within(promise, ms) {
 // NUL bytes, written to the browser's fd 3 and read from its fd 4.
 class Browser {
   static async launch(executable) {
-    const profile = mkdtempSync(join(tmpdir(), 'eaui-audit-'));
+    const profile = mkdtempSync(join(tmpdir(), PROFILE_PREFIX));
     let child;
     try {
       child = spawn(executable, [...browserArgs(), `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
@@ -227,6 +337,7 @@ class Browser {
       throw new Error(`Browser could not start (${err.code || err.message}): ${executable}`);
     }
     const browser = new Browser(child, profile);
+    ACTIVE.add(browser);
     try {
       await browser.send('Browser.getVersion', {}, undefined, START_TIMEOUT_MS);
       return browser;
@@ -268,15 +379,8 @@ class Browser {
     child.stdio[3].on('error', () => {}); // EPIPE once the browser has gone
     const input = child.stdio[4];
     input.setEncoding('utf8');
-    let buffer = '';
-    input.on('data', (text) => {
-      buffer += text;
-      for (let end = buffer.indexOf('\0'); end >= 0; end = buffer.indexOf('\0')) {
-        const message = buffer.slice(0, end);
-        buffer = buffer.slice(end + 1);
-        this.dispatch(JSON.parse(message));
-      }
-    });
+    input.on('data', createMessageReader((message) => this.dispatch(message), (err) => this.fail(err)));
+    input.on('error', (err) => this.fail(err));
   }
 
   fail(err) {
@@ -348,13 +452,34 @@ class Browser {
         this.child.kill();
         await within(this.exited, 2000);
       }
+      if (this.exitCode === null) {
+        this.child.kill('SIGKILL'); // a browser that ignores SIGTERM
+        await within(this.exited, 2000);
+      }
+      if (this.exitCode === null) this.child.unref(); // never keep this process alive for it
     }
     for (const stream of this.child.stdio) if (stream) stream.destroy();
     try {
       rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     } catch {
-      // a file the browser still holds; the OS cleans the temp folder
+      // a file the browser still holds; the next run's sweep removes the folder
     }
+    ACTIVE.delete(this);
+  }
+
+  // On Ctrl+C or SIGTERM: stop at once and remove the profile, without the protocol.
+  abort() {
+    try {
+      this.child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+    try {
+      rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // the next run's sweep removes it
+    }
+    ACTIVE.delete(this);
   }
 }
 
@@ -454,16 +579,17 @@ async function evaluate(send, expression, awaitPromise = false, timeoutMs = CALL
   return result.value;
 }
 
-// Opens url in a new tab, waits for it to load and settle, and runs the audit.
+// Opens url in a new tab of its own browser context (no storage or cookies from other targets), waits for it to load
+// and settle, and runs the audit.
 async function auditPage(browser, url, pageType, auditSource) {
-  const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
+  const { browserContextId } = await browser.send('Target.createBrowserContext');
   try {
+    const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
     const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
     const send = (method, params, timeoutMs) => browser.send(method, params, sessionId, timeoutMs);
     const ours = (message) => message.sessionId === sessionId;
 
     let navigating = false;
-    let mainFrame = null;
     let response = null;
     const inflight = new Set();
     const offEvents = browser.on((message) => {
@@ -475,8 +601,8 @@ async function auditPage(browser, url, pageType, auditSource) {
         inflight.add(params.requestId);
       } else if (method === 'Network.loadingFinished' || method === 'Network.loadingFailed') {
         inflight.delete(params.requestId);
-      } else if (method === 'Network.responseReceived' && params.type === 'Document' && (mainFrame === null || params.frameId === mainFrame)) {
-        response = params.response;
+      } else if (method === 'Network.responseReceived' && params.type === 'Document' && params.frameId === targetId) {
+        response = params.response; // the main frame's id is the target's id
       }
     });
     const loaded = browser.waitFor((message) => navigating && ours(message) && message.method === 'Page.loadEventFired', LOAD_TIMEOUT_MS);
@@ -501,7 +627,6 @@ async function auditPage(browser, url, pageType, auditSource) {
         if (err.timeout) throw new Error(`Could not load ${url}: no response after 30 s`);
         throw err;
       }
-      mainFrame = nav.frameId;
       if (nav.errorText) throw new Error(`Could not load ${url}: ${nav.errorText}`);
       if (!(await loaded.promise) && (await evaluate(send, 'document.readyState')) === 'loading') {
         throw new Error(`Could not load ${url}: no load event after 30 s`);
@@ -523,7 +648,8 @@ async function auditPage(browser, url, pageType, auditSource) {
       offEvents();
     }
   } finally {
-    await browser.send('Target.closeTarget', { targetId }, undefined, 5000).catch(() => {});
+    // Closes the tab with its context.
+    await browser.send('Target.disposeBrowserContext', { browserContextId }, undefined, 5000).catch(() => {});
   }
 }
 
@@ -592,12 +718,23 @@ export async function main(argv = process.argv.slice(2)) {
     process.stderr.write('No Chrome, Edge or Chromium found. Install one, pass --browser <path>, or set CHROME_PATH.\n');
     return 2;
   }
+  sweepStaleProfiles();
+  // Ctrl+C or SIGTERM: stop the browser and remove its profile before leaving (130 and 143, as shells report them).
+  const onSignal = (signal) => {
+    for (const browser of ACTIVE) browser.abort();
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
   let pages;
   try {
     pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;
+  } finally {
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
   }
   process.stdout.write((opts.json ? JSON.stringify(pages, null, 2) : formatText(pages, opts.pageType)) + '\n');
   return exitCode(pages, opts.strict);
@@ -613,4 +750,10 @@ function isMain() {
   }
 }
 
-if (isMain()) process.exitCode = await main();
+// An unexpected error exits 2 ("could not audit"), never 1, which means the page has an ✗ error.
+if (isMain()) {
+  process.exitCode = await main().catch((err) => {
+    process.stderr.write(`Internal error: ${(err && err.stack) || err}\n`);
+    return 2;
+  });
+}

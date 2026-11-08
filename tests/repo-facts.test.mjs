@@ -106,6 +106,11 @@ test('SKILL.md and every README name each file in scripts/ and assets/', () => {
   }
 });
 
+test('docs show the audit CLI with its skill folder, since it runs from the project, not from the skill', () => {
+  const docs = ['README.md', 'README.vi.md', 'README.zh-CN.md', 'CHANGELOG.md', `${SKILL_DIR}/SKILL.md`, ...facts.references.map((f) => `${SKILL_DIR}/references/${f}`)];
+  for (const file of docs) assert.doesNotMatch(read(file), /node scripts\/audit-cli\.mjs/, `${file}: write node <skill folder>/scripts/audit-cli.mjs`);
+});
+
 test('plugin manifests agree on name and version', () => {
   const agentPlugin = json('plugin.json');
   const claudePlugin = json('.claude-plugin/plugin.json');
