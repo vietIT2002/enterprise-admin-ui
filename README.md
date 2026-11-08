@@ -200,7 +200,7 @@ skills/enterprise-admin-ui/
 node <skill folder>/scripts/audit-cli.mjs http://localhost:3000/orders --type list
 ```
 
-`<skill folder>` is where the skill is installed, such as `.claude/skills/enterprise-admin-ui`. The target can be a URL or an HTML file; a relative file path is read from the folder you run the command in. The CLI opens the page at 1440×900 in an installed Chrome, Edge or Chromium and prints the score. It exits with 1 on an ✗ error, so an agent or a CI job can act on it. In a browser console or with Playwright, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` instead. The audit measures:
+`<skill folder>` is where the skill is installed, such as `.claude/skills/enterprise-admin-ui`. The target can be a URL or an HTML file; a relative file path is read from the folder you run the command in. The CLI opens the page at 1440×900 in an installed Chrome, Edge or Chromium and prints the score. It exits with 1 on an ✗ error, so an agent or a CI job can act on it. On a page with mock data, add `--states`: the CLI also opens `?state=empty`, `?state=error` and `?state=loading` and checks each state: no data rows and an action of its own when empty, a `role="alert"` message and Retry on error, a skeleton while loading. In a browser console or with Playwright, inject `scripts/audit.js` and run `enterpriseAdminAudit({ pageType: 'list' })` instead. The audit measures:
 - type size and scale;
 - radius;
 - row height and stacked rows;

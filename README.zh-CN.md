@@ -200,7 +200,7 @@ skills/enterprise-admin-ui/
 node <技能目录>/scripts/audit-cli.mjs http://localhost:3000/orders --type list
 ```
 
-`<技能目录>` 是技能的安装位置，例如 `.claude/skills/enterprise-admin-ui`。目标可以是 URL，也可以是 HTML 文件；相对文件路径按运行命令时所在的目录解析。CLI 会用本机已安装的 Chrome、Edge 或 Chromium 以 1440×900 打开页面并输出评分；存在 ✗ 错误时退出码为 1，便于 Agent 或 CI 据此处理。在浏览器控制台或 Playwright 中，也可以注入 `scripts/audit.js` 并运行 `enterpriseAdminAudit({ pageType: 'list' })`。审计会检测：
+`<技能目录>` 是技能的安装位置，例如 `.claude/skills/enterprise-admin-ui`。目标可以是 URL，也可以是 HTML 文件；相对文件路径按运行命令时所在的目录解析。CLI 会用本机已安装的 Chrome、Edge 或 Chromium 以 1440×900 打开页面并输出评分；存在 ✗ 错误时退出码为 1，便于 Agent 或 CI 据此处理。对使用模拟数据的页面，加上 `--states`：CLI 还会打开 `?state=empty`、`?state=error` 和 `?state=loading` 并逐一检查：空状态不再显示数据行且有自己的操作，错误状态有 `role="alert"` 提示和重试按钮，加载状态显示骨架屏。在浏览器控制台或 Playwright 中，也可以注入 `scripts/audit.js` 并运行 `enterpriseAdminAudit({ pageType: 'list' })`。审计会检测：
 - 字号与字号层级；
 - 圆角；
 - 行高与多行堆叠的行；

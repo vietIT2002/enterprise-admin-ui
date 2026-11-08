@@ -9,10 +9,12 @@ import {
   PAGE_TYPES,
   UsageError,
   browserArgs,
+  checkState,
   createMessageReader,
   exitCode,
   findBrowser,
   parseCli,
+  stateUrl,
   sweepStaleProfiles,
   toUrl,
 } from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
@@ -25,9 +27,67 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, browser: null, help: false });
-  const all = parseCli(['--json', '--strict', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, browser: '/x/chrome', help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, timeout: 90, browser: null, help: false });
+  const all = parseCli(['--json', '--strict', '--states', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, timeout: 120, browser: '/x/chrome', help: false });
+});
+
+test('parseCli: --timeout takes a positive number of seconds', () => {
+  assert.equal(parseCli(['a', '--timeout', '2.5']).timeout, 2.5);
+  for (const bad of ['abc', '0', '-3', '']) {
+    assert.throws(() => parseCli(['a', '--timeout', bad]), (err) => err instanceof UsageError && /--timeout takes a number of seconds/.test(err.message), bad);
+  }
+});
+
+test('stateUrl sets ?state= and keeps the rest of the URL', () => {
+  assert.equal(stateUrl('http://localhost:3000/orders', 'empty'), 'http://localhost:3000/orders?state=empty');
+  assert.equal(stateUrl('http://localhost:3000/orders?status=late', 'error'), 'http://localhost:3000/orders?status=late&state=error');
+  assert.equal(stateUrl('http://localhost:3000/orders?state=error', 'empty'), 'http://localhost:3000/orders?state=empty');
+  assert.equal(stateUrl('http://localhost:3000/orders#top', 'loading'), 'http://localhost:3000/orders?state=loading#top');
+  assert.equal(stateUrl('file:///D:/my%20app/orders.html', 'loading'), 'file:///D:/my%20app/orders.html?state=loading');
+});
+
+// Snapshots as the page reports them: main-content text, visible actions by name with their count, data rows,
+// visible role="alert" texts and loading placeholders.
+const BASE = { text: 'Đơn hàng 96 đơn hàng DH-1043 Minh Phát', actions: { 'Tạo đơn hàng': 1, 'Xuất CSV': 1 }, rows: 4, alerts: [], placeholders: 0 };
+const snap = (over) => ({ ...BASE, ...over });
+
+test('checkState: every state must change the page', () => {
+  for (const state of ['empty', 'error', 'loading']) {
+    const r = checkState(state, BASE, snap({}));
+    assert.equal(r.ok, false, state);
+    assert.match(r.problems.join('\n'), new RegExp(`\\?state=${state} shows the same page as without it`));
+  }
+});
+
+test('checkState empty: no data rows, and an action of its own', () => {
+  const ok = checkState('empty', BASE, snap({ text: 'Đơn hàng Chưa có đơn hàng nào', actions: { 'Tạo đơn hàng': 2, 'Xuất CSV': 1 }, rows: 0 }));
+  assert.deepEqual(ok, { state: 'empty', ok: true, problems: [], details: { actions: ['Tạo đơn hàng'] } });
+  const rows = checkState('empty', BASE, snap({ text: 'Đơn hàng Chưa có đơn hàng nào', actions: { 'Tạo đơn hàng': 2 }, rows: 2 }));
+  assert.match(rows.problems.join('\n'), /2 data rows still show/);
+  const noAction = checkState('empty', BASE, snap({ text: 'Đơn hàng Chưa có đơn hàng nào', rows: 0 }));
+  assert.equal(noAction.ok, false);
+  assert.match(noAction.problems.join('\n'), /no action of its own/);
+  const clear = checkState('empty', BASE, snap({ text: 'Không có đơn hàng nào khớp bộ lọc', actions: { ...BASE.actions, 'Xoá bộ lọc': 1 }, rows: 0 }));
+  assert.equal(clear.ok, true, 'a new name counts too');
+});
+
+test('checkState error: a role="alert" message and a Retry action', () => {
+  for (const retry of ['Retry', 'Try again', 'Thử lại', 'Tải lại trang', '重试']) {
+    const r = checkState('error', BASE, snap({ text: 'Đơn hàng Không tải được', alerts: ['Không tải được danh sách đơn hàng'], actions: { ...BASE.actions, [retry]: 1 } }));
+    assert.equal(r.ok, true, retry);
+  }
+  const bare = checkState('error', BASE, snap({ text: 'Đơn hàng Có lỗi xảy ra' }));
+  assert.equal(bare.ok, false);
+  assert.match(bare.problems.join('\n'), /no visible role="alert" message/);
+  assert.match(bare.problems.join('\n'), /no Retry action/);
+});
+
+test('checkState loading: skeleton placeholders, not only a spinner', () => {
+  assert.equal(checkState('loading', BASE, snap({ text: 'Đơn hàng', placeholders: 6 })).ok, true);
+  const spinner = checkState('loading', BASE, snap({ text: 'Đơn hàng Đang tải', placeholders: 0 }));
+  assert.equal(spinner.ok, false);
+  assert.match(spinner.problems.join('\n'), /no skeleton/);
 });
 
 test('parseCli: usage errors', () => {
@@ -167,4 +227,11 @@ test('exitCode: 0 clean, 1 on errors (or warnings with strict), 2 when a page co
   assert.equal(exitCode([page([{ rule: 'numeric-align', severity: 'error' }])], false), 1);
   assert.equal(exitCode([page([]), page(null, 'HTTP 404 from u')], false), 2);
   assert.equal(exitCode([page([{ rule: 'numeric-align', severity: 'error' }]), page(null, 'HTTP 404 from u')], true), 2);
+});
+
+test('exitCode: a state that fails exits 1; a state page that could not load exits 2', () => {
+  const withStates = (states) => ({ ...page([]), states });
+  assert.equal(exitCode([withStates([{ state: 'empty', ok: true, problems: [], error: null }])], false), 0);
+  assert.equal(exitCode([withStates([{ state: 'error', ok: false, problems: ['no Retry action'], error: null }])], false), 1);
+  assert.equal(exitCode([withStates([{ state: 'loading', ok: false, problems: [], error: 'HTTP 500 from u' }])], false), 2);
 });

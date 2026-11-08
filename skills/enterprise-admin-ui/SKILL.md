@@ -211,7 +211,7 @@ When the user asks to review or audit existing screens, report findings instead 
 
 ## Verify
 
-- **Audit:** run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`). It opens the page in an installed headless Chrome or Edge at 1440×900 and prints the score; exit code 1 means an ✗ error.
+- **Audit:** run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`). It opens the page in an installed headless Chrome or Edge at 1440×900 and prints the score; exit code 1 means an ✗ error. With mock data, add `--states`: it also opens `?state=empty`, `?state=error` and `?state=loading` and checks each one.
   - In a browser console, paste `scripts/audit.js`, then run `enterpriseAdminAudit({ pageType: 'list' })`.
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.

@@ -22,6 +22,11 @@ import { parseArgs } from 'node:util';
 
 export const PAGE_TYPES = Object.freeze(['list', 'detail', 'form', 'dashboard', 'settings', 'wizard', 'report', 'document', 'calendar', 'board', 'tree']);
 
+// The most one page (or one ?state= variant) may take, end to end. Its steps have their own limits, but a browser that
+// answers slowly at every step could otherwise keep a run going for minutes.
+const DEFAULT_PAGE_TIMEOUT_S = 90;
+const TIMEOUT_USAGE = `--timeout takes a number of seconds, such as --timeout ${DEFAULT_PAGE_TIMEOUT_S}.`;
+
 export class UsageError extends Error {
   constructor(message) {
     super(message);
@@ -43,11 +48,14 @@ export function parseCli(argv) {
         json: { type: 'boolean' },
         strict: { type: 'boolean' },
         browser: { type: 'string' },
+        states: { type: 'boolean' },
+        timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     });
   } catch (err) {
-    throw new UsageError(err.message);
+    // parseArgs reads "--timeout -3" as a missing value; say what --timeout takes instead.
+    throw new UsageError(/--timeout/.test(err.message) ? TIMEOUT_USAGE : err.message);
   }
   const { values, positionals } = parsed;
   const opts = {
@@ -55,10 +63,13 @@ export function parseCli(argv) {
     pageType: values.type ?? null,
     json: Boolean(values.json),
     strict: Boolean(values.strict),
+    states: Boolean(values.states),
+    timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
     help: Boolean(values.help),
   };
   if (opts.help) return opts;
+  if (!(opts.timeout > 0) || (values.timeout !== undefined && !values.timeout.trim())) throw new UsageError(TIMEOUT_USAGE);
   if (opts.pageType !== null && !PAGE_TYPES.includes(opts.pageType)) {
     throw new UsageError(`Unknown --type "${opts.pageType}". Use one of: ${PAGE_TYPES.join(', ')}.`);
   }
@@ -161,11 +172,60 @@ export function toUrl(target, cwd = process.cwd()) {
   return pathToFileURL(path).href;
 }
 
-// PageResult: { target, url, error: string|null, loadingPlaceholders: number, result: audit result|null }
+// ------------------------------------------------------------------ states (--states)
+
+// The states SKILL.md asks a page with mock data to show through ?state= (States → Mock data).
+export const STATES = Object.freeze(['empty', 'error', 'loading']);
+const RETRY = /retry|try again|reload|thử lại|tải lại|重试|重新加载|再试/i;
+
+// url with ?state=<state>, keeping its other parameters and its hash.
+export function stateUrl(url, state) {
+  const u = new URL(url);
+  u.searchParams.set('state', state);
+  return u.href;
+}
+
+// Compares a state's snapshot with the page's own (both from snapshotInPage): the state must change the page, and
+// show what SKILL.md asks of it. Returns { state, ok, problems: string[], details }.
+export function checkState(state, base, snap) {
+  const problems = [];
+  const details = {};
+  if (snap.text === base.text) problems.push(`?state=${state} shows the same page as without it: build the ${state} state (SKILL.md, States)`);
+  if (state === 'empty') {
+    if (snap.rows > 0) problems.push(`${snap.rows} data row${snap.rows === 1 ? '' : 's'} still show`);
+    // Its own action: a name that is new, or one that now appears more often (the header's "Create order" plus the empty state's).
+    const own = Object.keys(snap.actions).filter((name) => snap.actions[name] > (base.actions[name] || 0));
+    if (own.length) details.actions = own;
+    else problems.push('no action of its own, such as "Create order" or "Clear filters"');
+  } else if (state === 'error') {
+    const retry = Object.keys(snap.actions).find((name) => RETRY.test(name));
+    if (snap.alerts.length) details.alert = snap.alerts[0];
+    else problems.push('no visible role="alert" message saying what failed');
+    if (retry) details.retry = retry;
+    else problems.push('no Retry action');
+  } else if (state === 'loading') {
+    if (snap.placeholders > 0) details.placeholders = snap.placeholders;
+    else problems.push('no skeleton: show placeholder rows or blocks in the final layout (aria-busy="true" or animate-pulse); a spinner alone is not enough');
+  }
+  return { state, ok: problems.length === 0, problems, details };
+}
+
+// PageResult: { target, url, error: string|null, loadingPlaceholders: number, result: audit result|null,
+//               states: null | [{ state, url, ok, problems, details, error }] }
 export function exitCode(pages, strict) {
-  if (pages.some((p) => p.error)) return 2;
+  const states = (p) => p.states || [];
+  if (pages.some((p) => p.error || states(p).some((s) => s.error))) return 2;
   const fails = (v) => strict || v.severity === 'error';
-  return pages.some((p) => p.result && p.result.violations.some(fails)) ? 1 : 0;
+  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok)) ? 1 : 0;
+}
+
+function stateLine(s) {
+  if (s.error) return `✗ ${s.state}: could not audit: ${s.error}`;
+  if (!s.ok) return `✗ ${s.state}: ${s.problems.join('; ')}`;
+  const d = s.details;
+  if (s.state === 'empty') return `✓ empty: no data rows, its own action ${d.actions.map((a) => `"${a}"`).join(', ')}`;
+  if (s.state === 'error') return `✓ error: "${d.alert}" with "${d.retry}"`;
+  return `✓ loading: ${d.placeholders} loading placeholder(s)`;
 }
 
 export function formatText(pages, pageType = null) {
@@ -175,6 +235,7 @@ export function formatText(pages, pageType = null) {
       if (p.loadingPlaceholders > 0) {
         lines.push(`! Still loading after 8 s: ${p.loadingPlaceholders} loading placeholder(s) on the page, so the audit saw a loading state.`);
       }
+      if (p.states) lines.push('States (?state=):', ...p.states.map(stateLine));
       return lines.join('\n');
     })
     .join('\n\n');
@@ -459,32 +520,34 @@ class Browser {
       if (this.exitCode === null) this.child.unref(); // never keep this process alive for it
     }
     for (const stream of this.child.stdio) if (stream) stream.destroy();
-    try {
-      rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // a file the browser still holds; the next run's sweep removes the folder
-    }
+    this.removeProfile();
     ACTIVE.delete(this);
   }
 
-  // On Ctrl+C or SIGTERM: stop at once and remove the profile, without the protocol.
+  // On Ctrl+C or SIGTERM, or a page past --timeout: stop at once, without the protocol, and try to remove the profile.
   abort() {
     try {
       this.child.kill('SIGKILL');
     } catch {
       // already gone
     }
-    try {
-      rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-    } catch {
-      // the next run's sweep removes it
-    }
+    this.removeProfile();
     ACTIVE.delete(this);
+  }
+
+  // On Windows the browser's helper processes hold profile files for a moment after it exits; retry for about 2 s.
+  removeProfile() {
+    try {
+      rmSync(this.profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    } catch {
+      // still held: the next run's sweep removes the folder
+    }
   }
 }
 
 // Runs in the page: the benchmark's settle. Resolves with the number of loading placeholders still present.
-async function settleInPage({ quietMs, capMs }) {
+// waitForPlaceholders: false (for ?state=loading, which holds its skeleton) counts them without waiting.
+async function settleInPage({ quietMs, capMs, waitForPlaceholders = true }) {
   const started = Date.now();
   await new Promise((resolve) => {
     let quiet = null;
@@ -503,7 +566,7 @@ async function settleInPage({ quietMs, capMs }) {
     quiet = setTimeout(done, quietMs);
     cap = setTimeout(done, capMs);
   });
-  const remaining = Math.max(0, capMs - (Date.now() - started));
+  const remaining = waitForPlaceholders ? Math.max(0, capMs - (Date.now() - started)) : 0;
   const visible = (el) => {
     const r = el.getBoundingClientRect();
     const s = getComputedStyle(el);
@@ -551,6 +614,42 @@ function tailwindInPage() {
   };
 }
 
+// Runs in the page: what checkState compares. Main-content text; visible actions (buttons and links outside navigation)
+// by name with their count; data rows (two or more filled cells, so a "No orders yet" row spanning the table and
+// skeleton rows do not count); visible role="alert" messages; loading placeholders, counted as settleInPage does.
+function snapshotInPage() {
+  const root = document.querySelector('main, [role="main"]') || document.body;
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+  };
+  const actions = {};
+  for (const el of root.querySelectorAll('button, a[href], [role="button"]')) {
+    if (!visible(el) || el.disabled || el.closest('nav, [role="navigation"]')) continue;
+    const name = clean(el.getAttribute('aria-label') || el.innerText || el.getAttribute('title'));
+    if (name) actions[name] = (actions[name] || 0) + 1;
+  }
+  let rows = 0;
+  for (const row of root.querySelectorAll('tbody tr, [role="row"]')) {
+    if (!visible(row) || row.closest('thead') || row.querySelector('[role="columnheader"]')) continue;
+    const cells = row.querySelectorAll('td, th, [role="cell"], [role="gridcell"], [role="rowheader"]');
+    if ([...cells].filter((c) => clean(c.innerText)).length >= 2) rows++;
+  }
+  const alerts = [...document.querySelectorAll('[role="alert"], [aria-live="assertive"]')]
+    .filter((el) => visible(el) && clean(el.innerText))
+    .map((el) => clean(el.innerText).slice(0, 120));
+  const placeholder = (el) => {
+    const r = el.getBoundingClientRect();
+    return visible(el) && !el.textContent.trim() && r.width >= 12 && r.height >= 12;
+  };
+  const placeholders =
+    [...document.querySelectorAll('[aria-busy="true"]')].filter(visible).length +
+    [...document.querySelectorAll('.animate-pulse')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
+  return { text: clean(root.innerText), actions, rows, alerts, placeholders };
+}
+
 // Resolves true once busy() has been false for quietMs, or false after timeoutMs.
 async function waitForQuiet(busy, quietMs, timeoutMs) {
   const end = Date.now() + timeoutMs;
@@ -580,8 +679,8 @@ async function evaluate(send, expression, awaitPromise = false, timeoutMs = CALL
 }
 
 // Opens url in a new tab of its own browser context (no storage or cookies from other targets), waits for it to load
-// and settle, and runs the audit.
-async function auditPage(browser, url, pageType, auditSource) {
+// and settle, and returns work(send, { loadingPlaceholders }). The tab and its context close afterwards.
+async function withPage(browser, url, { waitForPlaceholders = true } = {}, work) {
   const { browserContextId } = await browser.send('Target.createBrowserContext');
   try {
     const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
@@ -635,14 +734,9 @@ async function auditPage(browser, url, pageType, auditSource) {
       // Like the benchmark's goto(networkidle): no request in flight for 500 ms, or go on after 15 s.
       await waitForQuiet(() => inflight.size > 0, NETWORK_IDLE.quietMs, NETWORK_IDLE.timeoutMs);
 
-      const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(SETTLE)})`, true, SETTLE_TIMEOUT_MS);
-      const tailwind = await evaluate(send, `(${tailwindInPage})()`);
-      if (tailwind.uses && !tailwind.loaded) {
-        throw new Error('Tailwind CDN did not load, so the page has none of its styles. Check the network and run the audit again');
-      }
-      await evaluate(send, auditSource);
-      const result = await evaluate(send, `enterpriseAdminAudit(${JSON.stringify({ pageType })})`, false, AUDIT_TIMEOUT_MS);
-      return { url: result.url, loadingPlaceholders, result };
+      const settle = { ...SETTLE, waitForPlaceholders };
+      const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(settle)})`, true, SETTLE_TIMEOUT_MS);
+      return await work(send, { loadingPlaceholders });
     } finally {
       loaded.cancel();
       offEvents();
@@ -653,29 +747,95 @@ async function auditPage(browser, url, pageType, auditSource) {
   }
 }
 
+// The page's audit; with snapshot, also the page's own snapshot that checkState compares each state with.
+function auditPage(browser, url, pageType, auditSource, { snapshot = false } = {}) {
+  return withPage(browser, url, {}, async (send, { loadingPlaceholders }) => {
+    const tailwind = await evaluate(send, `(${tailwindInPage})()`);
+    if (tailwind.uses && !tailwind.loaded) {
+      throw new Error('Tailwind CDN did not load, so the page has none of its styles. Check the network and run the audit again');
+    }
+    await evaluate(send, auditSource);
+    const result = await evaluate(send, `enterpriseAdminAudit(${JSON.stringify({ pageType })})`, false, AUDIT_TIMEOUT_MS);
+    const base = snapshot ? await evaluate(send, `(${snapshotInPage})()`) : null;
+    return { url: result.url, loadingPlaceholders, result, base };
+  });
+}
+
+// One ?state= variant (its URL from stateUrl), checked against the page's own snapshot. ?state=loading holds its
+// skeleton, so its settle does not wait for placeholders to go.
+async function auditState(browser, target, state, base) {
+  const snap = await withPage(browser, target, { waitForPlaceholders: state !== 'loading' }, (send) => evaluate(send, `(${snapshotInPage})()`));
+  const { ok, problems, details } = checkState(state, base, snap);
+  return { state, url: target, ok, problems, details, error: null };
+}
+
 // One browser for all targets, a new tab for each. A target that fails gets an error; a browser that cannot start rejects.
-export async function auditTargets(targets, { pageType = null, browser: executable }) {
+// With states, each page that was audited is also opened with ?state=empty, error and loading. Each page and each state
+// gets at most timeoutS; one that takes longer may have hung the browser, so it is stopped and a new one started.
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
-      return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null };
+      return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null };
     } catch (err) {
-      return { target, url: null, error: err.message, loadingPlaceholders: 0, result: null };
+      return { target, url: null, error: err.message, loadingPlaceholders: 0, result: null, states: null };
     }
   });
   const todo = pages.filter((p) => !p.error);
   if (!todo.length) return pages;
   const auditSource = readFileSync(AUDIT_JS, 'utf8');
-  const browser = await Browser.launch(executable);
+  let browser = await Browser.launch(executable);
+  const limited = async (work) => {
+    if (!browser) browser = await Browser.launch(executable);
+    const running = work(browser);
+    running.catch(() => {}); // it settles after the race once its browser is stopped
+    let timer;
+    try {
+      return await Promise.race([
+        running,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            reject(Object.assign(new Error(`The page did not finish within ${timeoutS} s, so the browser was stopped. Raise --timeout for a slow page`), { deadline: true }));
+          }, timeoutS * 1000);
+        }),
+      ]);
+    } catch (err) {
+      if (err.deadline) {
+        const stopped = browser;
+        browser = null;
+        stopped.abort();
+        await within(stopped.exited, 5000); // then its files are free
+        stopped.removeProfile();
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   try {
     for (const page of todo) {
+      let base;
       try {
-        Object.assign(page, await auditPage(browser, page.url, pageType, auditSource));
+        const audited = await limited((b) => auditPage(b, page.url, pageType, auditSource, { snapshot: states }));
+        base = audited.base;
+        delete audited.base;
+        Object.assign(page, audited);
       } catch (err) {
         page.error = err.message;
+        continue;
+      }
+      if (!states) continue;
+      page.states = [];
+      for (const state of STATES) {
+        const url = stateUrl(page.url, state);
+        try {
+          page.states.push(await limited((b) => auditState(b, url, state, base)));
+        } catch (err) {
+          page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message });
+        }
       }
     }
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
   return pages;
 }
@@ -690,6 +850,10 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --type <type>      the page type: ${PAGE_TYPES.join(', ')}
   --json             print the full results as JSON
   --strict           exit 1 on warnings too
+  --states           also open the page with ?state=empty, ?state=error and ?state=loading and check each state:
+                     a changed page; empty: no data rows and an action of its own; error: a role="alert" message
+                     and Retry; loading: a skeleton. For pages with mock data, as SKILL.md asks
+  --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
 Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.`;
@@ -728,7 +892,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;

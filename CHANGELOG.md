@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `audit-cli.mjs --states` checks the states SKILL.md asks a page with mock data to show. After the page itself, it opens `?state=empty`, `?state=error` and `?state=loading`, and each must change the page:
+  - empty: no data rows remain, and the state has an action of its own, such as "Create order" or "Clear filters";
+  - error: a visible `role="alert"` message, and a Retry action (Retry, Try again, Thử lại, 重试);
+  - loading: a skeleton (`aria-busy="true"` or `animate-pulse`), not only a spinner.
+
+  A state that fails prints ✗ and exits 1. The score stays as the benchmark measures it.
+- `audit-cli.mjs --timeout <s>` (default 90) limits each page and each state. A page that takes longer is reported, the browser is stopped and a new one audits the next page, so a browser that stops answering can no longer keep a run going for minutes.
+
 ## [0.5.9] — 2026-11-08
 
 ### Added

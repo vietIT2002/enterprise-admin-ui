@@ -50,6 +50,24 @@ function run(args, { cwd = ROOT, timeout = 90000, cli = CLI, env = {} } = {}) {
 const BASE_STYLE = `[hidden]{display:none!important} html{font:14px/20px system-ui,sans-serif;color:#0f172a;background:#fff} body{margin:0} main{padding:16px 24px} h1{font-size:20px;line-height:28px;font-weight:600;margin:0 0 16px}`;
 const html = (body, style = '') => `<!doctype html><html lang="vi-VN"><head><meta charset="utf-8"><title>t</title><style>${BASE_STYLE}${style}</style></head><body><main>${body}</main></body></html>`;
 
+function statePage(withStates) {
+  const rows = ['Công ty Minh Phát', 'Cửa hàng An Bình', 'Nhà thuốc Hoà Hảo']
+    .map((name, i) => `<tr><td><a href="#DH-104${i}">DH-104${i}</a></td><td>${name}</td><td>0${i + 2}/11/2026</td></tr>`)
+    .join('');
+  const table = `<table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Ngày đặt</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const states = withStates
+    ? `var state = new URLSearchParams(location.search).get('state');
+       if (state === 'loading') slot.innerHTML = '<div aria-busy="true"><div style="height:40px;background:#f1f5f9"></div><div style="height:40px;background:#f1f5f9"></div></div>';
+       else if (state === 'empty') slot.innerHTML = '<p>Chưa có đơn hàng nào.</p><button type="button">Tạo đơn hàng</button>';
+       else if (state === 'error') slot.innerHTML = '<div role="alert">Không tải được danh sách đơn hàng.</div><button type="button">Thử lại</button>';
+       else slot.innerHTML = ${JSON.stringify(table)};`
+    : `slot.innerHTML = ${JSON.stringify(table)};`;
+  return html(
+    `<h1>Đơn hàng</h1><button type="button">Tạo đơn hàng</button><div id="slot"></div><script>var slot = document.getElementById('slot'); ${states}</script>`,
+    'button{font:inherit;height:32px;padding:0 12px} table{border-collapse:collapse;margin-top:12px} th,td{height:40px;padding:0 12px;text-align:left;white-space:nowrap} a{color:#1d4ed8}'
+  );
+}
+
 const PAGES = {
   '/clean': () => readFileSync(CLEAN, 'utf8'),
   '/new': () => readFileSync(CLEAN, 'utf8'),
@@ -84,6 +102,11 @@ const PAGES = {
   '/busy': () => html('<h1>Tổng quan</h1><p>Đang tính toán.</p><script>addEventListener("load", function () { setTimeout(function () { for (;;) {} }, 0); });</script>'),
   // The Tailwind Play CDN fails to load (here: a 404), so the page has none of its styles.
   '/tailwind': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><script src="/cdn.tailwindcss.com/3.4.17"></script>'),
+  // Mock data with every state reachable through ?state=, as SKILL.md asks; and the same page without them.
+  // An image that never loads, so the load event never fires.
+  '/slow-load': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><img src="/hang" alt="" width="1" height="1">'),
+  '/stateful': () => statePage(true),
+  '/stateless': () => statePage(false),
   // Two pages of one origin: the first stores a value, the second shows an ALL-CAPS notice when it can read it.
   '/store-a': () => html('<h1>Tổng quan</h1><p>Mọi chỉ số đều bình thường.</p><script>localStorage.setItem("eaui", "1"); document.cookie = "eaui=1; path=/";</script>'),
   '/store-b': () =>
@@ -98,8 +121,10 @@ let base;
 
 before(async () => {
   server = createServer((req, res) => {
-    if (req.url === '/old') return res.writeHead(302, { location: '/new' }).end();
-    const page = PAGES[req.url];
+    const path = new URL(req.url, 'http://localhost').pathname; // ?state= and other parameters are for the page's script
+    if (path === '/hang') return; // never answers, so a page with <img src="/hang"> never fires its load event
+    if (path === '/old') return res.writeHead(302, { location: '/new' }).end();
+    const page = PAGES[path];
     if (!page) return res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page());
   });
@@ -107,7 +132,10 @@ before(async () => {
   base = `http://127.0.0.1:${server.address().port}`;
 });
 
-after(() => new Promise((resolve) => server.close(resolve)));
+after(() => {
+  server.closeAllConnections(); // the /hang requests stay open otherwise
+  return new Promise((resolve) => server.close(resolve));
+});
 
 test('fixtures through the CLI match their declared rules', async () => {
   const groups = new Map();
@@ -182,6 +210,40 @@ test('pages in one run do not share storage or cookies', async () => {
   const pages = JSON.parse(r.stdout);
   assert.equal(pages.length, 2);
   assert.deepEqual(pages[1].result.violations.map((v) => v.rule), [], pages[1].result.summary);
+});
+
+test('--states checks ?state=empty, error and loading on a page that has them', async () => {
+  const r = await run([`${base}/stateful`, '--type', 'list', '--states']);
+  assert.equal(r.code, 0, r.output);
+  for (const line of [/✓ empty/, /✓ error/, /✓ loading/]) assert.match(r.stdout, line);
+  const json = JSON.parse((await run([`${base}/stateful`, '--type', 'list', '--states', '--json'])).stdout);
+  assert.deepEqual(json[0].states.map((s) => [s.state, s.ok]), [['empty', true], ['error', true], ['loading', true]]);
+  assert.match(json[0].states[0].url, /\/stateful\?state=empty$/);
+});
+
+test('--states fails a page that ignores ?state=', async () => {
+  const r = await run([`${base}/stateless`, '--type', 'list', '--states']);
+  assert.equal(r.code, 1, r.output);
+  assert.match(r.stdout, /✗ empty: \?state=empty shows the same page as without it/);
+  assert.match(r.stdout, /✗ error:/);
+  assert.match(r.stdout, /✗ loading:/);
+});
+
+test('a page that does not finish within --timeout stops the browser, and the next page still gets audited', async () => {
+  const before = new Set(profiles());
+  const r = await run([`${base}/slow-load`, CLEAN, '--type', 'list', '--timeout', '3', '--json']);
+  assert.deepEqual(profiles().filter((name) => !before.has(name)), [], 'the stopped browser\'s profile is removed too');
+  assert.equal(r.code, 2, r.output);
+  assert.ok(r.ms < 20000, `took ${r.ms} ms`);
+  const [slow, clean] = JSON.parse(r.stdout);
+  assert.match(slow.error, /did not finish within 3 s/);
+  assert.equal(clean.error, null, 'a new browser audits the next page');
+  assert.equal(clean.result.score, 100);
+});
+
+test('without --states, no state is checked', async () => {
+  const [page] = JSON.parse((await run([`${base}/stateless`, '--type', 'list', '--json'])).stdout);
+  assert.equal(page.states, null);
 });
 
 test('a temp profile left by a killed run is removed by the next run', async () => {
