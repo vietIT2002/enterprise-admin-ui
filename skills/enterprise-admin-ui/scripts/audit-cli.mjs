@@ -5,12 +5,17 @@
  *
  *   node audit-cli.mjs <url | file.html>... [--type <type>] [--json] [--strict] [--browser <path>]
  *
+ * Each page opens at 1440×900 and settles the way the enterprise-admin-ui benchmark does (no DOM change for 800 ms,
+ * loading skeletons gone, fonts loaded, animations finished, scrolled to the top; at most 8 s) before the audit runs.
+ * The browser is driven over the DevTools protocol on a pipe, with a throwaway profile.
+ *
  * Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.
  */
-import { existsSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { posix, resolve, win32 } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { spawn } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join, posix, resolve, win32 } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 export const PAGE_TYPES = Object.freeze(['list', 'detail', 'form', 'dashboard', 'settings', 'wizard', 'report', 'document', 'calendar', 'board', 'tree']);
@@ -147,3 +152,378 @@ export function exitCode(pages, strict) {
   const fails = (v) => strict || v.severity === 'error';
   return pages.some((p) => p.result && p.result.violations.some(fails)) ? 1 : 0;
 }
+
+export function formatText(pages, pageType = null) {
+  return pages
+    .map((p) => {
+      const lines = [`${p.target}  (pageType: ${pageType || 'none'})`, p.error ? `✗ Could not audit: ${p.error}` : p.result.summary];
+      if (p.loadingPlaceholders > 0) {
+        lines.push(`! Still loading after 8 s: ${p.loadingPlaceholders} loading placeholder(s) on the page, so the audit saw a loading state.`);
+      }
+      return lines.join('\n');
+    })
+    .join('\n\n');
+}
+
+// ------------------------------------------------------------------ the browser
+
+const AUDIT_JS = fileURLToPath(new URL('./audit.js', import.meta.url));
+const START_TIMEOUT_MS = 15000;
+const LOAD_TIMEOUT_MS = 30000;
+const SETTLE = { quietMs: 800, capMs: 8000 };
+const BROWSER_ARGS = [
+  '--headless=new',
+  '--remote-debugging-pipe',
+  '--hide-scrollbars',
+  '--mute-audio',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-extensions',
+  '--disable-background-networking',
+  '--disable-component-update',
+  '--disable-sync',
+];
+
+const delay = (ms) => new Promise((done) => setTimeout(done, ms));
+
+// Waits for promise, at most ms. The timer is cleared either way, so it never keeps the process alive.
+async function within(promise, ms) {
+  let timer;
+  try {
+    return await Promise.race([promise, new Promise((done) => (timer = setTimeout(done, ms)))]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// A DevTools-protocol connection to a browser started with --remote-debugging-pipe: JSON messages separated by
+// NUL bytes, written to the browser's fd 3 and read from its fd 4.
+class Browser {
+  static async launch(executable) {
+    const profile = mkdtempSync(join(tmpdir(), 'eaui-audit-'));
+    let child;
+    try {
+      child = spawn(executable, [...BROWSER_ARGS, `--user-data-dir=${profile}`, 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe', 'pipe', 'pipe'] });
+    } catch (err) {
+      rmSync(profile, { recursive: true, force: true });
+      throw new Error(`Browser could not start (${err.code || err.message}): ${executable}`);
+    }
+    const browser = new Browser(child, profile);
+    let timer;
+    try {
+      const version = browser.send('Browser.getVersion');
+      version.catch(() => {}); // handled by the race below, or rejected later by close()
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timed out after 15 s')), START_TIMEOUT_MS);
+      });
+      await Promise.race([version, timeout]);
+      return browser;
+    } catch (err) {
+      await delay(100); // let the last stderr lines arrive
+      const reason = browser.exitCode ?? err.code ?? err.message;
+      const tail = browser.stderr.trim().split(/\r?\n/).slice(-5).join('\n');
+      await browser.close();
+      throw new Error(`Browser could not start (${reason}): ${tail || executable}`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  constructor(child, profile) {
+    this.child = child;
+    this.profile = profile;
+    this.nextId = 1;
+    this.pending = new Map();
+    this.listeners = new Set();
+    this.waiters = new Set();
+    this.stderr = '';
+    this.failure = null;
+    this.exitCode = null;
+    this.exited = new Promise((done) => {
+      child.once('exit', (code, signal) => {
+        this.exitCode = code ?? signal;
+        this.fail(new Error(`Browser exited (${this.exitCode})`));
+        done();
+      });
+      child.once('error', (err) => {
+        this.exitCode = err.code || err.message;
+        this.fail(err);
+        done();
+      });
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (text) => {
+      this.stderr = (this.stderr + text).slice(-8000);
+    });
+    child.stdio[3].on('error', () => {}); // EPIPE once the browser has gone
+    const input = child.stdio[4];
+    input.setEncoding('utf8');
+    let buffer = '';
+    input.on('data', (text) => {
+      buffer += text;
+      for (let end = buffer.indexOf('\0'); end >= 0; end = buffer.indexOf('\0')) {
+        const message = buffer.slice(0, end);
+        buffer = buffer.slice(end + 1);
+        this.dispatch(JSON.parse(message));
+      }
+    });
+  }
+
+  fail(err) {
+    this.failure = this.failure || err;
+    for (const { reject } of this.pending.values()) reject(this.failure);
+    this.pending.clear();
+    for (const cancel of this.waiters) cancel(null);
+  }
+
+  dispatch(message) {
+    if (message.id !== undefined) {
+      const call = this.pending.get(message.id);
+      if (!call) return;
+      this.pending.delete(message.id);
+      if (message.error) call.reject(new Error(`${call.method}: ${message.error.message}`));
+      else call.resolve(message.result);
+      return;
+    }
+    for (const listener of this.listeners) listener(message);
+  }
+
+  send(method, params = {}, sessionId = undefined) {
+    if (this.failure) return Promise.reject(this.failure);
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject, method });
+      this.child.stdio[3].write(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }) + '\0');
+    });
+  }
+
+  // Calls listener(message) for every event until the returned function is called.
+  on(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  // { promise, cancel }: the promise gives the first event that matches, or null after timeoutMs, on cancel()
+  // or when the browser goes away.
+  waitFor(match, timeoutMs) {
+    let cancel;
+    const promise = new Promise((resolve) => {
+      const timer = setTimeout(() => cancel(null), timeoutMs);
+      const off = this.on((message) => match(message) && cancel(message));
+      cancel = (value = null) => {
+        clearTimeout(timer);
+        off();
+        this.waiters.delete(cancel);
+        resolve(value);
+      };
+      this.waiters.add(cancel);
+    });
+    return { promise, cancel };
+  }
+
+  async close() {
+    if (!this.failure) await within(this.send('Browser.close').catch(() => {}), 5000);
+    if (this.exitCode === null) {
+      await within(this.exited, 5000);
+      if (this.exitCode === null) {
+        this.child.kill();
+        await within(this.exited, 2000);
+      }
+    }
+    for (const stream of this.child.stdio) if (stream) stream.destroy();
+    try {
+      rmSync(this.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    } catch {
+      // a file the browser still holds; the OS cleans the temp folder
+    }
+  }
+}
+
+// Runs in the page: the benchmark's settle. Resolves with the number of loading placeholders still present.
+async function settleInPage({ quietMs, capMs }) {
+  const started = Date.now();
+  await new Promise((resolve) => {
+    let quiet = null;
+    let cap = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(quiet);
+      quiet = setTimeout(done, quietMs);
+    });
+    function done() {
+      observer.disconnect();
+      clearTimeout(quiet);
+      clearTimeout(cap);
+      resolve();
+    }
+    observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    quiet = setTimeout(done, quietMs);
+    cap = setTimeout(done, capMs);
+  });
+  const remaining = Math.max(0, capMs - (Date.now() - started));
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+  };
+  // A placeholder is a visible, text-less block of at least 12×12 px; small dots and pulsing badges with text are decoration.
+  const placeholder = (el) => {
+    const r = el.getBoundingClientRect();
+    return visible(el) && !el.textContent.trim() && r.width >= 12 && r.height >= 12;
+  };
+  const count = () =>
+    [...document.querySelectorAll('[aria-busy="true"]')].filter(visible).length +
+    [...document.querySelectorAll('.animate-pulse')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
+  const left = await new Promise((resolve) => {
+    const end = Date.now() + remaining;
+    const tick = () => {
+      const n = count();
+      if (n === 0 || Date.now() >= end) resolve(n);
+      else setTimeout(tick, 100);
+    };
+    tick();
+  });
+  await document.fonts.ready;
+  for (const animation of document.getAnimations()) {
+    try {
+      animation.finish();
+    } catch {
+      // infinite animations (spinners, pulses) cannot finish
+    }
+  }
+  window.scrollTo(0, 0);
+  // Frames do not run while a stylesheet that never answers blocks rendering, so do not wait for them forever.
+  await new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+  return left;
+}
+
+async function evaluate(send, expression, awaitPromise = false) {
+  const { result, exceptionDetails } = await send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true });
+  if (exceptionDetails) {
+    throw new Error(`Script in the page failed: ${(exceptionDetails.exception && exceptionDetails.exception.description) || exceptionDetails.text}`);
+  }
+  return result.value;
+}
+
+// Opens url in a new tab, waits for it to load and settle, and runs the audit.
+async function auditPage(browser, url, pageType, auditSource) {
+  const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank' });
+  try {
+    const { sessionId } = await browser.send('Target.attachToTarget', { targetId, flatten: true });
+    const send = (method, params) => browser.send(method, params, sessionId);
+    await send('Page.enable');
+    await send('Network.enable');
+    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+
+    let navigating = false;
+    let mainFrame = null;
+    let response = null;
+    const ours = (message) => message.sessionId === sessionId;
+    const offResponse = browser.on((message) => {
+      if (!ours(message) || message.method !== 'Network.responseReceived' || message.params.type !== 'Document') return;
+      if (mainFrame === null || message.params.frameId === mainFrame) response = message.params.response;
+    });
+    const loaded = browser.waitFor((message) => navigating && ours(message) && message.method === 'Page.loadEventFired', LOAD_TIMEOUT_MS);
+    try {
+      navigating = true;
+      const nav = await send('Page.navigate', { url });
+      mainFrame = nav.frameId;
+      if (nav.errorText) throw new Error(`Could not load ${url}: ${nav.errorText}`);
+      if (!(await loaded.promise) && (await evaluate(send, 'document.readyState')) === 'loading') {
+        throw new Error(`Could not load ${url}: no load event after 30 s`);
+      }
+    } finally {
+      loaded.cancel();
+      offResponse();
+    }
+    if (response && response.status >= 400) throw new Error(`HTTP ${response.status} from ${response.url}`);
+
+    const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(SETTLE)})`, true);
+    await evaluate(send, auditSource);
+    const result = await evaluate(send, `enterpriseAdminAudit(${JSON.stringify({ pageType })})`);
+    return { url: result.url, loadingPlaceholders, result };
+  } finally {
+    await browser.send('Target.closeTarget', { targetId }).catch(() => {});
+  }
+}
+
+// One browser for all targets, a new tab for each. A target that fails gets an error; a browser that cannot start rejects.
+export async function auditTargets(targets, { pageType = null, browser: executable }) {
+  const pages = targets.map((target) => {
+    try {
+      return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null };
+    } catch (err) {
+      return { target, url: null, error: err.message, loadingPlaceholders: 0, result: null };
+    }
+  });
+  const todo = pages.filter((p) => !p.error);
+  if (!todo.length) return pages;
+  const auditSource = readFileSync(AUDIT_JS, 'utf8');
+  const browser = await Browser.launch(executable);
+  try {
+    for (const page of todo) {
+      try {
+        Object.assign(page, await auditPage(browser, page.url, pageType, auditSource));
+      } catch (err) {
+        page.error = err.message;
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+  return pages;
+}
+
+// ------------------------------------------------------------------ command line
+
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--json] [--strict] [--browser <path>]
+
+Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
+
+  <url | file.html>  an http(s) URL, such as a running dev server, or a local HTML file
+  --type <type>      the page type: ${PAGE_TYPES.join(', ')}
+  --json             print the full results as JSON
+  --strict           exit 1 on warnings too
+  --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
+
+Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.`;
+
+export async function main(argv = process.argv.slice(2)) {
+  let opts;
+  try {
+    opts = parseCli(argv);
+  } catch (err) {
+    if (!(err instanceof UsageError)) throw err;
+    process.stderr.write(`${err.message}\nRun with --help for usage.\n`);
+    return 2;
+  }
+  if (opts.help) {
+    process.stdout.write(HELP + '\n');
+    return 0;
+  }
+  let executable;
+  try {
+    executable = findBrowser({ flag: opts.browser });
+  } catch (err) {
+    process.stderr.write(err.message + '\n');
+    return 2;
+  }
+  if (!executable) {
+    process.stderr.write('No Chrome, Edge or Chromium found. Install one, pass --browser <path>, or set CHROME_PATH.\n');
+    return 2;
+  }
+  let pages;
+  try {
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable });
+  } catch (err) {
+    process.stderr.write(err.message + '\n');
+    return 2;
+  }
+  process.stdout.write((opts.json ? JSON.stringify(pages, null, 2) : formatText(pages, opts.pageType)) + '\n');
+  return exitCode(pages, opts.strict);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = await main();
