@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.5.10] — 2026-11-09
 
 ### Added
 - `audit-cli.mjs --states` checks the states SKILL.md asks a page with mock data to show. After the page itself, it opens `?state=empty`, `?state=error` and `?state=loading`, and each must change the page:
@@ -184,6 +184,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - `scripts/audit.js`, a dependency-free browser audit (17 rules, 0–100 score). Version 0.2.0 replaces the tracked-uppercase rule with `uppercase-text`.
 - Benchmark: 8 briefs plus 3 held-out briefs with acceptance checklists, and runs without and with the skill. Kept in the development repository, not published here.
 
+[0.5.10]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.10
 [0.5.9]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.9
 [0.5.8]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.8
 [0.5.7]: https://github.com/vietIT2002/enterprise-admin-ui/releases/tag/v0.5.7
