@@ -2,11 +2,23 @@
 
 [English](README.md) · [Tiếng Việt](README.vi.md) · **简体中文**
 
-**为登录后的应用提供企业级界面。** 这个 Agent Skill 教 AI 编程 Agent（Claude Code、Codex、Cursor、Antigravity、Copilot 等）像成熟的商业软件那样构建管理系统界面：信息密集且易读的表格；完整的各类状态；不会丢失已填内容的保存机制；也没有那种“AI 模板”味。
+**AI 编程 Agent 做出的管理界面看起来已经完成，一用就出问题。** 这个 Agent Skill 让 Claude Code、Codex、Cursor、GitHub Copilot 等 Agent 像成熟的商业软件那样构建这些界面。
 
-**有实测，不只是承诺。** 在 12 个界面上（验收清单由从未读过本技能的 Agent 编写，盲评），使用本技能生成的页面通过了 **44%** 的清单项，不使用时为 **19%**。可在[对比画廊](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3)中并排查看页面 · [数据与方法](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。
+| Agent 常做出的 | 本技能让它们做出的 |
+|---|---|
+| 只有一个搜索框的表格 | 带可移除标签的筛选，以及随筛选变化的结果数（“48 个订单中的 12 个”） |
+| 保存失败时丢掉你已输入内容的表单 | 每个字段旁的错误提示、获得焦点的错误摘要，你输入的内容全部保留 |
+| 点了就立刻删除的删除按钮 | 写明记录名称和后果的确认对话框 |
+| 加载时一片空白，请求失败时毫无反应 | 加载时的骨架屏、带“重试”的错误提示，以及带下一步操作的空状态 |
+| 每页都有灰色小号全大写标签和 KPI 卡片 | 易读的 14px 句首大写文字，表格位于首屏 |
 
-![同一提示词分别由 Codex CLI 和 Claude Code 生成：未使用与使用本技能的对比，附审计与验收清单得分](docs/img/demo.gif)
+| 1 · 查看 | 2 · 安装 | 3 · 试一个提示词 |
+|---|---|---|
+| [同样的界面，未使用与使用本技能](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) | `npx skills add vietIT2002/enterprise-admin-ui`<br>Windows：`npx.cmd skills add vietIT2002/enterprise-admin-ui --copy` | `/enterprise-admin-ui 为 ERP 做订单列表页：筛选、批量操作、分页` |
+
+![同一提示词、同一数据生成的订单页，未使用与使用本技能：筛选与结果数、无结果的搜索、删除订单](docs/img/same-data-orders.png)
+
+**在没人为它调优过的界面上实测**（12 个界面，清单独立编写，盲评）：使用本技能生成的页面完成了每个界面所需内容的 **44%**，不使用时为 **19%**。按主题：空、加载和错误状态 12% → 59%；搜索、筛选和计数 16% → 54%；删除前确认 25% → 63%。它让 Agent 做对的部分翻了一倍多，剩下的仍需你来检查。[测量方法](#效果)。
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
@@ -29,6 +41,9 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
 - 请用 `npx.cmd`，不要用 `npx`。PowerShell 的默认执行策略会阻止 `npx.ps1`，报错 "running scripts is disabled on this system"。在命令提示符（cmd）中可以直接用 `npx`。
 - `--copy` 会写入真实文件。不加它时，如果为多个 Agent 安装，CLI 会用指向绝对路径的 junction 链接它们，项目移动或被克隆后链接就会失效。
 
+<details>
+<summary><b>参数、所有项目、更新</b></summary>
+
 常用参数，各系统相同：
 - `-a claude-code` 直接指定 Agent，不再询问（还有 `codex`、`cursor`、`github-copilot`、`antigravity` 等）；`-y` 跳过所有确认。
 - `-g` 安装到用户目录，供所有项目使用，而不只是当前项目。
@@ -46,6 +61,8 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
 ```
 
 以后更新时，运行 `npx skills update`（Windows 上为 `npx.cmd skills update`）。
+
+</details>
 
 <details>
 <summary><b>手动安装（适用于任何 Agent）</b></summary>
@@ -223,40 +240,59 @@ node <技能目录>/scripts/audit-cli.mjs http://localhost:3000/orders --type li
 
 ## 效果
 
-**测量方法：**
+基准测试给出两类数字。它们回答不同的问题，需要分开看：
+
+| 问题 | 测量方式 | 不使用 | 使用本技能 |
+|---|---|---|---|
+| **页面是否完成了界面需要做的事？** | 每个界面一份验收清单，由从未读过本技能的 Agent 编写。每个页面一名评审，不知道页面由哪种方式生成。12 个界面，每组 108 项 | 19% | **44%** |
+| 页面是否遵守本技能自己的规则？ | 本技能的审计（`audit.js`）：字号、对比度、对齐、行高和模板痕迹，0–100 分。同样 12 个界面，中位分 | 69 | 90 |
+
+一个页面可以在审计中拿到 100 分，却仍缺少界面需要的很多内容。审计检查浏览器能测量的规则；清单检查界面能否完成它的工作。请以第一行来评价本技能：它让 Agent 做对的部分翻了一倍多，但仍有一半以上需要你检查。
+
+在同样 12 个界面上，本技能在哪里有帮助、在哪里无能为力：
+- **界面行为**（状态、筛选与计数、格式、确认、键盘操作、打印、导出）：14% → **51%**。
+- **提示词没有说明的业务规则**（工资单上的法定扣款、审计日志中隐藏敏感信息）：26% → 33%。请把它们写进提示词或项目文档；本技能不了解你的业务。
+
+**数据：** 所有页面、截图、审计和评审，连同需求、提示词和工具，都在 [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)，[对比画廊](https://vietit2002.github.io/enterprise-admin-ui-benchmark/)可并排查看页面。这些数字来自 [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) 和 [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md) 两组测试。
+
+<details>
+<summary><b>早期测量，以及为什么数字更高</b></summary>
+
+这些测量更早。它们的清单由本技能作者编写，作者了解这些规则；大多数评审也知道页面由哪种方式生成。上面的独立数字更低，也更公允。
+
 - **版本：** 于 2026-11-04 使用 v0.1.0（8 个参考文档）测量。v0.5.0 的改动在 3 个新页面（审计得分中位数 100，验收清单 22/22）和 9 个修复轮次的页面上做了复查，没有在完整测试集上重新测量。
 - **生成：** 同一模型（Claude Sonnet 5.5）根据同一组需求说明（英文和越南语）构建相同的界面，一次按常规方式生成，一次先要求它阅读 `SKILL.md`。输出为使用 Tailwind CDN 的单文件 HTML。
 - **评分：**
   - 页面由本技能自带的审计（`scripts/audit.js`）和一份验收清单评分；
   - 每个页面由一个评审 Agent 评判，评审时知道页面属于哪一组。对其中 12 个页面的盲评复核与原评审在 97% 的清单项上一致，差距相同；
   - 验收清单评审覆盖每份需求说明的第 1–2 次运行。
-- **数据：** 所有生成的页面、截图、审计与评审结果，以及题目、提示词和工具，均在 [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。可在[对比画廊](https://vietit2002.github.io/enterprise-admin-ui-benchmark/)中并排浏览这些页面。
 
 | | 不使用 | 使用本技能 |
 |---|---|---|
-| 本技能自带审计的得分中位数（各 40 个页面） | 82 | **100** |
-| 存在低对比度文字的页面 | 68% | **0%** |
-| 使用全大写标签的页面 | 73% | **0%** |
-| 验收清单：12 个新界面，其清单由未读过本技能的 Agent 编写，盲评，v0.5.8（各 12 个页面）‡ | 19% | **44%** |
-| 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | **72%** |
-| 验收清单：另外 3 个新界面，使用 v0.5.2（各 6 个页面）† | 39% | **89%** |
+| 本技能自带审计的得分中位数（各 40 个页面） | 82 | 100 |
+| 存在低对比度文字的页面 | 68% | 0% |
+| 使用全大写标签的页面 | 73% | 0% |
+| 验收清单：编写技能时从未参考过的 3 个界面（各 6 个页面） | 35% | 72% |
+| 验收清单：另外 3 个新界面，使用 v0.5.2（各 6 个页面）† | 39% | 89% |
 | 验收清单：8 个主要界面（各 16 次评审）\* | 56% | 100% |
 
 \* 本技能的配方正是根据这 8 个界面上的失败问题编写的，因此这一行高估了它在新界面上的表现。新界面那几行的数字更公允。
 
 † 这些界面是在 v0.5.2 规则之后编写的。27 个清单项中有 4 项直接检验这些规则（5/8 → 8/8）；其余 23 项从 35% 提升到 87%。
 
-‡ 最公允的数字。这些需求由一个未读过本技能的独立 Agent 编写，共两组，每组六个；评审者只看到随机编码的页面。在关于界面行为的清单项上（状态、筛选、格式、无障碍、打印、导出），页面从 14% 提升到 **51%**；在提示词没有说明的业务要求上（例如工资单上的法定扣款、审计日志中隐藏敏感信息），只从 26% 提升到 33%。本技能教的是界面行为，而不是你的业务规则。详见 [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) 和 [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md)。
+![同一提示词分别由 Codex CLI 和 Claude Code 生成：未使用与使用本技能的对比，附审计与验收清单得分](docs/img/demo.gif)
 
 ![运营仪表盘：未使用与使用本技能的对比](docs/img/before-after-07-ops-dashboard.png)
 
 ![发票表单：未使用与使用本技能的对比](docs/img/before-after-03-invoice-form.png)
 
-**自动触发**（Claude Code，Sonnet 5.5，2026-11-05）：在不点名的情况下，技能在 20/20 个管理界面提示词（10 个英文、10 个越南语）中自动加载，在 0/10 个落地页提示词中均未加载。
-
 **其他环境**（2026-11-05，同样的 3 个新界面，每个界面每种条件 1 个页面）：
-- Codex CLI（`gpt-6.1-sol`）：验收清单 33% → **96%**，审计中位分 62 → **100**。
-- Next.js 16 + shadcn/ui 应用（Sonnet 5.5）：验收清单 44% → **93%**。
+- Codex CLI（`gpt-6.1-sol`）：验收清单 33% → 96%，审计中位分 62 → 100。
+- Next.js 16 + shadcn/ui 应用（Sonnet 5.5）：验收清单 44% → 93%。
+
+</details>
+
+**自动触发**（Claude Code，Sonnet 5.5，2026-11-05）：在不点名的情况下，技能在 20/20 个管理界面提示词（10 个英文、10 个越南语）中自动加载，在 0/10 个落地页提示词中均未加载。
 
 **尚未测量：** Cursor 和 Copilot，以及技能在 Claude Code 之外能否自动加载。
 

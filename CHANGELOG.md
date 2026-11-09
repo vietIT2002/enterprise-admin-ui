@@ -23,7 +23,19 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Docs
 - Benchmark COMPARE: on the 12 independent briefs, reviewed blind, enterprise-admin-ui passed 44% of the acceptance checklist, ui-ux-pro-max 30%, impeccable 19%, frontend-design 18% and no skill 19%. The READMEs report it under "How it compares", with the caveats.
-- READMEs lead with the measured result: 12 independently written briefs, blind review, 19% → 44%.
+- READMEs open with the problems the skill fixes:
+  - tables with only a search box;
+  - forms that lose input when saving fails;
+  - deleting without a confirmation;
+  - missing loading and error states.
+
+  Then comes a "See it · Install · Try a prompt" row, and the measured result with numbers by theme (states 12% → 59%, search/filters/counts 16% → 54%, confirmations 25% → 63%). The install flags moved into a collapsed section.
+- New README image: the same orders page from the same prompt and the same data (English, USD), without and with the skill. Each moment is cropped from the real pages: the first screen, a search with no results, and deleting an order.
+- Results now separate two questions:
+  - **"Does the page do what the screen needs?"**: the independent checklist, 19% → 44%;
+  - **"Does it follow the skill's own rules?"**: the audit, median 69 → 90.
+
+  A page can score 100 on the audit and still miss requirements. The earlier, author-written measurements moved into a collapsed section that says why they look higher.
 
 ## [0.5.10] — 2026-11-09
 

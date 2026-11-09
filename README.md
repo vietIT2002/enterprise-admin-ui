@@ -2,11 +2,23 @@
 
 **English** · [Tiếng Việt](README.vi.md) · [简体中文](README.zh-CN.md)
 
-**Enterprise-grade UI for the apps behind the login.** This Agent Skill teaches AI coding agents (Claude Code, Codex, Cursor, Antigravity, Copilot and others) to build management screens the way mature business software does: dense, readable tables; complete states; saving that never loses work; and none of the "AI template" look.
+**AI coding agents build admin screens that look finished and break in use.** This Agent Skill makes Claude Code, Codex, Cursor, GitHub Copilot and other agents build them the way mature business software does.
 
-**Measured, not claimed.** On 12 screens whose acceptance checklists were written by an agent that never saw the skill, reviewed blind, pages built with the skill passed **44%** of the checklist against **19%** without it. Browse the pages side by side in the [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) · [data and method](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
+| What agents often ship | What the skill has them build |
+|---|---|
+| A table with a search box and nothing else | Filters with removable chips, and a result count that follows them ("12 of 48 orders") |
+| A form that throws away your input when saving fails | Errors next to each field, a summary that takes focus, and everything you typed still there |
+| A Delete button that deletes at once | A confirmation that names the record and what happens to it |
+| A blank area while loading, and nothing when the request fails | A skeleton while loading, an error with Retry, and an empty state with its next action |
+| Small grey ALL-CAPS labels and KPI tiles on every page | Readable 14px text in sentence case, and the table in the first screen |
 
-![The same prompt built by Codex CLI and by Claude Code, without and with the skill, with audit and checklist scores](docs/img/demo.gif)
+| 1 · See it | 2 · Install | 3 · Try a prompt |
+|---|---|---|
+| [The same screens, without and with the skill](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) | `npx skills add vietIT2002/enterprise-admin-ui`<br>Windows: `npx.cmd skills add vietIT2002/enterprise-admin-ui --copy` | `/enterprise-admin-ui Build the orders list page for our ERP: filters, bulk actions, pagination` |
+
+![The same orders page from the same prompt and the same data, without and with the skill: filters and result count, a search with no results, and deleting an order](docs/img/same-data-orders.png)
+
+**Measured on screens nobody tuned it for** (12 screens, checklists written independently, reviewed blind): pages built with the skill did **44%** of what each screen needed, against **19%** without it. By theme: empty, loading and error states 12% → 59%; search, filters and counts 16% → 54%; a confirmation before deleting 25% → 63%. It more than doubles what agents get right and leaves the rest for your review. [How this was measured](#results).
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 17](https://img.shields.io/badge/references-17-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
@@ -29,6 +41,9 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
 - Use `npx.cmd`, not `npx`. PowerShell's default policy blocks `npx.ps1` with "running scripts is disabled on this system". In Command Prompt, `npx` works.
 - `--copy` writes real files. Without it, an install for several agents links them with a junction to an absolute path, which breaks when the project moves or is cloned.
 
+<details>
+<summary><b>Flags, every project, updates</b></summary>
+
 Useful flags, the same on every system:
 - `-a claude-code` picks the agent without the prompt (also `codex`, `cursor`, `github-copilot`, `antigravity` …), and `-y` skips confirmations.
 - `-g` installs into your user folder for every project, instead of this project only.
@@ -46,6 +61,8 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
 ```
 
 To update later, run `npx skills update` (`npx.cmd skills update` on Windows).
+
+</details>
 
 <details>
 <summary><b>Manual install (any agent)</b></summary>
@@ -223,40 +240,56 @@ node <skill folder>/scripts/audit-cli.mjs http://localhost:3000/orders --type li
 
 ## Results
 
-**How it was measured:**
+The benchmark gives two kinds of numbers. They answer different questions, so read them apart:
+
+| Question | How it is measured | Without | With the skill |
+|---|---|---|---|
+| **Does the page do what the screen needs?** | An acceptance checklist per screen, written by an agent that never read the skill. One reviewer per page, who does not know which setup built it. 12 screens, 108 items per side | 19% | **44%** |
+| Does the page follow the skill's own rules? | The skill's audit (`audit.js`): text size, contrast, alignment, row height and template tells, scored 0–100. Same 12 screens, median score | 69 | 90 |
+
+A page can score 100 on the audit and still miss much of what its screen needs. The audit checks the rules a browser can measure; the checklist checks whether the screen does its job. Judge the skill by the first row: it more than doubles what agents get right and still leaves more than half for your review.
+
+Where the skill helps, and where it cannot, on the same 12 screens:
+- **UI behaviour** (states, filters and counts, formatting, confirmations, keyboard access, print, export): 14% → **51%**.
+- **Business rules the prompt did not state** (statutory payroll deductions, masking secrets in an audit log): 26% → 33%. Put those in your prompt or your project's docs; the skill does not know your business.
+
+**Data:** every page, screenshot, audit and review, with the briefs, prompts and tools, is in [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark), and the [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/) shows the pages side by side. The two suites behind these numbers are [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) and [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
+
+<details>
+<summary><b>Earlier measurements, and why they look higher</b></summary>
+
+These came first. Their checklists were written by the skill's author, who knew its rules, and most reviews knew which setup built each page. The independent numbers above are lower and fairer.
+
 - **Version:** measured on 2026-11-04 with v0.1.0 (8 references). The v0.5.0 changes were re-checked on 3 new pages (median audit score 100, checklist 22/22) and on 9 fix-round pages, not on the full suite.
 - **Generation:** the same model (Claude Sonnet 5.5) built the same screens from the same briefs, in English and Vietnamese, once as usual and once told to read `SKILL.md` first. Output was single-file HTML with the Tailwind CDN.
-- **Scoring:**
-  - the pages were scored with the skill's own audit (`scripts/audit.js`) and an acceptance checklist;
-  - one reviewer agent judged each page and knew the condition. A blind re-review of 12 pages agreed on 97% of items and gave the same gap;
-  - checklist reviews cover runs 1–2 of each brief.
-- **Data:** every generated page, screenshot, audit and review, plus the briefs, prompts and tools, is in [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark). Browse the pages side by side in the [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/).
+- **Scoring:** the skill's own audit and an acceptance checklist. One reviewer agent judged each page and knew the condition; a blind re-review of 12 pages agreed on 97% of items. Checklist reviews cover runs 1–2 of each brief.
 
 | | Without | With the skill |
 |---|---|---|
-| Median score on the skill's own audit (40 pages each) | 82 | **100** |
-| Pages with low-contrast text | 68% | **0%** |
-| Pages with ALL-CAPS labels | 73% | **0%** |
-| Acceptance checklist, 12 new screens whose checklists were written without reading the skill, blind review, v0.5.8 (12 pages each)‡ | 19% | **44%** |
-| Acceptance checklist, 3 screens the skill was never written against (6 pages each) | 35% | **72%** |
-| Acceptance checklist, 3 more new screens, with v0.5.2 (6 pages each)† | 39% | **89%** |
+| Median score on the skill's own audit (40 pages each) | 82 | 100 |
+| Pages with low-contrast text | 68% | 0% |
+| Pages with ALL-CAPS labels | 73% | 0% |
+| Acceptance checklist, 3 screens the skill was never written against (6 pages each) | 35% | 72% |
+| Acceptance checklist, 3 more new screens, with v0.5.2 (6 pages each)† | 39% | 89% |
 | Acceptance checklist, 8 main screens (16 reviews each)\* | 56% | 100% |
 
 \* The skill's recipes were written from the failures on these 8 screens, so this row overstates how it does on new screens. The held-out rows are the fairer numbers.
 
 † These screens were written after the v0.5.2 rules. 4 of their 27 checklist items test those rules (5/8 → 8/8); the other 23 went from 35% to 87%.
 
-‡ The fairest number. A separate agent wrote these briefs without reading the skill, in two sets of six, and reviewers saw randomly coded pages. On checklist items about UI behaviour (states, filters, formatting, accessibility, print, export) the pages went from 14% to **51%**. On domain requirements the prompts did not state, such as statutory payroll deductions or masking secrets in an audit log, they went from 26% to 33%. The skill teaches UI behaviour, not your business rules. See [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) and [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
+![The same prompt built by Codex CLI and by Claude Code, without and with the skill, with audit and checklist scores](docs/img/demo.gif)
 
 ![Operations dashboard without and with the skill](docs/img/before-after-07-ops-dashboard.png)
 
 ![Invoice form without and with the skill](docs/img/before-after-03-invoice-form.png)
 
-**Triggering on its own** (Claude Code, Sonnet 5.5, 2026-11-05): without being named, the skill loaded for 20/20 management-screen prompts (10 EN, 10 VI) and for 0/10 landing-page prompts.
-
 **Other settings** (2026-11-05, the same 3 new screens, 1 page per side each):
-- Codex CLI (`gpt-6.1-sol`): checklist 33% → **96%**, median audit score 62 → **100**.
-- A Next.js 16 + shadcn/ui app (Sonnet 5.5): checklist 44% → **93%**.
+- Codex CLI (`gpt-6.1-sol`): checklist 33% → 96%, median audit score 62 → 100.
+- A Next.js 16 + shadcn/ui app (Sonnet 5.5): checklist 44% → 93%.
+
+</details>
+
+**Triggering on its own** (Claude Code, Sonnet 5.5, 2026-11-05): without being named, the skill loaded for 20/20 management-screen prompts (10 EN, 10 VI) and for 0/10 landing-page prompts.
 
 **Not measured yet:** Cursor and Copilot, and whether the skill loads on its own outside Claude Code.
 

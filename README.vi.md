@@ -2,11 +2,23 @@
 
 [English](README.md) · **Tiếng Việt** · [简体中文](README.zh-CN.md)
 
-**UI chuẩn doanh nghiệp cho các ứng dụng nằm sau màn hình đăng nhập.** Agent Skill này dạy các AI coding agent (Claude Code, Codex, Cursor, Antigravity, Copilot và các agent khác) xây màn hình quản lý theo cách phần mềm doanh nghiệp lâu năm vẫn làm: bảng dày thông tin nhưng dễ đọc; đủ mọi trạng thái; lưu không bao giờ làm mất dữ liệu đang nhập; và không còn kiểu "template AI".
+**AI coding agent hay dựng màn hình quản trị trông như đã xong nhưng hỏng khi dùng thật.** Agent Skill này giúp Claude Code, Codex, Cursor, GitHub Copilot và các agent khác dựng các màn hình đó theo cách phần mềm doanh nghiệp lâu năm vẫn làm.
 
-**Có số đo, không chỉ là lời hứa.** Trên 12 màn hình có checklist nghiệm thu do một agent chưa từng đọc skill viết ra, chấm mù, các trang dựng với skill đạt **44%** checklist, so với **19%** khi không có skill. Xem các trang đặt cạnh nhau trong [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) · [dữ liệu và phương pháp](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
+| Agent thường làm ra | Skill yêu cầu agent dựng |
+|---|---|
+| Bảng chỉ có một ô tìm kiếm | Bộ lọc với các thẻ gỡ được, và số kết quả đi theo bộ lọc ("12 trên 48 đơn") |
+| Form làm mất những gì bạn đã nhập khi lưu bị lỗi | Lỗi hiện cạnh từng ô, phần tóm tắt lỗi nhận focus, và mọi thứ bạn đã nhập vẫn còn |
+| Nút Xóa xóa ngay lập tức | Hộp xác nhận nêu tên bản ghi và điều sẽ xảy ra với nó |
+| Vùng trống khi đang tải, không có gì khi yêu cầu bị lỗi | Khung chờ khi đang tải, thông báo lỗi có nút Thử lại, và trạng thái trống kèm việc cần làm tiếp |
+| Nhãn VIẾT HOA màu xám nhỏ và ô KPI ở mọi trang | Chữ 14px dễ đọc, viết hoa đầu câu, bảng nằm ngay màn hình đầu |
 
-![Cùng một prompt do Codex CLI và Claude Code dựng, không có và có skill, kèm điểm audit và checklist](docs/img/demo.gif)
+| 1 · Xem | 2 · Cài | 3 · Thử một prompt |
+|---|---|---|
+| [Cùng các màn hình, không có và có skill](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) | `npx skills add vietIT2002/enterprise-admin-ui`<br>Windows: `npx.cmd skills add vietIT2002/enterprise-admin-ui --copy` | `/enterprise-admin-ui Làm trang danh sách đơn hàng cho ERP: bộ lọc, thao tác hàng loạt, phân trang` |
+
+![Cùng trang đơn hàng từ cùng prompt và cùng dữ liệu, không có và có skill: bộ lọc và số kết quả, tìm kiếm không có kết quả, và xóa một đơn](docs/img/same-data-orders.png)
+
+**Đo trên các màn hình không ai tinh chỉnh skill cho chúng** (12 màn hình, checklist viết độc lập, chấm mù): các trang dựng với skill làm được **44%** những gì mỗi màn hình cần, so với **19%** khi không có skill. Theo nhóm: trạng thái trống, đang tải và lỗi 12% → 59%; tìm kiếm, bộ lọc và số đếm 16% → 54%; xác nhận trước khi xóa 25% → 63%. Skill giúp agent làm đúng nhiều hơn gấp đôi, và phần còn lại vẫn cần bạn kiểm tra. [Cách đo](#kết-quả).
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
@@ -29,6 +41,9 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui --copy
 - Dùng `npx.cmd` thay cho `npx`. Chính sách mặc định của PowerShell chặn `npx.ps1` với lỗi "running scripts is disabled on this system". Trong Command Prompt (cmd), `npx` chạy bình thường.
 - `--copy` chép file thật. Nếu thiếu tùy chọn này, khi cài cho nhiều agent CLI sẽ tạo junction trỏ tới đường dẫn tuyệt đối, và liên kết đó hỏng khi dự án bị chuyển chỗ hoặc được clone sang máy khác.
 
+<details>
+<summary><b>Tùy chọn, cài cho mọi dự án, cập nhật</b></summary>
+
 Các tùy chọn hay dùng, giống nhau trên mọi hệ điều hành:
 - `-a claude-code` chọn agent mà không cần trả lời câu hỏi (có cả `codex`, `cursor`, `github-copilot`, `antigravity` …), còn `-y` bỏ qua các bước xác nhận.
 - `-g` cài vào thư mục người dùng để mọi dự án đều dùng được, thay vì chỉ dự án hiện tại.
@@ -46,6 +61,8 @@ npx.cmd skills add vietIT2002/enterprise-admin-ui -g -a claude-code -y --copy
 ```
 
 Để cập nhật về sau, chạy `npx skills update` (trên Windows: `npx.cmd skills update`).
+
+</details>
 
 <details>
 <summary><b>Cài thủ công (mọi agent)</b></summary>
@@ -223,40 +240,59 @@ node <thư mục skill>/scripts/audit-cli.mjs http://localhost:3000/orders --typ
 
 ## Kết quả
 
-**Cách đo:**
+Benchmark cho ra hai loại số. Chúng trả lời hai câu hỏi khác nhau, nên cần đọc riêng:
+
+| Câu hỏi | Cách đo | Không có skill | Có skill |
+|---|---|---|---|
+| **Trang có làm được việc màn hình cần không?** | Checklist nghiệm thu cho từng màn hình, do một agent chưa từng đọc skill viết. Mỗi trang một reviewer, không biết trang do cách nào dựng. 12 màn hình, mỗi bên 108 mục | 19% | **44%** |
+| Trang có theo quy tắc của chính skill không? | Audit của skill (`audit.js`): cỡ chữ, độ tương phản, căn lề, chiều cao dòng và dấu hiệu template, điểm 0–100. Cùng 12 màn hình, điểm trung vị | 69 | 90 |
+
+Một trang có thể đạt 100 điểm audit mà vẫn thiếu nhiều thứ màn hình cần. Audit kiểm tra những quy tắc mà trình duyệt đo được; checklist kiểm tra màn hình có làm được việc của nó không. Hãy đánh giá skill bằng dòng đầu tiên: skill giúp agent làm đúng nhiều hơn gấp đôi, và hơn một nửa vẫn cần bạn kiểm tra.
+
+Skill giúp ở đâu và không giúp được ở đâu, trên cùng 12 màn hình:
+- **Hành vi UI** (trạng thái, bộ lọc và số đếm, định dạng, hộp xác nhận, bàn phím, in, xuất file): 14% → **51%**.
+- **Quy tắc nghiệp vụ mà prompt không nêu** (các khoản khấu trừ bắt buộc trên phiếu lương, che thông tin bí mật trong nhật ký kiểm toán): 26% → 33%. Hãy đưa chúng vào prompt hoặc tài liệu của dự án; skill không biết nghiệp vụ của bạn.
+
+**Dữ liệu:** mọi trang, ảnh chụp, audit và review, cùng đề bài, prompt và công cụ, nằm ở [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark), và [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/) đặt các trang cạnh nhau. Hai bộ đo đứng sau các con số này là [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) và [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
+
+<details>
+<summary><b>Các lần đo trước, và vì sao số cao hơn</b></summary>
+
+Các lần đo này có trước. Checklist do chính tác giả skill viết, người biết các quy tắc của nó, và phần lớn reviewer biết trang do cách nào dựng. Các con số độc lập ở trên thấp hơn và công bằng hơn.
+
 - **Phiên bản:** đo ngày 2026-11-04 với v0.1.0 (8 file tham khảo). Các thay đổi của v0.5.0 được kiểm tra lại trên 3 trang mới (điểm audit trung vị 100, checklist 22/22) và trên 9 trang của vòng sửa lỗi, chứ không chạy lại toàn bộ bộ thử nghiệm.
 - **Tạo trang:** cùng một model (Claude Sonnet 5.5) dựng cùng các màn hình từ cùng các đề bài, bằng tiếng Anh và tiếng Việt, một lần theo cách bình thường và một lần được yêu cầu đọc `SKILL.md` trước. Kết quả là HTML một file dùng Tailwind CDN.
 - **Chấm điểm:**
   - các trang được chấm bằng audit của chính skill (`scripts/audit.js`) và một checklist nghiệm thu;
   - mỗi trang do một agent review đánh giá, và agent này biết trang thuộc nhóm nào. Một lượt chấm mù lại 12 trang khớp 97% số mục và cho cùng mức chênh lệch;
   - các lượt review checklist áp dụng cho lượt chạy 1–2 của mỗi đề bài.
-- **Dữ liệu:** toàn bộ trang đã sinh, ảnh chụp, kết quả audit và review, cùng đề bài, prompt và công cụ, nằm ở [enterprise-admin-ui-benchmark](https://github.com/vietIT2002/enterprise-admin-ui-benchmark). Xem các trang đặt cạnh nhau trong [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/).
 
 | | Không có skill | Có skill |
 |---|---|---|
-| Điểm trung vị trên audit của chính skill (mỗi bên 40 trang) | 82 | **100** |
-| Trang có chữ tương phản thấp | 68% | **0%** |
-| Trang có nhãn VIẾT HOA TOÀN BỘ | 73% | **0%** |
-| Checklist nghiệm thu, 12 màn hình mới có checklist được viết mà không đọc skill, chấm mù, v0.5.8 (mỗi bên 12 trang)‡ | 19% | **44%** |
-| Checklist nghiệm thu, 3 màn hình không dùng khi viết skill (mỗi bên 6 trang) | 35% | **72%** |
-| Checklist nghiệm thu, thêm 3 màn hình mới, với v0.5.2 (mỗi bên 6 trang)† | 39% | **89%** |
+| Điểm trung vị trên audit của chính skill (mỗi bên 40 trang) | 82 | 100 |
+| Trang có chữ tương phản thấp | 68% | 0% |
+| Trang có nhãn VIẾT HOA TOÀN BỘ | 73% | 0% |
+| Checklist nghiệm thu, 3 màn hình không dùng khi viết skill (mỗi bên 6 trang) | 35% | 72% |
+| Checklist nghiệm thu, thêm 3 màn hình mới, với v0.5.2 (mỗi bên 6 trang)† | 39% | 89% |
 | Checklist nghiệm thu, 8 màn hình chính (mỗi bên 16 lượt review)\* | 56% | 100% |
 
 \* Các công thức trang của skill được viết từ chính những lỗi trên 8 màn hình này, nên dòng này cho kết quả cao hơn thực tế trên màn hình mới. Các dòng màn hình mới là con số công bằng hơn.
 
 † Các màn hình này được viết sau khi có quy tắc v0.5.2. 4 trong 27 mục checklist kiểm tra trực tiếp các quy tắc đó (5/8 → 8/8); 23 mục còn lại tăng từ 35% lên 87%.
 
-‡ Con số công bằng nhất. Một agent riêng viết các brief này mà không đọc skill, thành hai bộ, mỗi bộ sáu brief. Reviewer chỉ thấy các trang được mã hóa ngẫu nhiên. Với các mục về hành vi UI (trạng thái, bộ lọc, định dạng, accessibility, in, xuất file), các trang tăng từ 14% lên **51%**. Với các yêu cầu nghiệp vụ mà prompt không nêu, như các khoản khấu trừ bắt buộc trên phiếu lương hay che thông tin bí mật trong nhật ký kiểm toán, các trang chỉ tăng từ 26% lên 33%. Skill dạy hành vi UI, không dạy quy tắc nghiệp vụ của bạn. Xem [HELDOUT3](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout3-claude-green/HELDOUT3.md) và [HELDOUT4](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-06-heldout4-new-claude-green/HELDOUT4.md).
+![Cùng một prompt do Codex CLI và Claude Code dựng, không có và có skill, kèm điểm audit và checklist](docs/img/demo.gif)
 
 ![Dashboard vận hành không có và có skill](docs/img/before-after-07-ops-dashboard.png)
 
 ![Form hóa đơn không có và có skill](docs/img/before-after-03-invoice-form.png)
 
-**Tự kích hoạt** (Claude Code, Sonnet 5.5, 2026-11-05): khi không được gọi tên, skill tự nạp ở 20/20 prompt màn hình quản lý (10 EN, 10 VI) và 0/10 prompt landing page.
-
 **Môi trường khác** (2026-11-05, cùng 3 màn hình mới, mỗi bên 1 trang mỗi màn hình):
-- Codex CLI (`gpt-6.1-sol`): checklist 33% → **96%**, điểm audit trung vị 62 → **100**.
-- Ứng dụng Next.js 16 + shadcn/ui (Sonnet 5.5): checklist 44% → **93%**.
+- Codex CLI (`gpt-6.1-sol`): checklist 33% → 96%, điểm audit trung vị 62 → 100.
+- Ứng dụng Next.js 16 + shadcn/ui (Sonnet 5.5): checklist 44% → 93%.
+
+</details>
+
+**Tự kích hoạt** (Claude Code, Sonnet 5.5, 2026-11-05): khi không được gọi tên, skill tự nạp ở 20/20 prompt màn hình quản lý (10 EN, 10 VI) và 0/10 prompt landing page.
 
 **Chưa đo:** Cursor và Copilot, và việc skill có tự nạp ở các agent ngoài Claude Code hay không.
 
