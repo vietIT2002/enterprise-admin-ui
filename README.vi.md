@@ -4,6 +4,8 @@
 
 **UI chuẩn doanh nghiệp cho các ứng dụng nằm sau màn hình đăng nhập.** Agent Skill này dạy các AI coding agent (Claude Code, Codex, Cursor, Antigravity, Copilot và các agent khác) xây màn hình quản lý theo cách phần mềm doanh nghiệp lâu năm vẫn làm: bảng dày thông tin nhưng dễ đọc; đủ mọi trạng thái; lưu không bao giờ làm mất dữ liệu đang nhập; và không còn kiểu "template AI".
 
+**Có số đo, không chỉ là lời hứa.** Trên 12 màn hình có checklist nghiệm thu do một agent chưa từng đọc skill viết ra, chấm mù, các trang dựng với skill đạt **44%** checklist, so với **19%** khi không có skill. Xem các trang đặt cạnh nhau trong [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) · [dữ liệu và phương pháp](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
+
 ![Cùng một prompt do Codex CLI và Claude Code dựng, không có và có skill, kèm điểm audit và checklist](docs/img/demo.gif)
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
@@ -159,11 +161,13 @@ Nếu dự án đã có design system hoặc thư viện component tùy biến, 
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            248 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
+├─ SKILL.md            250 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
 ├─ references/         17 file, chỉ nạp khi tác vụ cần
 ├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 22 quy tắc, điểm 0–100
 ├─ scripts/audit-cli.mjs  chạy audit từ terminal bằng Chrome hoặc Edge chạy ngầm, không cần thư viện ngoài
+├─ scripts/check.mjs   tùy chọn: phép thử hành vi trong Chromium (Playwright), mỗi lỗi một dòng
 └─ assets/
+   ├─ templates/           tùy chọn: trang danh sách, chi tiết và form dạng một file HTML
    ├─ tokens.css           token tương thích shadcn, sáng và tối, Tailwind v4 @theme
    └─ DESIGN.template.md   file ghi quyết định riêng của từng dự án (định dạng design.md của Google)
 ```
@@ -268,13 +272,15 @@ Dựa trên repository của từng skill, tính đến ngày 2026-11-04.
 | `pbakaus/impeccable` | Bộ dò lỗi thiết kế (62 quy tắc), chế độ "Operate" cho màn hình ứng dụng | Một phần (thiếu audit log và phân trang) |
 | **enterprise-admin-ui** | Màn hình nghiệp vụ, cố ý không hào nhoáng | Danh sách, bộ lọc, thao tác hàng loạt, form có dòng hàng, phân quyền, lịch sử thay đổi, phê duyệt, nhập dữ liệu, định dạng theo locale, đủ mọi trạng thái |
 
+**Đo trên màn hình quản trị** (chấm mù, cùng 12 đề viết độc lập, mỗi skill 1 trang mỗi đề, Claude Sonnet 5.5): enterprise-admin-ui đạt **44%** checklist nghiệm thu, ui-ux-pro-max 30%, impeccable 19%, frontend-design 18% và không dùng skill 19%. Đây là lĩnh vực sở trường của skill này, và các skill khác chạy không có script của chúng. Xem [COMPARE](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-07-compare-blind/COMPARE.md).
+
 Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm mỹ cho website marketing và skill này cho ứng dụng sau màn hình đăng nhập.
 
 ## Câu hỏi thường gặp
 
 **Skill có xung đột với design system của tôi không?** Không. Design system hoặc thư viện component tùy biến của dự án luôn được ưu tiên; khi đó skill chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
 
-**Skill tốn bao nhiêu token?** `SKILL.md` dài 248 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
+**Skill tốn bao nhiêu token?** `SKILL.md` dài 250 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
 
 **Skill có hỗ trợ tiếng Việt và các locale khác không?** Có. Việc định dạng đi qua `Intl` với locale của dự án. `data-formatting.md` có sẵn bộ quy ước vi-VN:
 - `1.250.000 ₫`;

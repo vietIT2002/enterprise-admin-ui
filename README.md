@@ -4,6 +4,8 @@
 
 **Enterprise-grade UI for the apps behind the login.** This Agent Skill teaches AI coding agents (Claude Code, Codex, Cursor, Antigravity, Copilot and others) to build management screens the way mature business software does: dense, readable tables; complete states; saving that never loses work; and none of the "AI template" look.
 
+**Measured, not claimed.** On 12 screens whose acceptance checklists were written by an agent that never saw the skill, reviewed blind, pages built with the skill passed **44%** of the checklist against **19%** without it. Browse the pages side by side in the [gallery](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3) · [data and method](https://github.com/vietIT2002/enterprise-admin-ui-benchmark).
+
 ![The same prompt built by Codex CLI and by Claude Code, without and with the skill, with audit and checklist scores](docs/img/demo.gif)
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 17](https://img.shields.io/badge/references-17-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
@@ -159,11 +161,13 @@ If your project already has a design system or a customised component library, t
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            248 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
+├─ SKILL.md            250 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         17 files, loaded only when the task needs them
 ├─ scripts/audit.js    dependency-free browser audit, 22 rules, score 0–100
 ├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies
+├─ scripts/check.mjs   optional: behaviour checks in Chromium (Playwright), one line per problem
 └─ assets/
+   ├─ templates/           optional single-file list, detail and form pages
    ├─ tokens.css           shadcn-compatible tokens, light and dark, Tailwind v4 @theme
    └─ DESIGN.template.md   per-project decision file (Google design.md format)
 ```
@@ -268,13 +272,15 @@ Based on each skill's repository as of 2026-11-04.
 | `pbakaus/impeccable` | Design detector (62 rules), an "Operate" mode for app screens | Partial (no audit log or pagination) |
 | **enterprise-admin-ui** | Deliberately unflashy business screens | Lists, filters, bulk actions, line-item forms, permissions, audit history, approvals, import, locale formatting, all states |
 
+**Measured on management screens** (blind, the same 12 independently written briefs, one page each, Claude Sonnet 5.5): enterprise-admin-ui passed **44%** of the acceptance checklist, ui-ux-pro-max 30%, impeccable 19%, frontend-design 18% and no skill 19%. These are this skill's home ground, and the other skills ran without their scripts. See [COMPARE](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-07-compare-blind/COMPARE.md).
+
 The skills work together. Use an aesthetics skill for the marketing site and this one for the app behind the login.
 
 ## FAQ
 
 **Will it fight my design system?** No. A project design system or customised component library always wins; the skill then applies only layout, state and behaviour rules. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
 
-**How many tokens does it cost?** `SKILL.md` is 248 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
+**How many tokens does it cost?** `SKILL.md` is 250 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
 
 **Does it handle Vietnamese and other locales?** Yes. Formatting goes through `Intl` with the project locale. `data-formatting.md` has a vi-VN profile:
 - `1.250.000 ₫`;

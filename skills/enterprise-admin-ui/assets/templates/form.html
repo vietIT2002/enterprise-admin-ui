@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New order · Orders · Acme ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [hidden] { display: none !important; }
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-white text-sm text-slate-900 antialiased">
+<!--
+  Template: create/edit form. Copy it, then replace the sections, fields and line items.
+  Keep:
+  - one field per row with the label above it, and the input type that matches the value;
+  - the error summary that takes focus, inline errors linked with aria-describedby;
+  - the sticky Cancel · Save draft · Save bar, the unsaved-changes guard and the role="status" region.
+  The page scrolls the window, so the sticky bar sticks (no overflow-y-auto on the shell).
+-->
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-slate-200 bg-slate-50">
+    <div class="flex h-12 items-center px-4 font-semibold">Acme ERP</div>
+    <nav aria-label="Main" class="px-2 pb-4">
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Sales</p>
+      <a href="#" aria-current="page" class="flex h-8 items-center rounded bg-slate-200 px-2 font-medium">Orders</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Customers</a>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1">
+    <form id="form" novalidate class="px-6 pt-4">
+      <nav aria-label="Breadcrumb" class="text-slate-600"><a href="#" class="hover:underline">Orders</a> <span aria-hidden="true">/</span> <span aria-current="page">New order</span></nav>
+      <h1 class="mt-2 text-xl font-semibold">New order</h1>
+
+      <div id="summary" role="alert" tabindex="-1" hidden class="mt-4 max-w-2xl rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+        <p class="font-medium">Fix <span id="summary-count"></span> before saving:</p>
+        <ul id="summary-list" class="mt-1 list-disc pl-5"></ul>
+      </div>
+
+      <div class="max-w-2xl space-y-8 py-6">
+        <section aria-labelledby="h-customer" class="space-y-4">
+          <h2 id="h-customer" class="text-base font-semibold">Customer</h2>
+          <div>
+            <label class="block font-medium" for="customer">Customer <span class="text-red-700" aria-hidden="true">*</span></label>
+            <select id="customer" name="customer" required aria-describedby="customer-error" class="mt-1 h-8 w-80 rounded border border-slate-300 bg-white px-2">
+              <option value="">Choose a customer</option><option>Minh Phat Co.</option><option>Hoa Binh Trading</option><option>An Khang Pharmacy</option>
+            </select>
+            <p id="customer-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+          <div>
+            <label class="block font-medium" for="email">Contact email <span class="text-red-700" aria-hidden="true">*</span></label>
+            <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-help email-error" class="mt-1 h-8 w-80 rounded border border-slate-300 px-2">
+            <p id="email-help" class="mt-1 text-slate-600">The order confirmation goes to this address.</p>
+            <p id="email-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+          <div>
+            <label class="block font-medium" for="phone">Contact phone</label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" class="mt-1 h-8 w-56 rounded border border-slate-300 px-2">
+          </div>
+        </section>
+
+        <section aria-labelledby="h-delivery" class="space-y-4">
+          <h2 id="h-delivery" class="text-base font-semibold">Delivery</h2>
+          <div>
+            <label class="block font-medium" for="address">Street address <span class="text-red-700" aria-hidden="true">*</span></label>
+            <input id="address" name="address" required aria-describedby="address-error" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+            <p id="address-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+          <div class="flex gap-4">
+            <div>
+              <label class="block font-medium" for="city">City</label>
+              <input id="city" name="city" autocomplete="address-level2" class="mt-1 h-8 w-56 rounded border border-slate-300 px-2">
+            </div>
+            <div>
+              <label class="block font-medium" for="postal">Postal code</label>
+              <input id="postal" name="postal" autocomplete="postal-code" inputmode="numeric" class="mt-1 h-8 w-28 rounded border border-slate-300 px-2">
+            </div>
+          </div>
+          <div>
+            <label class="block font-medium" for="deliver">Delivery date <span class="text-red-700" aria-hidden="true">*</span></label>
+            <input id="deliver" name="deliver" type="date" required aria-describedby="deliver-error" class="mt-1 h-8 w-44 rounded border border-slate-300 px-2">
+            <p id="deliver-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-lines" class="space-y-3">
+          <h2 id="h-lines" class="text-base font-semibold">Lines</h2>
+          <div class="overflow-x-auto rounded-md border border-slate-200">
+            <table class="w-full border-collapse">
+              <caption class="sr-only">Order lines</caption>
+              <thead class="bg-slate-50 text-slate-700">
+                <tr class="h-10 border-b border-slate-200">
+                  <th scope="col" class="px-3 text-left font-medium">Product</th>
+                  <th scope="col" class="w-24 px-3 text-right font-medium">Qty</th>
+                  <th scope="col" class="w-32 px-3 text-right font-medium">Unit price (<span class="cur"></span>)</th>
+                  <th scope="col" class="w-32 px-3 text-right font-medium">Amount (<span class="cur"></span>)</th>
+                  <th scope="col" class="w-12 px-3"><span class="sr-only">Remove</span></th>
+                </tr>
+              </thead>
+              <tbody id="lines"></tbody>
+            </table>
+          </div>
+          <button type="button" id="add-line" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Add line</button>
+          <p id="lines-error" class="text-red-700" hidden></p>
+          <table class="ml-auto w-72">
+            <tbody id="totals"></tbody>
+          </table>
+        </section>
+
+        <section aria-labelledby="h-notes" class="space-y-4">
+          <h2 id="h-notes" class="text-base font-semibold">Notes</h2>
+          <div>
+            <label class="block font-medium" for="notes">Note for the warehouse</label>
+            <textarea id="notes" name="notes" rows="3" class="mt-1 w-full rounded border border-slate-300 px-2 py-1"></textarea>
+          </div>
+        </section>
+      </div>
+
+      <div class="sticky bottom-0 -mx-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+        <span id="draft-status" class="mr-auto text-slate-600"></span>
+        <button type="button" id="cancel" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Cancel</button>
+        <button type="button" id="save-draft" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Save draft</button>
+        <button type="submit" id="save" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Save order</button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<div id="backdrop" hidden class="fixed inset-0 z-30 bg-slate-900/40"></div>
+<div id="discard" role="alertdialog" aria-modal="true" aria-labelledby="discard-title" aria-describedby="discard-text" hidden class="fixed left-1/2 top-24 z-40 w-[420px] -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+  <h2 id="discard-title" class="text-base font-semibold">Discard this order?</h2>
+  <p id="discard-text" class="mt-2 text-slate-700">The changes you made are not saved. Save a draft to keep them.</p>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" id="discard-keep" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Keep editing</button>
+    <button type="button" id="discard-ok" class="h-8 rounded bg-red-700 px-3 font-medium text-white hover:bg-red-800">Discard</button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-20 right-4 z-50"></div>
+
+<script>
+  const LOCALE = 'en-US';
+  const CURRENCY = 'USD';
+  const VAT_RATE = 0.1;
+  const decimals = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: CURRENCY }).resolvedOptions().maximumFractionDigits;
+  const fmtAmount = (n) => new Intl.NumberFormat(LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
+  const fmtTime = (d) => new Intl.DateTimeFormat(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  document.querySelectorAll('.cur').forEach((e) => (e.textContent = CURRENCY));
+
+  const PRODUCTS = { 'Steel shelf 120 cm': 89.5, 'Pallet jack 2.5 t': 420, 'Safety gloves (box of 50)': 14.2 };
+  let lines = [{ product: '', qty: 1 }];
+  let dirty = false;
+  const $ = (id) => document.getElementById(id);
+  const announce = (text) => { $('toast').innerHTML = `<div class="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md">${text}</div>`; setTimeout(() => ($('toast').innerHTML = ''), 6000); };
+
+  function renderLines() {
+    $('lines').innerHTML = lines.map((l, i) => {
+      const price = PRODUCTS[l.product] || 0;
+      return `<tr class="h-10 border-b border-slate-200 last:border-0">
+        <td class="px-3"><label class="sr-only" for="p${i}">Product, line ${i + 1}</label><select id="p${i}" data-line="${i}" data-field="product" class="h-8 w-full rounded border border-slate-300 bg-white px-2"><option value="">Choose a product</option>${Object.keys(PRODUCTS).map((p) => `<option ${p === l.product ? 'selected' : ''}>${p}</option>`).join('')}</select></td>
+        <td class="px-3"><label class="sr-only" for="q${i}">Quantity, line ${i + 1}</label><input id="q${i}" data-line="${i}" data-field="qty" type="number" min="1" step="1" inputmode="numeric" value="${l.qty}" class="tnum h-8 w-full rounded border border-slate-300 px-2 text-right"></td>
+        <td class="tnum px-3 text-right">${fmtAmount(price)}</td>
+        <td class="tnum px-3 text-right">${fmtAmount(price * l.qty)}</td>
+        <td class="px-3 text-right"><button type="button" data-remove="${i}" aria-label="Remove line ${i + 1}" class="h-8 w-8 rounded hover:bg-slate-100" ${lines.length === 1 ? 'disabled title="An order needs at least one line"' : ''}>×</button></td>
+      </tr>`;
+    }).join('');
+    const subtotal = lines.reduce((s, l) => s + (PRODUCTS[l.product] || 0) * l.qty, 0);
+    const vat = Math.round(subtotal * VAT_RATE * 100) / 100;
+    $('totals').innerHTML = [['Subtotal', subtotal], [`VAT ${VAT_RATE * 100}%`, vat], ['Total', subtotal + vat]].map(([k, v], i) => `<tr class="h-8 ${i === 2 ? 'font-semibold' : 'text-slate-700'}"><th scope="row" class="text-left font-normal ${i === 2 ? 'font-semibold' : ''}">${k}</th><td class="tnum text-right">${fmtAmount(v)} ${CURRENCY}</td></tr>`).join('');
+  }
+
+  function setError(id, message) {
+    const field = $(id), error = $(id + '-error');
+    if (field) field.setAttribute('aria-invalid', message ? 'true' : 'false');
+    if (field) field.classList.toggle('border-red-600', !!message);
+    error.textContent = message || '';
+    error.hidden = !message;
+  }
+  function validate() {
+    const errors = [];
+    const check = (id, ok, message) => { setError(id, ok ? '' : message); if (!ok) errors.push([id, message]); };
+    check('customer', $('customer').value, 'Choose a customer.');
+    check('email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('email').value), $('email').value ? 'Enter an email like name@company.com.' : 'Enter the contact email.');
+    check('address', $('address').value.trim(), 'Enter the street address.');
+    check('deliver', $('deliver').value, 'Choose a delivery date.');
+    const hasLine = lines.some((l) => l.product && l.qty > 0);
+    $('lines-error').hidden = hasLine;
+    $('lines-error').textContent = hasLine ? '' : 'Add at least one product.';
+    if (!hasLine) errors.push(['p0', 'Add at least one product.']);
+    return errors;
+  }
+
+  $('form').addEventListener('input', () => { dirty = true; $('draft-status').textContent = 'Unsaved changes'; });
+  $('lines').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-line]');
+    if (!el) return;
+    const l = lines[Number(el.dataset.line)];
+    l[el.dataset.field] = el.dataset.field === 'qty' ? Math.max(1, Number(el.value) || 1) : el.value;
+    renderLines();
+  });
+  $('lines').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-remove]');
+    if (!b) return;
+    lines.splice(Number(b.dataset.remove), 1);
+    dirty = true;
+    renderLines();
+    announce(`Line removed. ${lines.length} line${lines.length === 1 ? '' : 's'} left.`);
+  });
+  $('add-line').addEventListener('click', () => { lines.push({ product: '', qty: 1 }); renderLines(); $('p' + (lines.length - 1)).focus(); });
+
+  $('form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const errors = validate();
+    if (errors.length) {
+      $('summary-count').textContent = errors.length === 1 ? '1 problem' : `${errors.length} problems`;
+      $('summary-list').innerHTML = errors.map(([id, m]) => `<li><a href="#${id}" class="underline">${m}</a></li>`).join('');
+      $('summary').hidden = false;
+      $('summary').focus();
+      return;
+    }
+    $('summary').hidden = true;
+    $('save').disabled = true;
+    $('save').textContent = 'Saving…';
+    setTimeout(() => { dirty = false; $('save').disabled = false; $('save').textContent = 'Save order'; $('draft-status').textContent = ''; announce('Order SO-1049 created for ' + $('customer').value + '.'); }, 600);
+  });
+  $('summary').addEventListener('click', (e) => { const a = e.target.closest('a'); if (a) { e.preventDefault(); $(a.getAttribute('href').slice(1)).focus(); } });
+  $('save-draft').addEventListener('click', () => { dirty = false; $('draft-status').textContent = `Draft saved ${fmtTime(new Date())}`; announce('Draft saved. It stays in Draft until you save the order.'); });
+
+  const closeDiscard = () => { $('backdrop').hidden = $('discard').hidden = true; $('cancel').focus(); };
+  $('cancel').addEventListener('click', () => { if (!dirty) { history.back(); return; } $('backdrop').hidden = $('discard').hidden = false; $('discard-keep').focus(); });
+  $('discard-keep').addEventListener('click', closeDiscard);
+  $('discard-ok').addEventListener('click', () => { dirty = false; closeDiscard(); history.back(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('discard').hidden) closeDiscard(); });
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  renderLines();
+</script>
+</body>
+</html>

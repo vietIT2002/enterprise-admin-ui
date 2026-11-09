@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SO-1043 · Orders · Acme ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [hidden] { display: none !important; }
+
+
+  .tnum { font-variant-numeric: tabular-nums; }
+  @media print {
+    aside, nav, button, input, select, [data-no-print] { display: none !important; }
+    main { padding: 0 !important; }
+    section { break-inside: avoid; }
+    thead { display: table-header-group; }
+  }
+</style>
+</head>
+<body class="bg-white text-sm text-slate-900 antialiased">
+<!--
+  Template: record detail page. Copy it, then replace the entity, the key fields, the sections and
+  the mock data. Keep the parts that scripts/check.mjs looks for:
+  - data-region with data-state="empty|loading|error" for every section that loads data (?state=empty|loading|error);
+  - the confirmation dialog for destructive actions, the role="status" region and the print stylesheet.
+  Breadcrumb ends with the record's number when records are known by number, otherwise with its name.
+-->
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-slate-200 bg-slate-50">
+    <div class="flex h-12 items-center px-4 font-semibold">Acme ERP</div>
+    <nav aria-label="Main" class="px-2 pb-4">
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Sales</p>
+      <a href="#" aria-current="page" class="flex h-8 items-center rounded bg-slate-200 px-2 font-medium">Orders</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Customers</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Invoices</a>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1 px-6 py-4">
+    <nav aria-label="Breadcrumb" class="text-slate-600"><a href="#" class="hover:underline">Orders</a> <span aria-hidden="true">/</span> <span aria-current="page">SO-1043</span></nav>
+
+    <header class="mt-2 flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <div class="flex items-center gap-3">
+          <h1 class="text-xl font-semibold">SO-1043</h1>
+          <span id="status" class="inline-flex h-6 items-center whitespace-nowrap rounded-full bg-blue-50 px-2 text-xs font-medium text-blue-800">Pending</span>
+        </div>
+        <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-slate-700">
+          <div class="flex gap-1"><dt class="text-slate-600">Customer</dt><dd><a href="#" class="text-blue-700 hover:underline">Minh Phat Co.</a></dd></div>
+          <div class="flex gap-1"><dt class="text-slate-600">Order date</dt><dd class="tnum" id="kf-date"></dd></div>
+          <div class="flex gap-1"><dt class="text-slate-600">Total</dt><dd class="tnum" id="kf-total"></dd></div>
+          <div class="flex gap-1"><dt class="text-slate-600">Owner</dt><dd>Le Thu Ha</dd></div>
+        </dl>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <button type="button" id="btn-print" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Print</button>
+        <button type="button" id="btn-ship" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Ship order</button>
+        <button type="button" id="btn-more" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for SO-1043" class="h-8 w-8 rounded border border-slate-300 bg-white hover:bg-slate-50">⋯</button>
+      </div>
+    </header>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div class="space-y-6 xl:col-span-2">
+        <section aria-labelledby="h-lines">
+          <h2 id="h-lines" class="text-base font-semibold">Lines</h2>
+          <div data-region="lines" class="mt-2">
+            <div data-state="ready" class="overflow-x-auto rounded-md border border-slate-200">
+              <table class="w-full border-collapse">
+                <caption class="sr-only">Order lines</caption>
+                <thead class="bg-slate-50 text-slate-700">
+                  <tr class="h-10 border-b border-slate-200">
+                    <th scope="col" class="px-3 text-left font-medium">Product</th>
+                    <th scope="col" class="px-3 text-left font-medium">Code</th>
+                    <th scope="col" class="px-3 text-right font-medium">Qty</th>
+                    <th scope="col" class="px-3 text-right font-medium">Unit price (<span class="cur"></span>)</th>
+                    <th scope="col" class="px-3 text-right font-medium">Amount (<span class="cur"></span>)</th>
+                  </tr>
+                </thead>
+                <tbody id="lines"></tbody>
+                <tfoot id="totals" class="text-slate-700"></tfoot>
+              </table>
+            </div>
+            <div data-state="empty" hidden class="rounded-md border border-dashed border-slate-300 px-6 py-8 text-center">
+              <p class="font-medium">This order has no lines yet</p>
+              <button type="button" class="mt-3 h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Add line</button>
+            </div>
+            <div data-state="loading" aria-busy="true" hidden class="space-y-2 rounded-md border border-slate-200 p-3" aria-label="Loading lines">
+              <div class="h-3 w-2/3 rounded bg-slate-200"></div><div class="h-3 w-1/2 rounded bg-slate-200"></div><div class="h-3 w-3/5 rounded bg-slate-200"></div>
+            </div>
+            <div data-state="error" hidden role="alert" class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+              <p class="font-medium">Lines could not be loaded.</p>
+              <button type="button" class="retry mt-2 h-8 rounded border border-red-300 bg-white px-3 hover:bg-red-100">Retry</button>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-activity">
+          <h2 id="h-activity" class="text-base font-semibold">Activity</h2>
+          <div data-region="activity" class="mt-2">
+            <ol data-state="ready" id="activity" class="space-y-3 border-l border-slate-200 pl-4"></ol>
+            <div data-state="empty" hidden class="rounded-md border border-dashed border-slate-300 px-6 py-6 text-center">
+              <p class="font-medium">No activity yet</p>
+              <button type="button" class="mt-3 h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Add note</button>
+            </div>
+            <div data-state="loading" aria-busy="true" hidden class="space-y-2" aria-label="Loading activity"><div class="h-3 w-1/2 rounded bg-slate-200"></div><div class="h-3 w-2/5 rounded bg-slate-200"></div></div>
+            <div data-state="error" hidden role="alert" class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+              <p class="font-medium">Activity could not be loaded.</p>
+              <button type="button" class="retry mt-2 h-8 rounded border border-red-300 bg-white px-3 hover:bg-red-100">Retry</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="space-y-6">
+        <section aria-labelledby="h-details" class="rounded-md border border-slate-200 p-4">
+          <h2 id="h-details" class="text-base font-semibold">Details</h2>
+          <table class="mt-2 w-full">
+            <tbody>
+              <tr class="h-8"><th scope="row" class="w-36 text-left font-normal text-slate-600">Channel</th><td>Online</td></tr>
+              <tr class="h-8"><th scope="row" class="text-left font-normal text-slate-600">Payment terms</th><td>Net 30</td></tr>
+              <tr class="h-8"><th scope="row" class="text-left font-normal text-slate-600">Due date</th><td class="tnum" id="due"></td></tr>
+              <tr class="h-8"><th scope="row" class="text-left font-normal text-slate-600">Warehouse</th><td>Thu Duc DC</td></tr>
+            </tbody>
+          </table>
+        </section>
+        <section aria-labelledby="h-contact" class="rounded-md border border-slate-200 p-4">
+          <h2 id="h-contact" class="text-base font-semibold">Contact</h2>
+          <p class="mt-2 flex items-center gap-2">Nguyen Van Binh <span class="inline-flex h-5 items-center rounded-full bg-slate-100 px-2 text-xs font-medium text-slate-700">Primary</span></p>
+          <p><a href="mailto:binh@minhphat.example" class="inline-flex h-6 items-center text-blue-700 hover:underline">binh@minhphat.example</a></p>
+          <p><a href="tel:+84281234567" class="inline-flex h-6 items-center text-blue-700 hover:underline">+84 28 1234 567</a></p>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="menu" role="menu" hidden class="fixed z-20 w-44 rounded-md border border-slate-200 bg-white py-1 shadow-md">
+  <button type="button" role="menuitem" data-act="duplicate" class="block h-8 w-full px-3 text-left hover:bg-slate-100">Duplicate</button>
+  <button type="button" role="menuitem" data-act="cancel" class="block h-8 w-full px-3 text-left text-red-700 hover:bg-slate-100">Cancel order</button>
+</div>
+
+<div id="backdrop" hidden class="fixed inset-0 z-30 bg-slate-900/40"></div>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text" hidden class="fixed left-1/2 top-24 z-40 w-[420px] -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+  <h2 id="confirm-title" class="text-base font-semibold">Cancel order SO-1043?</h2>
+  <p id="confirm-text" class="mt-2 text-slate-700">The reserved stock is released and Minh Phat Co. is notified. A cancelled order cannot be shipped.</p>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" id="confirm-cancel" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Keep order</button>
+    <button type="button" id="confirm-ok" class="h-8 rounded bg-red-700 px-3 font-medium text-white hover:bg-red-800">Cancel order</button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-4 right-4 z-50"></div>
+
+<script>
+  const LOCALE = 'en-US';
+  const CURRENCY = 'USD';
+  const decimals = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: CURRENCY }).resolvedOptions().maximumFractionDigits;
+  const fmtAmount = (n) => new Intl.NumberFormat(LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
+  const fmtNumber = (n) => new Intl.NumberFormat(LOCALE).format(n);
+  const fmtDate = (iso) => new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
+  const fmtDateTime = (iso) => new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(iso));
+  document.querySelectorAll('.cur').forEach((e) => (e.textContent = CURRENCY));
+
+  // Mock data. Replace with the real record.
+  const order = { date: '2026-11-04T09:12:00', due: '2026-12-04T00:00:00', vatRate: 0.1 };
+  let lines = [
+    { product: 'Steel shelf 120 cm', code: 'SH-120', qty: 12, price: 89.5 },
+    { product: 'Pallet jack 2.5 t', code: 'PJ-25', qty: 2, price: 420 },
+    { product: 'Safety gloves (box of 50)', code: 'GL-50', qty: 30, price: 14.2 },
+  ];
+  const activity = [
+    { at: '2026-11-05T15:58:00', who: 'Le Thu Ha', what: 'confirmed stock for 3 lines' },
+    { at: '2026-11-04T09:20:00', who: 'Le Thu Ha', what: 'sent the order confirmation to binh@minhphat.example' },
+    { at: '2026-11-04T09:12:00', who: 'Nguyen Van Binh', what: 'placed the order online' },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const forced = new URLSearchParams(location.search).get('state'); // ?state=empty|loading|error
+  const show = (region, state) => document.querySelectorAll(`[data-region="${region}"] [data-state]`).forEach((e) => (e.hidden = e.dataset.state !== state));
+  const announce = (text) => { $('toast').innerHTML = `<div class="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md">${text}</div>`; setTimeout(() => ($('toast').innerHTML = ''), 6000); };
+
+  function render() {
+    const subtotal = lines.reduce((s, l) => s + l.qty * l.price, 0);
+    const vat = Math.round(subtotal * order.vatRate * 100) / 100;
+    $('kf-date').textContent = fmtDate(order.date);
+    $('kf-total').textContent = `${fmtAmount(subtotal + vat)} ${CURRENCY}`;
+    $('due').textContent = `${fmtDate(order.due)} · in 28 days`;
+    $('lines').innerHTML = lines.map((l) => `<tr class="h-10 border-b border-slate-200"><td class="max-w-72 truncate px-3" title="${l.product}">${l.product}</td><td class="px-3">${l.code}</td><td class="tnum px-3 text-right">${fmtNumber(l.qty)}</td><td class="tnum px-3 text-right">${fmtAmount(l.price)}</td><td class="tnum px-3 text-right">${fmtAmount(l.qty * l.price)}</td></tr>`).join('');
+    $('totals').innerHTML = [['Subtotal', subtotal], [`VAT ${order.vatRate * 100}%`, vat], ['Total', subtotal + vat]].map(([k, v], i) => `<tr class="h-8 ${i === 2 ? 'font-semibold text-slate-900' : ''}"><th scope="row" colspan="4" class="px-3 text-right font-normal ${i === 2 ? 'font-semibold' : ''}">${k}</th><td class="tnum px-3 text-right">${fmtAmount(v)}</td></tr>`).join('');
+    $('activity').innerHTML = activity.map((a) => `<li><p><span class="font-medium">${a.who}</span> ${a.what}</p><p class="tnum text-slate-600"><time datetime="${a.at}">${fmtDateTime(a.at)}</time></p></li>`).join('');
+    show('lines', lines.length ? 'ready' : 'empty');
+    show('activity', activity.length ? 'ready' : 'empty');
+  }
+
+  $('btn-print').addEventListener('click', () => window.print());
+  $('btn-ship').addEventListener('click', () => { $('status').textContent = 'Shipped'; announce('Order SO-1043 marked as shipped.'); });
+  $('btn-more').addEventListener('click', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    Object.assign($('menu').style, { top: r.bottom + 4 + 'px', left: r.right - 176 + 'px' });
+    $('menu').hidden = false;
+    e.currentTarget.setAttribute('aria-expanded', 'true');
+    $('menu').querySelector('button').focus();
+  });
+  $('menu').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]');
+    if (!a) return;
+    $('menu').hidden = true;
+    $('btn-more').setAttribute('aria-expanded', 'false');
+    if (a.dataset.act === 'cancel') { $('backdrop').hidden = $('confirm').hidden = false; $('confirm-cancel').focus(); }
+    else announce('Order duplicated as SO-1049.');
+  });
+  const closeConfirm = () => { $('backdrop').hidden = $('confirm').hidden = true; $('btn-more').focus(); };
+  $('confirm-cancel').addEventListener('click', closeConfirm);
+  $('confirm-ok').addEventListener('click', () => { $('status').textContent = 'Cancelled'; $('status').className = 'inline-flex h-6 items-center whitespace-nowrap rounded-full bg-red-50 px-2 text-xs font-medium text-red-800'; closeConfirm(); announce('Order SO-1043 cancelled.'); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('menu').hidden = true; if (!$('confirm').hidden) closeConfirm(); } });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#menu, #btn-more')) $('menu').hidden = true; });
+  document.querySelectorAll('.retry').forEach((b) => b.addEventListener('click', () => { location.search = ''; }));
+
+  if (forced === 'empty') { lines = []; activity.length = 0; }
+  render();
+  if (forced === 'loading' || forced === 'error') { show('lines', forced); show('activity', forced); }
+</script>
+</body>
+</html>

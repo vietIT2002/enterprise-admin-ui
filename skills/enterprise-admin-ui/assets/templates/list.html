@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders · Acme ERP</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [hidden] { display: none !important; }
+
+
+  .tnum { font-variant-numeric: tabular-nums; }
+  @media print {
+    aside, nav, button, input, select, [data-no-print] { display: none !important; }
+    main { padding: 0 !important; }
+  }
+</style>
+</head>
+<body class="bg-white text-sm text-slate-900 antialiased">
+<!--
+  Template: list page. Copy it, then replace the entity ("order"), the columns, the filters and
+  the mock data. Keep the parts that scripts/check.mjs looks for:
+  - data-region with data-state="empty|loading|error" children, shown by ?state=empty|loading|error;
+  - data-result-count next to the filters, updated on every change;
+  - the Export label with its count, the confirmation dialog, the role="status" region and the print stylesheet.
+  Set LOCALE and CURRENCY from DESIGN.md.
+-->
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-slate-200 bg-slate-50">
+    <div class="flex h-12 items-center px-4 font-semibold">Acme ERP</div>
+    <nav aria-label="Main" class="px-2 pb-4">
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Sales</p>
+      <a href="#" aria-current="page" class="flex h-8 items-center rounded bg-slate-200 px-2 font-medium">Orders</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Customers</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Invoices</a>
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Inventory</p>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Products</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Stock movements</a>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1 px-6 py-4">
+    <header class="flex items-center justify-between gap-4">
+      <h1 class="text-xl font-semibold">Orders</h1>
+      <div class="flex items-center gap-2">
+        <button type="button" id="btn-export" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Export <span id="export-count" class="tnum">0</span> orders</button>
+        <button type="button" id="btn-create" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Create order</button>
+      </div>
+    </header>
+
+    <div class="mt-3 flex gap-1 border-b border-slate-200" role="group" aria-label="Status" id="tabs"></div>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <input type="search" id="q" aria-label="Search orders by number or customer" placeholder="Search number or customer" class="h-8 w-72 rounded border border-slate-300 px-2">
+      <label class="sr-only" for="f-channel">Channel</label>
+      <select id="f-channel" class="h-8 rounded border border-slate-300 bg-white px-2">
+        <option value="">All channels</option><option>Online</option><option>Store</option><option>Phone</option>
+      </select>
+      <div id="chips" class="flex flex-wrap items-center gap-1"></div>
+    </div>
+
+    <p class="mt-3 text-slate-600" data-result-count><span id="result-count" class="tnum">0</span> orders · <span id="result-total" class="tnum"></span></p>
+
+    <div id="bulk" hidden class="mt-2 flex h-10 items-center gap-3 rounded-md border border-blue-200 bg-blue-50 px-3" role="region" aria-label="Bulk actions">
+      <span><span id="bulk-count" class="tnum">0</span> selected</span>
+      <button type="button" id="bulk-all" class="text-blue-700 underline">Select all <span id="bulk-all-count" class="tnum">0</span> matching</button>
+      <button type="button" id="bulk-clear" class="text-blue-700 underline">Clear selection</button>
+    </div>
+
+    <section data-region="orders" class="mt-2" aria-label="Orders">
+      <div data-state="ready" class="overflow-x-auto rounded-md border border-slate-200">
+        <table class="w-full border-collapse">
+          <caption class="sr-only">Orders</caption>
+          <thead class="bg-slate-50 text-slate-700">
+            <tr class="h-10 border-b border-slate-200">
+              <th scope="col" class="w-10 px-3 text-left"><input type="checkbox" id="select-page" class="h-4 w-4" aria-label="Select all orders on this page"></th>
+              <th scope="col" class="px-3 text-left font-medium" data-col="id"><button type="button" data-sort="id">Order</button></th>
+              <th scope="col" class="px-3 text-left font-medium" data-col="customer"><button type="button" data-sort="customer">Customer</button></th>
+              <th scope="col" class="px-3 text-left font-medium" data-col="date"><button type="button" data-sort="date">Date</button></th>
+              <th scope="col" class="px-3 text-left font-medium">Status</th>
+              <th scope="col" class="px-3 text-right font-medium" data-col="total"><button type="button" data-sort="total" class="w-full text-right">Total (<span id="currency-label"></span>)</button></th>
+              <th scope="col" class="w-12 px-3"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div data-state="empty" hidden class="rounded-md border border-dashed border-slate-300 px-6 py-10 text-center">
+        <p class="font-medium" id="empty-title">No orders match these filters</p>
+        <p class="mt-1 text-slate-600" id="empty-text">Try another status or search, or clear the filters.</p>
+        <button type="button" id="empty-action" class="mt-3 h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Clear filters</button>
+      </div>
+      <div data-state="loading" aria-busy="true" hidden class="rounded-md border border-slate-200" aria-label="Loading orders">
+        <div class="h-10 border-b border-slate-200 bg-slate-50"></div>
+        <div id="skeleton"></div>
+      </div>
+      <div data-state="error" hidden class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+        <p class="font-medium">Orders could not be loaded.</p>
+        <p class="mt-1">Check your connection, then try again.</p>
+        <button type="button" id="retry" class="mt-2 h-8 rounded border border-red-300 bg-white px-3 text-red-800 hover:bg-red-100">Retry</button>
+      </div>
+
+      <div id="pager" class="mt-2 flex items-center justify-end gap-3 text-slate-700">
+        <label for="page-size">Rows per page</label>
+        <select id="page-size" class="h-8 rounded border border-slate-300 bg-white px-2"><option>20</option><option>50</option><option>100</option></select>
+        <span id="page-range" class="tnum"></span>
+        <button type="button" id="prev" class="h-8 w-8 rounded border border-slate-300 bg-white" aria-label="Previous page">‹</button>
+        <button type="button" id="next" class="h-8 w-8 rounded border border-slate-300 bg-white" aria-label="Next page">›</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="menu" role="menu" hidden class="fixed z-20 w-40 rounded-md border border-slate-200 bg-white py-1 shadow-md">
+  <button type="button" role="menuitem" data-act="open" class="block h-8 w-full px-3 text-left hover:bg-slate-100">Open</button>
+  <button type="button" role="menuitem" data-act="delete" class="block h-8 w-full px-3 text-left text-red-700 hover:bg-slate-100">Delete</button>
+</div>
+
+<div id="backdrop" hidden class="fixed inset-0 z-30 bg-slate-900/40"></div>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text" hidden class="fixed left-1/2 top-24 z-40 w-[420px] -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+  <h2 id="confirm-title" class="text-base font-semibold"></h2>
+  <p id="confirm-text" class="mt-2 text-slate-700"></p>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" id="confirm-cancel" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Cancel</button>
+    <button type="button" id="confirm-ok" class="h-8 rounded bg-red-700 px-3 font-medium text-white hover:bg-red-800"></button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-4 right-4 z-50"></div>
+
+<script>
+  // Locale and currency come from DESIGN.md. One formatter module per app; this file keeps them inline.
+  const LOCALE = 'en-US';
+  const CURRENCY = 'USD';
+  const amountFmt = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: CURRENCY, currencyDisplay: 'code' });
+  const decimals = amountFmt.resolvedOptions().maximumFractionDigits;
+  const fmtAmount = (n) => new Intl.NumberFormat(LOCALE, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
+  const fmtCount = (n) => new Intl.NumberFormat(LOCALE).format(n);
+  const fmtDate = (iso) => new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso + 'T00:00:00'));
+  document.getElementById('currency-label').textContent = CURRENCY;
+
+  // Mock data. Replace with the real entity and fields.
+  const CUSTOMERS = ['Minh Phat Co.', 'Hoa Binh Trading', 'An Khang Pharmacy', 'Northwind Retail', 'Blue Lotus Hotel', 'Saigon Steel', 'Tran Thi Hong', 'Le Van An'];
+  const STATUSES = ['Draft', 'Pending', 'Shipped', 'Delivered', 'Cancelled'];
+  const CHANNELS = ['Online', 'Store', 'Phone'];
+  let orders = Array.from({ length: 48 }, (_, i) => ({
+    id: 'SO-' + (1001 + i),
+    customer: CUSTOMERS[(i * 5) % CUSTOMERS.length],
+    date: new Date(Date.UTC(2026, 10, 6 - Math.floor(i / 2))).toISOString().slice(0, 10),
+    status: STATUSES[(i * 7) % STATUSES.length],
+    channel: CHANNELS[i % CHANNELS.length],
+    total: Math.round(((i * 7919) % 4800) * 10.5 + 120) / 1,
+  }));
+
+  // Five-tone status vocabulary: text always present.
+  const TONE = { Draft: 'bg-slate-100 text-slate-700', Pending: 'bg-blue-50 text-blue-800', Shipped: 'bg-blue-50 text-blue-800', Delivered: 'bg-green-50 text-green-800', Cancelled: 'bg-red-50 text-red-800' };
+
+  const params = new URLSearchParams(location.search);
+  const forced = params.get('state'); // ?state=empty|loading|error shows that state
+  const ui = { tab: params.get('status') || 'All', q: params.get('q') || '', channel: params.get('channel') || '', sort: params.get('sort') || 'date', dir: params.get('dir') || 'desc', page: 1, size: 20, selected: new Set(), allMatching: false };
+  if (forced === 'empty') orders = [];
+
+  const $ = (id) => document.getElementById(id);
+  const announce = (html) => { $('toast').innerHTML = `<div class="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md">${html}</div>`; clearTimeout(announce.t); announce.t = setTimeout(() => ($('toast').innerHTML = ''), 6000); };
+  const show = (state) => document.querySelectorAll('[data-region="orders"] [data-state]').forEach((e) => (e.hidden = e.dataset.state !== state));
+
+  function matching() {
+    const q = ui.q.trim().toLowerCase();
+    return orders.filter((o) => (ui.tab === 'All' || o.status === ui.tab) && (!ui.channel || o.channel === ui.channel) && (!q || (o.id + ' ' + o.customer).toLowerCase().includes(q)));
+  }
+  function sorted(list) {
+    const k = ui.sort, d = ui.dir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => (a[k] > b[k] ? d : a[k] < b[k] ? -d : 0));
+  }
+  function syncUrl() {
+    const p = new URLSearchParams();
+    if (ui.tab !== 'All') p.set('status', ui.tab);
+    if (ui.q) p.set('q', ui.q);
+    if (ui.channel) p.set('channel', ui.channel);
+    if (ui.sort !== 'date' || ui.dir !== 'desc') { p.set('sort', ui.sort); p.set('dir', ui.dir); }
+    if (forced) p.set('state', forced);
+    history.replaceState(null, '', p.toString() ? '?' + p : location.pathname);
+  }
+
+  function renderTabs() {
+    const counts = Object.fromEntries(['All', ...STATUSES].map((s) => [s, s === 'All' ? orders.length : orders.filter((o) => o.status === s).length]));
+    $('tabs').innerHTML = ['All', ...STATUSES].map((s) => `<button type="button" data-tab="${s}" aria-pressed="${ui.tab === s}" class="h-9 border-b-2 px-3 ${ui.tab === s ? 'border-blue-700 font-medium text-slate-900' : 'border-transparent text-slate-700 hover:text-slate-900'}">${s} <span class="tnum text-slate-600">${fmtCount(counts[s])}</span></button>`).join('');
+  }
+  function renderChips() {
+    const chips = [];
+    if (ui.q) chips.push(['q', `Search: ${ui.q}`]);
+    if (ui.channel) chips.push(['channel', `Channel: ${ui.channel}`]);
+    $('chips').innerHTML = chips.map(([k, t]) => `<span class="inline-flex h-6 items-center gap-1 rounded-full bg-slate-100 pl-2 pr-1 text-slate-700">${t}<button type="button" data-chip="${k}" class="h-6 w-6 rounded-full hover:bg-slate-200" aria-label="Remove filter ${t}">×</button></span>`).join('') + (chips.length ? '<button type="button" id="clear-all" class="h-6 px-2 text-blue-700 underline">Clear all</button>' : '');
+  }
+
+  function render() {
+    syncUrl();
+    renderTabs();
+    renderChips();
+    const list = sorted(matching());
+    const total = list.reduce((s, o) => s + o.total, 0);
+    $('result-count').textContent = fmtCount(list.length);
+    $('result-total').textContent = `${fmtAmount(total)} ${CURRENCY}`;
+    const selectedCount = ui.allMatching ? list.length : ui.selected.size;
+    $('btn-export').innerHTML = selectedCount ? `Export <span class="tnum">${fmtCount(selectedCount)}</span> selected` : `Export <span id="export-count" class="tnum">${fmtCount(list.length)}</span> orders`;
+    $('bulk').hidden = !selectedCount;
+    $('bulk-count').textContent = fmtCount(selectedCount);
+    $('bulk-all-count').textContent = fmtCount(list.length);
+    $('bulk-all').hidden = ui.allMatching || list.length <= ui.size;
+
+    document.querySelectorAll('th[data-col]').forEach((th) => th.setAttribute('aria-sort', th.dataset.col === ui.sort ? (ui.dir === 'asc' ? 'ascending' : 'descending') : 'none'));
+
+    if (!list.length) {
+      const firstUse = orders.length === 0;
+      $('empty-title').textContent = firstUse ? 'No orders yet' : 'No orders match these filters';
+      $('empty-text').textContent = firstUse ? 'Orders appear here when you create one or a customer orders online.' : 'Try another status or search, or clear the filters.';
+      $('empty-action').textContent = firstUse ? 'Create order' : 'Clear filters';
+      show('empty');
+      $('pager').hidden = true;
+      return;
+    }
+    show('ready');
+    $('pager').hidden = false;
+    const pages = Math.max(1, Math.ceil(list.length / ui.size));
+    ui.page = Math.min(ui.page, pages);
+    const start = (ui.page - 1) * ui.size;
+    const rows = list.slice(start, start + ui.size);
+    $('page-range').textContent = `${fmtCount(start + 1)}–${fmtCount(start + rows.length)} of ${fmtCount(list.length)}`;
+    $('prev').disabled = ui.page === 1;
+    $('next').disabled = ui.page === pages;
+    $('rows').innerHTML = rows.map((o) => `<tr class="h-10 border-b border-slate-200 last:border-0 hover:bg-slate-50">
+        <td class="px-3"><input type="checkbox" class="h-4 w-4" data-select="${o.id}" ${ui.allMatching || ui.selected.has(o.id) ? 'checked' : ''} aria-label="Select ${o.id}"></td>
+        <td class="whitespace-nowrap px-3"><a href="#${o.id}" class="text-blue-700 hover:underline">${o.id}</a></td>
+        <td class="max-w-64 truncate px-3" title="${o.customer}">${o.customer}</td>
+        <td class="tnum whitespace-nowrap px-3">${fmtDate(o.date)}</td>
+        <td class="px-3"><span class="inline-flex h-6 items-center whitespace-nowrap rounded-full px-2 text-xs font-medium ${TONE[o.status]}">${o.status}</span></td>
+        <td class="tnum whitespace-nowrap px-3 text-right">${fmtAmount(o.total)}</td>
+        <td class="px-3 text-right"><button type="button" data-menu="${o.id}" aria-haspopup="menu" aria-expanded="false" aria-label="Actions for ${o.id}" class="h-8 w-8 rounded hover:bg-slate-100">⋯</button></td>
+      </tr>`).join('');
+    const ids = rows.map((o) => o.id);
+    const onPage = ids.filter((id) => ui.allMatching || ui.selected.has(id)).length;
+    $('select-page').checked = onPage === ids.length;
+    $('select-page').indeterminate = onPage > 0 && onPage < ids.length;
+  }
+
+  function confirmDelete(id) {
+    const o = orders.find((x) => x.id === id);
+    $('confirm-title').textContent = `Delete order ${id}?`;
+    $('confirm-text').textContent = `${id} for ${o.customer} is removed with its lines. You can undo this for a few seconds.`;
+    $('confirm-ok').textContent = 'Delete order';
+    $('backdrop').hidden = $('confirm').hidden = false;
+    $('confirm-cancel').focus();
+    $('confirm-ok').onclick = () => {
+      const index = orders.indexOf(o);
+      orders.splice(index, 1);
+      ui.selected.delete(id);
+      closeConfirm();
+      render();
+      announce(`<span>Order ${id} deleted.</span><button type="button" id="undo" class="font-medium text-blue-700 underline">Undo</button>`);
+      $('undo').onclick = () => { orders.splice(index, 0, o); render(); announce(`<span>Order ${id} restored.</span>`); };
+    };
+  }
+  function closeConfirm() { $('backdrop').hidden = $('confirm').hidden = true; }
+
+  // Events
+  $('tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) { ui.tab = b.dataset.tab; ui.page = 1; render(); } });
+  let qTimer;
+  $('q').addEventListener('input', (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { ui.q = e.target.value; ui.page = 1; ui.allMatching = false; render(); }, 250); });
+  $('f-channel').addEventListener('change', (e) => { ui.channel = e.target.value; ui.page = 1; render(); });
+  $('chips').addEventListener('click', (e) => {
+    const c = e.target.closest('[data-chip]');
+    if (c) { ui[c.dataset.chip] = ''; if (c.dataset.chip === 'q') $('q').value = ''; if (c.dataset.chip === 'channel') $('f-channel').value = ''; render(); }
+    if (e.target.id === 'clear-all') clearFilters();
+  });
+  function clearFilters() { ui.q = ''; ui.channel = ''; ui.tab = 'All'; $('q').value = ''; $('f-channel').value = ''; render(); $('q').focus(); }
+  $('empty-action').addEventListener('click', () => (orders.length ? clearFilters() : $('btn-create').click()));
+  document.querySelector('thead').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sort]');
+    if (!b) return;
+    ui.dir = ui.sort === b.dataset.sort && ui.dir === 'asc' ? 'desc' : 'asc';
+    ui.sort = b.dataset.sort;
+    render();
+  });
+  $('select-page').addEventListener('change', (e) => {
+    document.querySelectorAll('[data-select]').forEach((c) => (e.target.checked ? ui.selected.add(c.dataset.select) : ui.selected.delete(c.dataset.select)));
+    if (!e.target.checked) ui.allMatching = false;
+    render();
+  });
+  $('rows').addEventListener('change', (e) => { const c = e.target.closest('[data-select]'); if (c) { c.checked ? ui.selected.add(c.dataset.select) : ui.selected.delete(c.dataset.select); ui.allMatching = false; render(); } });
+  $('bulk-all').addEventListener('click', () => { ui.allMatching = true; render(); });
+  $('bulk-clear').addEventListener('click', () => { ui.selected.clear(); ui.allMatching = false; render(); });
+  $('page-size').addEventListener('change', (e) => { ui.size = Number(e.target.value); ui.page = 1; render(); });
+  $('prev').addEventListener('click', () => { ui.page--; render(); });
+  $('next').addEventListener('click', () => { ui.page++; render(); });
+  $('btn-export').addEventListener('click', () => announce(`<span>Export started: ${$('btn-export').textContent.replace('Export ', '')}.</span>`));
+  $('retry').addEventListener('click', () => { location.search = ''; });
+
+  let menuFor = null;
+  $('rows').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-menu]');
+    if (!b) return;
+    menuFor = b.dataset.menu;
+    const r = b.getBoundingClientRect();
+    Object.assign($('menu').style, { top: r.bottom + 4 + 'px', left: r.right - 160 + 'px' });
+    $('menu').hidden = false;
+    b.setAttribute('aria-expanded', 'true');
+    $('menu').querySelector('button').focus();
+  });
+  $('menu').addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]');
+    if (!a) return;
+    $('menu').hidden = true;
+    if (a.dataset.act === 'delete') confirmDelete(menuFor);
+    else location.hash = menuFor;
+  });
+  $('confirm-cancel').addEventListener('click', closeConfirm);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeConfirm(); $('menu').hidden = true; } });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#menu, [data-menu]')) $('menu').hidden = true; });
+
+  // Initial state: ?state=loading|error shows that state; otherwise render the data.
+  $('skeleton').innerHTML = Array.from({ length: 8 }, () => '<div class="flex h-10 items-center gap-4 border-b border-slate-200 px-3"><div class="h-3 w-24 rounded bg-slate-200"></div><div class="h-3 w-48 rounded bg-slate-200"></div><div class="ml-auto h-3 w-20 rounded bg-slate-200"></div></div>').join('');
+  $('q').value = ui.q;
+  $('f-channel').value = ui.channel;
+  if (forced === 'loading' || forced === 'error') { show(forced); $('pager').hidden = true; renderTabs(); $('result-count').textContent = '—'; }
+  else render();
+</script>
+</body>
+</html>

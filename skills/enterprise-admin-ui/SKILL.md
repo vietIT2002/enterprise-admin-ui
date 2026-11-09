@@ -246,3 +246,5 @@ When the user asks to review or audit existing screens, report findings instead 
 | `references/calendars.md` | calendars and schedules: leave, shifts, bookings; week start, multi-day bars, coverage |
 | `references/boards.md` | Kanban boards: columns, cards, moving without drag, transitions, side-panel details |
 | `references/trees.md` | trees and split views: chart of accounts, org charts, categories; keyboard and persistence |
+| `assets/templates/` | optional: working single-file list, detail and form pages to start from |
+| `scripts/check.mjs` | optional: `node scripts/check.mjs page.html --page list` adds behaviour checks (result count, Export count, print, confirmation, status region) in Chromium; needs Playwright |

@@ -4,6 +4,8 @@
 
 **为登录后的应用提供企业级界面。** 这个 Agent Skill 教 AI 编程 Agent（Claude Code、Codex、Cursor、Antigravity、Copilot 等）像成熟的商业软件那样构建管理系统界面：信息密集且易读的表格；完整的各类状态；不会丢失已填内容的保存机制；也没有那种“AI 模板”味。
 
+**有实测，不只是承诺。** 在 12 个界面上（验收清单由从未读过本技能的 Agent 编写，盲评），使用本技能生成的页面通过了 **44%** 的清单项，不使用时为 **19%**。可在[对比画廊](https://vietit2002.github.io/enterprise-admin-ui-benchmark/?suite=heldout3)中并排查看页面 · [数据与方法](https://github.com/vietIT2002/enterprise-admin-ui-benchmark)。
+
 ![同一提示词分别由 Codex CLI 和 Claude Code 生成：未使用与使用本技能的对比，附审计与验收清单得分](docs/img/demo.gif)
 
 [![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
@@ -159,11 +161,13 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            248 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
+├─ SKILL.md            250 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         17 个文件，仅在任务需要时加载
 ├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
 ├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖
+├─ scripts/check.mjs   可选：在 Chromium 中运行行为检查（需 Playwright），每个问题一行
 └─ assets/
+   ├─ templates/           可选：单文件的列表、详情和表单页面
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
    └─ DESIGN.template.md   项目级决策文件（Google design.md 格式）
 ```
@@ -268,13 +272,15 @@ node <技能目录>/scripts/audit-cli.mjs http://localhost:3000/orders --type li
 | `pbakaus/impeccable` | 设计检测器（62 条规则），面向应用界面的“Operate”模式 | 部分覆盖（没有审计日志和分页） |
 | **enterprise-admin-ui** | 刻意朴素的业务界面 | 列表、筛选、批量操作、带明细行的表单、权限、审计记录、审批、导入、按区域设置格式化、所有状态 |
 
+**在管理界面上的实测**（盲评，同样 12 个独立编写的需求，每个技能每个需求 1 个页面，Claude Sonnet 5.5）：enterprise-admin-ui 通过了 **44%** 的验收清单项，ui-ux-pro-max 30%，impeccable 19%，frontend-design 18%，不使用技能 19%。这是本技能擅长的领域，且其他技能运行时没有使用它们的脚本。详见 [COMPARE](https://github.com/vietIT2002/enterprise-admin-ui-benchmark/blob/main/benchmark/runs/2026-11-07-compare-blind/COMPARE.md)。
+
 这些技能可以配合使用：营销网站用侧重美感的技能，登录后的应用用本技能。
 
 ## 常见问题
 
 **它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
 
-**会消耗多少 token？** `SKILL.md` 共 248 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+**会消耗多少 token？** `SKILL.md` 共 250 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
 
 **支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
 - `1.250.000 ₫`；

@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `scripts/check.mjs`, an optional tool for you or your CI, opens a page in Chromium and runs the audit plus behaviour checks. It prints one line per problem with its fix and exits 0 when every check passes. The checks:
+  - every data region shows empty, loading and error for `?state=`;
+  - a search that matches nothing updates the result count and shows a no-results state;
+  - Export names its count;
+  - a page with Print has a print stylesheet;
+  - destructive actions ask first;
+  - a status region exists.
+- Optional page templates in `assets/templates/` (`list.html`, `detail.html`, `form.html`) that pass the checker and the audit as shipped.
+- SKILL.md lists both as optional. A workflow that made agents start from a template and loop on the checker until it passed was measured on 12 blind-reviewed pages:
+  - the checklist reached 39%, against 38% for v0.5.8;
+  - the audit score rose from 88 to 100;
+  - cost rose 1.65×.
+
+  It is not part of the workflow (benchmark SCREEN-A).
+- Both overlap with `audit-cli.mjs --states` (0.5.10), which also checks the three states without Playwright.
+
+### Docs
+- Benchmark COMPARE: on the 12 independent briefs, reviewed blind, enterprise-admin-ui passed 44% of the acceptance checklist, ui-ux-pro-max 30%, impeccable 19%, frontend-design 18% and no skill 19%. The READMEs report it under "How it compares", with the caveats.
+- READMEs lead with the measured result: 12 independently written briefs, blind review, 19% → 44%.
+
 ## [0.5.10] — 2026-11-09
 
 ### Added
