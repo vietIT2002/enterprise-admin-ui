@@ -178,11 +178,10 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            250 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
+├─ SKILL.md            249 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         17 个文件，仅在任务需要时加载
 ├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
-├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖
-├─ scripts/check.mjs   可选：在 Chromium 中运行行为检查（需 Playwright），每个问题一行
+├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖；--states 和 --checks 检查状态与行为
 └─ assets/
    ├─ templates/           可选：单文件的列表、详情和表单页面
    ├─ tokens.css           兼容 shadcn 的 token，含亮色和暗色，Tailwind v4 @theme
@@ -316,7 +315,7 @@ node <技能目录>/scripts/audit-cli.mjs http://localhost:3000/orders --type li
 
 **它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
 
-**会消耗多少 token？** `SKILL.md` 共 250 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+**会消耗多少 token？** `SKILL.md` 共 249 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
 
 **支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
 - `1.250.000 ₫`；

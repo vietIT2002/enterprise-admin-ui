@@ -68,7 +68,79 @@ function statePage(withStates) {
   );
 }
 
+// A detail page: label–value fields (a row header and one value, as SKILL.md asks) and a list of order lines that
+// follows ?state=. The fields stay in every state; only the lines empty, load or fail. rowHeaders: the lines' first
+// column is a row header too, so a data row with a row header still counts as a data row.
+function detailStatePage({ rowHeaders = false, ignoreState = false } = {}) {
+  const fields = [['Customer', 'Minh Phat'], ['Channel', 'Online'], ['Payment terms', 'Net 30']]
+    .map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td></tr>`)
+    .join('');
+  const cell = rowHeaders ? 'th scope="row"' : 'td';
+  const lines = `<table><thead><tr><th>Product</th><th>Qty</th><th>Amount</th></tr></thead><tbody><tr><${cell}>Paper A4</${cell.split(' ')[0]}><td>10</td><td>650.000</td></tr><tr><${cell}>Ink</${cell.split(' ')[0]}><td>2</td><td>480.000</td></tr></tbody></table>`;
+  return html(
+    `<h1>Order SO-1043</h1><table><tbody>${fields}</tbody></table><h2>Lines</h2><div id="slot"></div>
+<script>var slot = document.getElementById('slot'); var state = ${ignoreState ? 'null' : "new URLSearchParams(location.search).get('state')"};
+if (state === 'loading') slot.innerHTML = '<div aria-busy="true"><div style="height:40px;background:#f1f5f9"></div></div>';
+else if (state === 'empty') slot.innerHTML = '<p>No lines yet.</p><button type="button">Add line</button>';
+else if (state === 'error') slot.innerHTML = '<div role="alert">Lines could not be loaded.</div><button type="button">Retry</button>';
+else slot.innerHTML = ${JSON.stringify(lines)};</script>`,
+    'button{font:inherit;height:32px;padding:0 12px} table{border-collapse:collapse;margin-top:12px} th,td{height:40px;padding:0 12px;text-align:left;white-space:nowrap}'
+  );
+}
+
+// A list page that does what --checks looks for, with no special markup: a search that empties the table, says so and
+// updates "3 orders"; Export with its count; print CSS that hides the shell; Delete that opens a dialog; a status
+// region. Each option breaks one part. native: Delete asks with the browser's confirm() instead of a dialog.
+function checksPage({ count = true, exportCount = true, confirmDelete = true, native = false, printCss = true, live = true, noResults = true } = {}) {
+  const data = JSON.stringify([{ id: 'SO-1', c: 'Minh Phat' }, { id: 'SO-2', c: 'Hoa Binh' }, { id: 'SO-3', c: 'An Khang' }]);
+  const onDelete = native
+    ? "if (confirm('Delete order ' + id + '?')) b.closest('tr').remove();"
+    : confirmDelete
+      ? "document.getElementById('dlg').hidden = false; document.getElementById('cancel').focus();"
+      : "b.closest('tr').remove();";
+  return html(
+    `<nav aria-label="Order views"><a href="#all">All orders</a></nav>
+<h1>Orders</h1>
+<button type="button">Print</button>
+<button type="button">${exportCount ? 'Export <span id="ec">3</span> orders' : 'Export'}</button>
+<input type="search" id="q" aria-label="Search orders">
+${count ? '<p><span id="n">3</span> orders</p>' : ''}
+<table><thead><tr><th>Order</th><th>Customer</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table>
+<div id="none" hidden>${noResults ? '<p>No orders match this search</p><button type="button" id="clear">Clear search</button>' : ''}</div>
+${live ? '<div role="status" id="live"></div>' : ''}
+<div role="alertdialog" aria-modal="true" aria-labelledby="dt" id="dlg" hidden><h2 id="dt">Delete order?</h2><button type="button" id="cancel">Cancel</button></div>
+<script>
+var data = ${data};
+function render(list) {
+  document.getElementById('rows').innerHTML = list.map(function (r) { return '<tr><td>' + r.id + '</td><td>' + r.c + '</td><td><button type="button" class="del" data-id="' + r.id + '">Delete</button></td></tr>'; }).join('');
+  if (document.getElementById('n')) document.getElementById('n').textContent = list.length;
+  if (document.getElementById('ec')) document.getElementById('ec').textContent = list.length;
+  document.getElementById('none').hidden = list.length > 0;
+  document.querySelectorAll('.del').forEach(function (b) { b.addEventListener('click', function () { var id = b.getAttribute('data-id'); ${onDelete} }); });
+}
+render(data);
+document.getElementById('q').addEventListener('input', function (e) { var q = e.target.value.toLowerCase(); render(data.filter(function (r) { return (r.id + r.c).toLowerCase().indexOf(q) >= 0; })); });
+</script>`,
+    `${printCss ? '@media print { nav, button, input { display: none !important } }' : ''} button,input{font:inherit;height:32px;padding:0 12px} table{border-collapse:collapse;margin-top:12px} th,td{height:40px;padding:0 12px;text-align:left;white-space:nowrap}`
+  );
+}
+
 const PAGES = {
+  '/detail-states': () => detailStatePage(),
+  '/detail-stateless-row-headers': () => detailStatePage({ rowHeaders: true, ignoreState: true }),
+  '/checks': () => checksPage(),
+  '/checks-no-count': () => checksPage({ count: false }),
+  '/checks-no-message': () => checksPage({ noResults: false }),
+  '/checks-export': () => checksPage({ exportCount: false }),
+  '/checks-print': () => checksPage({ printCss: false }),
+  '/checks-no-confirm': () => checksPage({ confirmDelete: false }),
+  '/checks-native': () => checksPage({ native: true }),
+  '/checks-no-live': () => checksPage({ live: false }),
+  // Nothing to search, export, print or delete: those checks are skipped. A status region is still needed.
+  '/checks-settings': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>'),
+  // Removing a form line or a filter chip is undone in place and needs no confirmation.
+  '/checks-remove-line': () =>
+    html('<h1>New order</h1><button type="button" aria-label="Remove line 1" onclick="this.remove()">×</button><button type="button" onclick="this.remove()">Remove filter: Online</button><div role="status"></div>'),
   '/clean': () => readFileSync(CLEAN, 'utf8'),
   '/new': () => readFileSync(CLEAN, 'utf8'),
   // The only issue: one ALL-CAPS label, a warning.
@@ -241,9 +313,74 @@ test('a page that does not finish within --timeout stops the browser, and the ne
   assert.equal(clean.result.score, 100);
 });
 
+test('--states: a detail page keeps its label–value fields in ?state=empty; they are not data rows', async () => {
+  const [page] = JSON.parse((await run([`${base}/detail-states`, '--type', 'detail', '--states', '--json'])).stdout);
+  assert.deepEqual(page.states.map((s) => [s.state, s.ok, s.problems.join('; ')]), [['empty', true, ''], ['error', true, ''], ['loading', true, '']]);
+});
+
+test('--states: data rows whose first cell is a row header still count as data rows', async () => {
+  // The page ignores ?state=, so ?state=empty still shows its 2 order lines (and its 3 fields, which do not count).
+  const [page] = JSON.parse((await run([`${base}/detail-stateless-row-headers`, '--type', 'detail', '--states', '--json'])).stdout);
+  assert.match(page.states[0].problems.join('; '), /(^|; )2 data rows still show/);
+});
+
 test('without --states, no state is checked', async () => {
   const [page] = JSON.parse((await run([`${base}/stateless`, '--type', 'list', '--json'])).stdout);
   assert.equal(page.states, null);
+});
+
+const checksOf = async (path, type = 'list') => {
+  const r = await run([`${base}${path}`, '--type', type, '--checks', '--json']);
+  const [page] = JSON.parse(r.stdout || '[]');
+  assert.ok(page && page.checks, `${path}: no checks in the output\n${r.output}`);
+  return Object.fromEntries(page.checks.map((c) => [c.check, c]));
+};
+
+test('--checks passes a list page that searches, exports, prints, confirms and announces as SKILL.md asks', async () => {
+  const c = await checksOf('/checks');
+  for (const id of ['search', 'export', 'print', 'confirm', 'live-region']) {
+    assert.equal(c[id].ok && !c[id].skipped && !c[id].error, true, `${id}: ${JSON.stringify(c[id])}`);
+  }
+  const r = await run([`${base}/checks`, '--type', 'list', '--checks']);
+  assert.match(r.stdout, /Checks:\n✓ search: [^\n]+\n✓ export: "Export 3 orders"\n✓ print: [^\n]+\n✓ confirm: "Delete" opens a dialog first\n✓ live-region:/);
+});
+
+test('--checks fails each part a page leaves out, and only that part', async () => {
+  for (const [path, id, problem] of [
+    ['/checks-no-count', 'search', /no count changed/],
+    ['/checks-no-message', 'search', /no "no results" message/],
+    ['/checks-export', 'export', /"Export" does not name/],
+    ['/checks-print', 'print', /navigation element|buttons? still print/],
+    ['/checks-no-confirm', 'confirm', /"Delete" acts at once/],
+    ['/checks-no-live', 'live-region', /no role="status"/],
+  ]) {
+    const c = await checksOf(path);
+    assert.equal(c[id].ok, false, `${path}: ${id} should fail`);
+    assert.match(c[id].problems.join('; '), problem, path);
+    const others = Object.values(c).filter((x) => x.check !== id && !x.ok);
+    assert.deepEqual(others.map((x) => x.check), [], `${path}: only ${id} fails`);
+  }
+  const r = await run([`${base}/checks-export`, '--type', 'list', '--checks']);
+  assert.equal(r.code, 1, r.output);
+});
+
+test('--checks accepts the browser\'s own confirm() before a delete', async () => {
+  const c = await checksOf('/checks-native');
+  assert.equal(c.confirm.ok, true, JSON.stringify(c.confirm));
+  assert.match(c.confirm.note, /confirm\(\)/);
+});
+
+test('--checks skips what a page does not have, and does not take removing a line or a filter for a delete', async () => {
+  const settings = await checksOf('/checks-settings', 'settings');
+  for (const id of ['search', 'export', 'print', 'confirm']) assert.equal(settings[id].skipped, true, id);
+  assert.equal(settings['live-region'].ok, true);
+  const form = await checksOf('/checks-remove-line', 'form');
+  assert.equal(form.confirm.skipped, true, JSON.stringify(form.confirm));
+});
+
+test('without --checks, no behaviour is checked', async () => {
+  const [page] = JSON.parse((await run([`${base}/checks`, '--type', 'list', '--json'])).stdout);
+  assert.equal(page.checks, null);
 });
 
 test('a temp profile left by a killed run is removed by the next run', async () => {

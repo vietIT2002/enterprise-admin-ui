@@ -178,11 +178,10 @@ Nếu dự án đã có design system hoặc thư viện component tùy biến, 
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            250 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
+├─ SKILL.md            249 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
 ├─ references/         17 file, chỉ nạp khi tác vụ cần
 ├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 22 quy tắc, điểm 0–100
-├─ scripts/audit-cli.mjs  chạy audit từ terminal bằng Chrome hoặc Edge chạy ngầm, không cần thư viện ngoài
-├─ scripts/check.mjs   tùy chọn: phép thử hành vi trong Chromium (Playwright), mỗi lỗi một dòng
+├─ scripts/audit-cli.mjs  chạy audit từ terminal bằng Chrome hoặc Edge chạy ngầm, không cần thư viện ngoài; --states và --checks kiểm tra trạng thái và hành vi
 └─ assets/
    ├─ templates/           tùy chọn: trang danh sách, chi tiết và form dạng một file HTML
    ├─ tokens.css           token tương thích shadcn, sáng và tối, Tailwind v4 @theme
@@ -316,7 +315,7 @@ Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm 
 
 **Skill có xung đột với design system của tôi không?** Không. Design system hoặc thư viện component tùy biến của dự án luôn được ưu tiên; khi đó skill chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
 
-**Skill tốn bao nhiêu token?** `SKILL.md` dài 250 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
+**Skill tốn bao nhiêu token?** `SKILL.md` dài 249 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
 
 **Skill có hỗ trợ tiếng Việt và các locale khác không?** Có. Việc định dạng đi qua `Intl` với locale của dự án. `data-formatting.md` có sẵn bộ quy ước vi-VN:
 - `1.250.000 ₫`;

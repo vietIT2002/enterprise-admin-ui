@@ -211,7 +211,7 @@ When the user asks to review or audit existing screens, report findings instead 
 
 ## Verify
 
-- **Audit:** run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`). It opens the page in an installed headless Chrome or Edge at 1440×900 and prints the score; exit code 1 means an ✗ error. With mock data, add `--states`: it also opens `?state=empty`, `?state=error` and `?state=loading` and checks each one.
+- **Audit:** run `node <this skill's folder>/scripts/audit-cli.mjs <url or file.html> --type list` (or `detail`, `form`, `dashboard`, `settings`, `wizard`, `report`, `document`, `calendar`, `board`, `tree`). It opens the page in an installed headless Chrome or Edge at 1440×900 and prints the score; exit code 1 means an ✗ error. With mock data, add `--states`: it also opens `?state=empty`, `?state=error` and `?state=loading` and checks each one. Add `--checks` to use the page as a person would: a search that matches nothing, Export, Print and Delete are each checked against this file, and a check the page has no control for is skipped.
   - In a browser console, paste `scripts/audit.js`, then run `enterpriseAdminAudit({ pageType: 'list' })`.
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.
@@ -246,5 +246,4 @@ When the user asks to review or audit existing screens, report findings instead 
 | `references/calendars.md` | calendars and schedules: leave, shifts, bookings; week start, multi-day bars, coverage |
 | `references/boards.md` | Kanban boards: columns, cards, moving without drag, transitions, side-panel details |
 | `references/trees.md` | trees and split views: chart of accounts, org charts, categories; keyboard and persistence |
-| `assets/templates/` | optional: working single-file list, detail and form pages to start from |
-| `scripts/check.mjs` | optional: `node scripts/check.mjs page.html --page list` adds behaviour checks (result count, Export count, print, confirmation, status region) in Chromium; needs Playwright |
+| `assets/templates/` | optional: working single-file list, detail and form pages to start from; each passes `audit-cli.mjs --checks` |

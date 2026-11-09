@@ -19,9 +19,9 @@
 <body class="bg-white text-sm text-slate-900 antialiased">
 <!--
   Template: list page. Copy it, then replace the entity ("order"), the columns, the filters and
-  the mock data. Keep the parts that scripts/check.mjs looks for:
-  - data-region with data-state="empty|loading|error" children, shown by ?state=empty|loading|error;
-  - data-result-count next to the filters, updated on every change;
+  the mock data. Keep the parts that scripts/audit-cli.mjs --states --checks looks for:
+  - the empty, loading and error states, shown by ?state=empty|loading|error;
+  - the count of matching records next to the filters, updated on every change, and the no-results state;
   - the Export label with its count, the confirmation dialog, the role="status" region and the print stylesheet.
   Set LOCALE and CURRENCY from DESIGN.md.
 -->

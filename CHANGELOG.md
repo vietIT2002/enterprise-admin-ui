@@ -5,21 +5,24 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
-- `scripts/check.mjs`, an optional tool for you or your CI, opens a page in Chromium and runs the audit plus behaviour checks. It prints one line per problem with its fix and exits 0 when every check passes. The checks:
-  - every data region shows empty, loading and error for `?state=`;
-  - a search that matches nothing updates the result count and shows a no-results state;
+- `audit-cli.mjs --checks` uses the page the way a person would and checks the behaviour SKILL.md asks for:
+  - a search that matches nothing empties the list and says so, and on a list the count changes;
   - Export names its count;
-  - a page with Print has a print stylesheet;
-  - destructive actions ask first;
-  - a status region exists.
-- Optional page templates in `assets/templates/` (`list.html`, `detail.html`, `form.html`) that pass the checker and the audit as shipped.
-- SKILL.md lists both as optional. A workflow that made agents start from a template and loop on the checker until it passed was measured on 12 blind-reviewed pages:
+  - Print hides the navigation and buttons and keeps the title;
+  - Delete opens a dialog first (the browser's `confirm()` also counts);
+  - a `role="status"` region exists.
+
+  It needs no special markup and no dependencies, and it skips a check when the page has no control for it. It replaces `scripts/check.mjs`, which was never in a release: that script needed Playwright and `data-*` attributes, and its state checks are covered by `--states`.
+- Optional page templates in `assets/templates/` (`list.html`, `detail.html`, `form.html`). As shipped, each passes the audit and `--checks`, and the list and detail templates also pass `--states`.
+- SKILL.md lists the templates as optional. A workflow that made agents start from a template and loop on a checker until it passed was measured on 12 blind-reviewed pages:
   - the checklist reached 39%, against 38% for v0.5.8;
   - the audit score rose from 88 to 100;
   - cost rose 1.65×.
 
   It is not part of the workflow (benchmark SCREEN-A).
-- Both overlap with `audit-cli.mjs --states` (0.5.10), which also checks the three states without Playwright.
+
+### Fixed
+- `audit-cli.mjs --states` no longer counts label–value rows as data rows. Such a row is a row header with one value ("Customer | Minh Phat"), so a detail page whose related lists are empty now passes `?state=empty`.
 
 ### Docs
 - Benchmark COMPARE: on the 12 independent briefs, reviewed blind, enterprise-admin-ui passed 44% of the acceptance checklist, ui-ux-pro-max 30%, impeccable 19%, frontend-design 18% and no skill 19%. The READMEs report it under "How it compares", with the caveats.

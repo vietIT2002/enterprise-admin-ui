@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  CHECKS,
   PAGE_TYPES,
   UsageError,
   browserArgs,
@@ -13,6 +14,12 @@ import {
   createMessageReader,
   exitCode,
   findBrowser,
+  formatText,
+  judgeConfirm,
+  judgeExport,
+  judgeLive,
+  judgePrint,
+  judgeSearch,
   parseCli,
   stateUrl,
   sweepStaleProfiles,
@@ -27,9 +34,9 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, timeout: 90, browser: null, help: false });
-  const all = parseCli(['--json', '--strict', '--states', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, timeout: 120, browser: '/x/chrome', help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, timeout: 90, browser: null, help: false });
+  const all = parseCli(['--json', '--strict', '--states', '--checks', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, timeout: 120, browser: '/x/chrome', help: false });
 });
 
 test('parseCli: --timeout takes a positive number of seconds', () => {
@@ -234,4 +241,80 @@ test('exitCode: a state that fails exits 1; a state page that could not load exi
   assert.equal(exitCode([withStates([{ state: 'empty', ok: true, problems: [], error: null }])], false), 0);
   assert.equal(exitCode([withStates([{ state: 'error', ok: false, problems: ['no Retry action'], error: null }])], false), 1);
   assert.equal(exitCode([withStates([{ state: 'loading', ok: false, problems: [], error: 'HTTP 500 from u' }])], false), 2);
+});
+
+// ------------------------------------------------------------------ behaviour checks (--checks)
+
+test('CHECKS lists the five behaviour checks in the order they print', () => {
+  assert.deepEqual([...CHECKS], ['search', 'export', 'print', 'confirm', 'live-region']);
+});
+
+test('judgeSearch: skipped without a search box', () => {
+  const r = judgeSearch({ found: false });
+  assert.equal(r.check, 'search');
+  assert.equal(r.skipped, true);
+  assert.equal(r.ok, true);
+});
+
+test('judgeSearch: a search that matches nothing must clear the rows, say so, and change the count of a list', () => {
+  const before = { rows: 3, numbers: ['3'], noResults: false };
+  const good = judgeSearch({ found: true, before, after: { rows: 0, numbers: ['0'], noResults: true }, pageType: 'list' });
+  assert.equal(good.ok, true, good.problems.join('; '));
+  assert.equal(good.skipped, false);
+
+  const bad = judgeSearch({ found: true, before, after: { rows: 3, numbers: ['3'], noResults: false }, pageType: 'list' });
+  assert.equal(bad.ok, false);
+  assert.equal(bad.problems.length, 3);
+  assert.match(bad.problems[0], /3 data rows still show/);
+  assert.match(bad.problems[1], /no "no results" message/);
+  assert.match(bad.problems[2], /no count changed/);
+
+  // Only a list must show a count; a tree or a board with a search box need not.
+  const tree = judgeSearch({ found: true, before, after: { rows: 0, numbers: ['3'], noResults: true }, pageType: 'tree' });
+  assert.equal(tree.ok, true, tree.problems.join('; '));
+});
+
+test('judgeExport: an Export control names what it exports, with a number', () => {
+  assert.equal(judgeExport([]).skipped, true);
+  assert.equal(judgeExport(['Export 1.245 orders']).ok, true);
+  const bare = judgeExport(['Xuất 12 đơn hàng', 'Download']);
+  assert.equal(bare.ok, false);
+  assert.match(bare.problems[0], /"Download" does not name/);
+});
+
+test('judgePrint: printing keeps the title and hides navigation and buttons', () => {
+  assert.equal(judgePrint(null).skipped, true);
+  assert.equal(judgePrint({ h1: true, nav: 0, buttons: 0 }).ok, true);
+  const bad = judgePrint({ h1: false, nav: 1, buttons: 2 });
+  assert.equal(bad.ok, false);
+  assert.deepEqual(bad.problems.map((p) => p.split(' ').slice(0, 3).join(' ')), ['the title (h1)', '1 navigation element', '2 buttons still']);
+});
+
+test('judgeConfirm: a destructive action opens a dialog first; the browser confirm() also counts', () => {
+  assert.equal(judgeConfirm({ label: null }).skipped, true);
+  assert.equal(judgeConfirm({ label: 'Delete SO-1', dialog: true, native: false }).ok, true);
+  const native = judgeConfirm({ label: 'Delete SO-1', dialog: false, native: true });
+  assert.equal(native.ok, true);
+  assert.match(native.note, /confirm\(\)/);
+  const none = judgeConfirm({ label: 'Delete SO-1', dialog: false, native: false });
+  assert.equal(none.ok, false);
+  assert.match(none.problems[0], /"Delete SO-1" acts at once/);
+});
+
+test('judgeLive: a role="status", role="alert" or aria-live region exists', () => {
+  assert.equal(judgeLive(2).ok, true);
+  assert.equal(judgeLive(0).ok, false);
+});
+
+test('exitCode: a failed check exits 1, a skipped one passes, a check that could not run exits 2', () => {
+  const withChecks = (checks) => ({ ...page([]), checks });
+  assert.equal(exitCode([withChecks([judgeExport([]), judgeLive(1)])], false), 0);
+  assert.equal(exitCode([withChecks([judgeLive(0)])], false), 1);
+  assert.equal(exitCode([withChecks([{ check: 'search', ok: false, skipped: false, problems: [], note: '', error: 'The page did not respond' }])], false), 2);
+});
+
+test('formatText: one line per check, ✓ passed, ✗ failed, – skipped', () => {
+  const p = { ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [judgeSearch({ found: false }), judgeExport(['Export']), judgeLive(1)] };
+  const text = formatText([p], 'list');
+  assert.match(text, /Checks:\n– search: no search box\n✗ export: "Export" does not name[^\n]*\n✓ live-region: 1 live region/);
 });

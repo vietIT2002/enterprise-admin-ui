@@ -3,7 +3,10 @@
  * enterprise-admin-ui audit CLI — MIT License
  * Runs scripts/audit.js on pages in an installed headless Chrome, Edge or Chromium. No dependencies; Node 22 or later.
  *
- *   node audit-cli.mjs <url | file.html>... [--type <type>] [--json] [--strict] [--browser <path>]
+ *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks] [--json] [--strict] [--browser <path>]
+ *
+ * --states also opens ?state=empty, error and loading; --checks also searches, exports, prints and deletes the way a
+ * person would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page.
  *
  * Each page opens the way the enterprise-admin-ui benchmark opens it: a light colour scheme on a 1440×900 screen, then
  * load, network idle for 500 ms (at most 15 s), and the benchmark's settle (no DOM change for 800 ms, loading skeletons
@@ -49,6 +52,7 @@ export function parseCli(argv) {
         strict: { type: 'boolean' },
         browser: { type: 'string' },
         states: { type: 'boolean' },
+        checks: { type: 'boolean' },
         timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -64,6 +68,7 @@ export function parseCli(argv) {
     json: Boolean(values.json),
     strict: Boolean(values.strict),
     states: Boolean(values.states),
+    checks: Boolean(values.checks),
     timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
     help: Boolean(values.help),
@@ -210,13 +215,88 @@ export function checkState(state, base, snap) {
   return { state, ok: problems.length === 0, problems, details };
 }
 
+// ------------------------------------------------------------------ behaviour checks (--checks)
+
+// What SKILL.md asks of a screen's behaviour, tested by using the page as a person would: a search that matches
+// nothing, Export, Print, a destructive action, and a region for status messages. No special markup is needed.
+export const CHECKS = Object.freeze(['search', 'export', 'print', 'confirm', 'live-region']);
+// No digits, so a "No orders match …" message that repeats the query does not look like a changed count.
+const NO_MATCH_QUERY = 'zzqxwv';
+// Passed to the page as strings. English, Vietnamese and Chinese names.
+const PATTERNS = Object.freeze({
+  search:
+    'input[type="search"], [role="searchbox"], input[aria-label*="search" i], input[placeholder*="search" i], input[aria-label*="tìm" i], input[placeholder*="tìm" i], input[aria-label*="搜索"], input[placeholder*="搜索"]',
+  exportRe: String.raw`\bexport\b|xuất|导出`,
+  printRe: String.raw`\bprint\b|^in$|^in (phiếu|hóa đơn|hoá đơn|báo cáo|bảng|danh sách|trang)|打印`,
+  destructiveRe: String.raw`\b(delete|remove|deactivate|terminate)\b|xóa|xoá|vô hiệu|ngừng hoạt động|删除|移除|停用`,
+  // Removing a filter, a form line or a row before saving is undone in place and needs no confirmation.
+  notDestructiveRe: String.raw`\bremove (filter|line|row)|(xóa|xoá) (bộ lọc|dòng)|清除筛选`,
+  noResultsRe: String.raw`\bno\b.{0,60}\b(match|matches|matching|results?|found)\b|nothing (matches|found)|không (có|tìm thấy)|没有.{0,20}(结果|匹配)|无结果|未找到`,
+});
+
+// CheckResult: { check, ok, skipped, problems: string[], note, error: string|null }. A skipped check is ok.
+const outcome = (check, { skipped = false, problems = [], note = '' } = {}) => ({ check, ok: problems.length === 0, skipped, problems, note, error: null });
+
+// before and after the search: { rows, numbers, noResults } from the page (data rows; short texts with a number outside
+// the table body and the controls; whether it says nothing matches). Only a list must show a count that changes.
+export function judgeSearch({ found, before, after, pageType = null }) {
+  if (!found) return outcome('search', { skipped: true, note: 'no search box' });
+  const problems = [];
+  if (after.rows > 0) problems.push(`${after.rows} data row${after.rows === 1 ? '' : 's'} still show after a search that matches nothing`);
+  if (!after.noResults) problems.push('no "no results" message, such as "No orders match this search" with Clear search');
+  const changed = [...before.numbers].sort().join('\n') !== [...after.numbers].sort().join('\n');
+  if (!changed && pageType === 'list') problems.push('no count changed: show how many records match ("12 of 48 orders") and update it on every search');
+  return outcome('search', { problems, note: `a search for "${NO_MATCH_QUERY}" empties the list and says so${changed ? ', and the count changes' : ''}` });
+}
+
+// names: the visible Export controls.
+export function judgeExport(names) {
+  if (!names.length) return outcome('export', { skipped: true, note: 'no Export control' });
+  const bare = names.filter((name) => !/\d/.test(name));
+  const problems = bare.length ? [`"${bare[0]}" does not name what it exports: give the scope and count, as "Export 1.245 orders" or "Export 3 selected"`] : [];
+  return outcome('export', { problems, note: `"${names[0]}"` });
+}
+
+// printed: null without a Print control, else what shows in print media: { h1, nav, buttons }.
+export function judgePrint(printed) {
+  if (!printed) return outcome('print', { skipped: true, note: 'no Print control' });
+  const problems = [];
+  if (!printed.h1) problems.push('the title (h1) does not print: keep it, with the period and totals');
+  if (printed.nav) problems.push(`${printed.nav} navigation element${printed.nav === 1 ? ' still prints' : 's still print'} (hide the shell in @media print)`);
+  if (printed.buttons) problems.push(`${printed.buttons} button${printed.buttons === 1 ? ' still prints' : 's still print'} (hide controls in @media print)`);
+  return outcome('print', { problems, note: 'printing keeps the title and hides navigation and buttons' });
+}
+
+// label: the first visible delete, remove or deactivate action, or null; dialog: a dialog showed after the click;
+// native: the browser's confirm() opened.
+export function judgeConfirm({ label, dialog = false, native = false }) {
+  if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action' });
+  if (dialog) return outcome('confirm', { note: `"${label}" opens a dialog first` });
+  if (native) return outcome('confirm', { note: `"${label}" asks with the browser's confirm(); a dialog that names the record and the consequence is better` });
+  return outcome('confirm', { problems: [`"${label}" acts at once: open a dialog (role="alertdialog") that names the record and the consequence, with focus on Cancel`] });
+}
+
+// count: role="status", role="alert" and aria-live regions on the page.
+export function judgeLive(count) {
+  const problems = count ? [] : ['no role="status", role="alert" or aria-live region, so screen readers hear no messages: add <div role="status" aria-live="polite">'];
+  return outcome('live-region', { problems, note: `${count} live region${count === 1 ? '' : 's'}` });
+}
+
 // PageResult: { target, url, error: string|null, loadingPlaceholders: number, result: audit result|null,
-//               states: null | [{ state, url, ok, problems, details, error }] }
+//               states: null | [{ state, url, ok, problems, details, error }], checks: null | [CheckResult] }
 export function exitCode(pages, strict) {
   const states = (p) => p.states || [];
-  if (pages.some((p) => p.error || states(p).some((s) => s.error))) return 2;
+  const checks = (p) => p.checks || [];
+  if (pages.some((p) => p.error || states(p).some((s) => s.error) || checks(p).some((c) => c.error))) return 2;
   const fails = (v) => strict || v.severity === 'error';
-  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok)) ? 1 : 0;
+  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok) || checks(p).some((c) => !c.ok)) ? 1 : 0;
+}
+
+function checkLine(c) {
+  if (c.error) return `✗ ${c.check}: could not check: ${c.error}`;
+  if (c.skipped) return `– ${c.check}: ${c.note}`;
+  if (!c.ok) return `✗ ${c.check}: ${c.problems.join('; ')}`;
+  return `✓ ${c.check}: ${c.note}`;
 }
 
 function stateLine(s) {
@@ -236,6 +316,7 @@ export function formatText(pages, pageType = null) {
         lines.push(`! Still loading after 8 s: ${p.loadingPlaceholders} loading placeholder(s) on the page, so the audit saw a loading state.`);
       }
       if (p.states) lines.push('States (?state=):', ...p.states.map(stateLine));
+      if (p.checks) lines.push('Checks:', ...p.checks.map(checkLine));
       return lines.join('\n');
     })
     .join('\n\n');
@@ -616,7 +697,8 @@ function tailwindInPage() {
 
 // Runs in the page: what checkState compares. Main-content text; visible actions (buttons and links outside navigation)
 // by name with their count; data rows (two or more filled cells, so a "No orders yet" row spanning the table and
-// skeleton rows do not count); visible role="alert" messages; loading placeholders, counted as settleInPage does.
+// skeleton rows do not count, and neither do label–value rows such as "Customer | Minh Phat"); visible role="alert"
+// messages; loading placeholders, counted as settleInPage does.
 function snapshotInPage() {
   const root = document.querySelector('main, [role="main"]') || document.body;
   const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
@@ -635,7 +717,9 @@ function snapshotInPage() {
   for (const row of root.querySelectorAll('tbody tr, [role="row"]')) {
     if (!visible(row) || row.closest('thead') || row.querySelector('[role="columnheader"]')) continue;
     const cells = row.querySelectorAll('td, th, [role="cell"], [role="gridcell"], [role="rowheader"]');
-    if ([...cells].filter((c) => clean(c.innerText)).length >= 2) rows++;
+    // A row header and one value is a label–value row: a field of the record, which stays when its lists are empty.
+    const labelValue = cells.length === 2 && (cells[0].tagName === 'TH' || cells[0].getAttribute('role') === 'rowheader');
+    if (!labelValue && [...cells].filter((c) => clean(c.innerText)).length >= 2) rows++;
   }
   const alerts = [...document.querySelectorAll('[role="alert"], [aria-live="assertive"]')]
     .filter((el) => visible(el) && clean(el.innerText))
@@ -648,6 +732,99 @@ function snapshotInPage() {
     [...document.querySelectorAll('[aria-busy="true"]')].filter(visible).length +
     [...document.querySelectorAll('.animate-pulse')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
   return { text: clean(root.innerText), actions, rows, alerts, placeholders };
+}
+
+// Runs in the page: the controls --checks uses, outside open dialogs. A control's name is its aria-label or its text.
+// Marks the first destructive action data-eaui-confirm, so confirmTargetInPage can find it.
+function controlsInPage(patterns) {
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+  };
+  const name = (el) => clean(el.getAttribute('aria-label') || el.innerText || el.getAttribute('title'));
+  const re = (source) => new RegExp(source, 'i');
+  const controls = [...document.querySelectorAll('button, a[href], [role="button"], [role="menuitem"]')].filter(
+    (el) => visible(el) && !el.closest('[role="dialog"], [role="alertdialog"], dialog')
+  );
+  const destructive = controls.find((el) => re(patterns.destructiveRe).test(name(el)) && !re(patterns.notDestructiveRe).test(name(el)));
+  if (destructive) destructive.setAttribute('data-eaui-confirm', '');
+  return {
+    search: [...document.querySelectorAll(patterns.search)].some(visible),
+    exports: controls.map(name).filter((n) => re(patterns.exportRe).test(n)),
+    print: controls.some((el) => re(patterns.printRe).test(name(el))),
+    destructive: destructive ? name(destructive) : null,
+    live: document.querySelectorAll('[role="status"], [role="alert"], [aria-live]').length,
+  };
+}
+
+// Runs in the page: short texts that hold a number, outside the table body, rows, controls and dialogs (a count such as
+// "48 orders" or "12 of 48"), and whether the page says nothing matches.
+function countsInPage(patterns) {
+  const root = document.querySelector('main, [role="main"]') || document.body;
+  const clean = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+  };
+  const skip = 'tbody, [role="row"], button, a, [role="button"], select, option, script, style, [role="dialog"], [role="alertdialog"], dialog';
+  const numbers = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const el = node.parentElement;
+    if (!/\d/.test(node.nodeValue) || !el || el.closest(skip) || !visible(el)) continue;
+    numbers.push(clean(el.innerText).slice(0, 80));
+  }
+  return { numbers, noResults: new RegExp(patterns.noResultsRe, 'i').test(root.innerText) };
+}
+
+// Runs in the page: focuses the first visible search box and selects its text, so typing replaces it.
+function focusSearchInPage(selector) {
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== 'hidden';
+  };
+  const el = [...document.querySelectorAll(selector)].find(visible);
+  if (!el) return false;
+  el.scrollIntoView({ block: 'center' });
+  el.focus();
+  if (typeof el.select === 'function') el.select();
+  return document.activeElement === el;
+}
+
+// Runs in the page: the centre of the action controlsInPage marked, scrolled into view.
+function confirmTargetInPage() {
+  const el = document.querySelector('[data-eaui-confirm]');
+  if (!el) return null;
+  el.scrollIntoView({ block: 'center' });
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+
+// Runs in the page: whether a dialog shows.
+function dialogInPage() {
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+  };
+  return [...document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open]')].some(visible);
+}
+
+// Runs in the page, in print media: what would print.
+function printInPage() {
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none';
+  };
+  return {
+    h1: [...document.querySelectorAll('h1')].some(visible),
+    nav: [...document.querySelectorAll('nav, aside, [role="navigation"]')].filter(visible).length,
+    buttons: [...document.querySelectorAll('button')].filter(visible).length,
+  };
 }
 
 // Resolves true once busy() has been false for quietMs, or false after timeoutMs.
@@ -678,8 +855,15 @@ async function evaluate(send, expression, awaitPromise = false, timeoutMs = CALL
   return result.value;
 }
 
+// The benchmark's light colour scheme, in screen and in print media.
+const MEDIA_FEATURES = Object.freeze([
+  { name: 'prefers-color-scheme', value: 'light' },
+  { name: 'prefers-reduced-motion', value: 'no-preference' },
+]);
+
 // Opens url in a new tab of its own browser context (no storage or cookies from other targets), waits for it to load
-// and settle, and returns work(send, { loadingPlaceholders }). The tab and its context close afterwards.
+// and settle, and returns work(send, { loadingPlaceholders, dialogs }); dialogs() counts the alert(), confirm() and
+// prompt() dialogs the page has opened (each is dismissed). The tab and its context close afterwards.
 async function withPage(browser, url, { waitForPlaceholders = true } = {}, work) {
   const { browserContextId } = await browser.send('Target.createBrowserContext');
   try {
@@ -690,11 +874,13 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
 
     let navigating = false;
     let response = null;
+    let dialogs = 0;
     const inflight = new Set();
     const offEvents = browser.on((message) => {
       if (!ours(message)) return;
       const { method, params } = message;
       if (method === 'Page.javascriptDialogOpening') {
+        dialogs++;
         send('Page.handleJavaScriptDialog', { accept: false }).catch(() => {}); // as Playwright does with no dialog handler
       } else if (method === 'Network.requestWillBeSent') {
         inflight.add(params.requestId);
@@ -709,13 +895,7 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
       await send('Page.enable');
       await send('Network.enable');
       await send('Emulation.setDeviceMetricsOverride', { ...VIEWPORT, deviceScaleFactor: 1, mobile: false, screenWidth: VIEWPORT.width, screenHeight: VIEWPORT.height });
-      await send('Emulation.setEmulatedMedia', {
-        media: '',
-        features: [
-          { name: 'prefers-color-scheme', value: 'light' },
-          { name: 'prefers-reduced-motion', value: 'no-preference' },
-        ],
-      });
+      await send('Emulation.setEmulatedMedia', { media: '', features: MEDIA_FEATURES });
       await send('Emulation.setFocusEmulationEnabled', { enabled: true });
 
       navigating = true;
@@ -736,7 +916,7 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
 
       const settle = { ...SETTLE, waitForPlaceholders };
       const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(settle)})`, true, SETTLE_TIMEOUT_MS);
-      return await work(send, { loadingPlaceholders });
+      return await work(send, { loadingPlaceholders, dialogs: () => dialogs });
     } finally {
       loaded.cancel();
       offEvents();
@@ -769,15 +949,94 @@ async function auditState(browser, target, state, base) {
   return { state, url: target, ok, problems, details, error: null };
 }
 
+// After typing or clicking: wait for a debounced handler, then for the page to settle again.
+const AFTER_ACTION = { quietMs: 300, capMs: 3000 };
+async function settleAfterAction(send, ms) {
+  await delay(ms);
+  await evaluate(send, `(${settleInPage})(${JSON.stringify(AFTER_ACTION)})`, true, SETTLE_TIMEOUT_MS);
+}
+
+const controlsOf = (send) => evaluate(send, `(${controlsInPage})(${JSON.stringify(PATTERNS)})`);
+
+// The read-only checks, from one tab: the controls, then what prints (print media last, as it changes the page).
+function readControls(browser, url) {
+  return withPage(browser, url, {}, async (send) => {
+    const controls = await controlsOf(send);
+    controls.printed = null;
+    if (controls.print) {
+      await send('Emulation.setEmulatedMedia', { media: 'print', features: MEDIA_FEATURES });
+      controls.printed = await evaluate(send, `(${printInPage})()`);
+    }
+    return controls;
+  });
+}
+
+// Types a search that matches nothing into the first search box, as a person would, and compares the page before and after.
+function searchCheck(browser, url, pageType) {
+  return withPage(browser, url, {}, async (send) => {
+    const read = async () => ({
+      ...(await evaluate(send, `(${countsInPage})(${JSON.stringify(PATTERNS)})`)),
+      rows: (await evaluate(send, `(${snapshotInPage})()`)).rows,
+    });
+    const before = await read();
+    if (!(await evaluate(send, `(${focusSearchInPage})(${JSON.stringify(PATTERNS.search)})`))) return judgeSearch({ found: false });
+    await send('Input.insertText', { text: NO_MATCH_QUERY });
+    await settleAfterAction(send, 700);
+    return judgeSearch({ found: true, before, after: await read(), pageType });
+  });
+}
+
+// Clicks the first destructive action with the mouse and looks for a dialog, or the browser's confirm().
+function confirmCheck(browser, url) {
+  return withPage(browser, url, {}, async (send, { dialogs }) => {
+    const { destructive } = await controlsOf(send);
+    const point = destructive ? await evaluate(send, `(${confirmTargetInPage})()`) : null;
+    if (!point) return judgeConfirm({ label: null });
+    const before = dialogs();
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    await settleAfterAction(send, 400);
+    const dialog = await evaluate(send, `(${dialogInPage})()`);
+    return judgeConfirm({ label: destructive, dialog, native: dialogs() > before });
+  });
+}
+
+// The five checks of CHECKS, in order, each tab under the same per-page time limit. A check that fails to run gets an error.
+async function behaviourChecks(limited, url, pageType) {
+  const failed = (check, err) => ({ check, ok: false, skipped: false, problems: [], note: '', error: err.message });
+  let controls;
+  try {
+    controls = await limited((b) => readControls(b, url));
+  } catch (err) {
+    return CHECKS.map((check) => failed(check, err));
+  }
+  const attempt = async (check, work) => {
+    try {
+      return await limited(work);
+    } catch (err) {
+      return failed(check, err);
+    }
+  };
+  return [
+    controls.search ? await attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false }),
+    judgeExport(controls.exports),
+    judgePrint(controls.printed),
+    controls.destructive ? await attempt('confirm', (b) => confirmCheck(b, url)) : judgeConfirm({ label: null }),
+    judgeLive(controls.live),
+  ];
+}
+
 // One browser for all targets, a new tab for each. A target that fails gets an error; a browser that cannot start rejects.
-// With states, each page that was audited is also opened with ?state=empty, error and loading. Each page and each state
-// gets at most timeoutS; one that takes longer may have hung the browser, so it is stopped and a new one started.
-export async function auditTargets(targets, { pageType = null, browser: executable, states = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
+// With states, each page that was audited is also opened with ?state=empty, error and loading; with checks, it gets the
+// behaviour checks. Each page, state and check tab gets at most timeoutS; one that takes longer may have hung the
+// browser, so it is stopped and a new one started.
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
-      return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null };
+      return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null, checks: null };
     } catch (err) {
-      return { target, url: null, error: err.message, loadingPlaceholders: 0, result: null, states: null };
+      return { target, url: null, error: err.message, loadingPlaceholders: 0, result: null, states: null, checks: null };
     }
   });
   const todo = pages.filter((p) => !p.error);
@@ -823,16 +1082,18 @@ export async function auditTargets(targets, { pageType = null, browser: executab
         page.error = err.message;
         continue;
       }
-      if (!states) continue;
-      page.states = [];
-      for (const state of STATES) {
-        const url = stateUrl(page.url, state);
-        try {
-          page.states.push(await limited((b) => auditState(b, url, state, base)));
-        } catch (err) {
-          page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message });
+      if (states) {
+        page.states = [];
+        for (const state of STATES) {
+          const url = stateUrl(page.url, state);
+          try {
+            page.states.push(await limited((b) => auditState(b, url, state, base)));
+          } catch (err) {
+            page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message });
+          }
         }
       }
+      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType);
     }
   } finally {
     if (browser) await browser.close();
@@ -842,7 +1103,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
 
 // ------------------------------------------------------------------ command line
 
-const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--json] [--strict] [--browser <path>]
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks] [--json] [--strict] [--browser <path>]
 
 Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
 
@@ -853,6 +1114,10 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --states           also open the page with ?state=empty, ?state=error and ?state=loading and check each state:
                      a changed page; empty: no data rows and an action of its own; error: a role="alert" message
                      and Retry; loading: a skeleton. For pages with mock data, as SKILL.md asks
+  --checks           also use the page as a person would and check what SKILL.md asks of its behaviour: a search that
+                     matches nothing empties the list, says so and (on a list) changes the count; Export names its
+                     count; Print hides navigation and buttons and keeps the title; Delete opens a dialog first; a
+                     role="status" region exists. A check the page gives no control for is skipped
   --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
@@ -892,7 +1157,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, timeoutS: opts.timeout });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;

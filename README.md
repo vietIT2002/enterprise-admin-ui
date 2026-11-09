@@ -178,11 +178,10 @@ If your project already has a design system or a customised component library, t
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            250 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
+├─ SKILL.md            249 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         17 files, loaded only when the task needs them
 ├─ scripts/audit.js    dependency-free browser audit, 22 rules, score 0–100
-├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies
-├─ scripts/check.mjs   optional: behaviour checks in Chromium (Playwright), one line per problem
+├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies; --states and --checks test the states and behaviour
 └─ assets/
    ├─ templates/           optional single-file list, detail and form pages
    ├─ tokens.css           shadcn-compatible tokens, light and dark, Tailwind v4 @theme
@@ -313,7 +312,7 @@ The skills work together. Use an aesthetics skill for the marketing site and thi
 
 **Will it fight my design system?** No. A project design system or customised component library always wins; the skill then applies only layout, state and behaviour rules. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
 
-**How many tokens does it cost?** `SKILL.md` is 250 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
+**How many tokens does it cost?** `SKILL.md` is 249 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
 
 **Does it handle Vietnamese and other locales?** Yes. Formatting goes through `Intl` with the project locale. `data-formatting.md` has a vi-VN profile:
 - `1.250.000 ₫`;
