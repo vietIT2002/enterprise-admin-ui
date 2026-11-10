@@ -1,3 +1,7 @@
 node_modules/
 test-results/
 playwright-report/
+tests/next-build/node_modules/
+tests/next-build/.next/
+tests/next-build/app/
+tests/next-build/next.config.mjs

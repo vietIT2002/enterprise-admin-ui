@@ -1,0 +1,10 @@
+{
+  "name": "next-build-fixture",
+  "private": true,
+  "description": "Fixture for tools/check-next-build.mjs. The app/ folder and next.config.mjs are generated per build.",
+  "dependencies": {
+    "next": "16.4.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  }
+}
