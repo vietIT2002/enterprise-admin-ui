@@ -18,7 +18,7 @@ People use management software all day to find records, change them safely and s
 ## Workflow
 
 1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md`, filling product, roles, locale and status vocabulary from the user or the code. A single standalone file needs no DESIGN.md.
-2. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, export, approval, a background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
+2. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, server-side export, approval, background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
 3. **Pick the page type** below and build its anatomy in order.
 4. **Apply** States, Saving, Tables and Foundations.
 5. **Verify** with the audit and the checklist at the end.
