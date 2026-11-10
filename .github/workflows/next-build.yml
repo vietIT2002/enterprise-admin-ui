@@ -1,0 +1,46 @@
+name: Next.js build
+
+# Builds the fixture in tests/next-build and checks the build rules SKILL.md states.
+# On demand: leave `next` empty for the pinned version, or give a version or tag.
+# Weekly: builds against next@latest, to catch drift in newer releases.
+on:
+  workflow_dispatch:
+    inputs:
+      next:
+        description: 'Next.js version or tag to build against (empty = the pinned version)'
+        required: false
+        default: ''
+        type: string
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  next-build:
+    name: Next.js build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install the fixture
+        run: npm ci --prefix tests/next-build
+
+      - name: Check the Next.js build rules
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          NEXT_INPUT: ${{ inputs.next }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            npm run check:next -- --next latest
+          elif [ -n "$NEXT_INPUT" ]; then
+            npm run check:next -- --next "$NEXT_INPUT"
+          else
+            npm run check:next
+          fi
