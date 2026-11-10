@@ -14,9 +14,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), '..', 'tests', 'next-build');
 const PASS = { pass: true };
-// next 16.4 words this as "`useSearchParams()` in a Client Component outside of `<Suspense>`"; older versions as "should be wrapped".
-const SUSPENSE_CSR =
-  /useSearchParams\(\)` in a Client Component outside of|blocking-prerender-client-hook|useSearchParams\(\) should be wrapped in a suspense boundary|missing-suspense-with-csr-bailout/;
+// next 16.4.6 words the bare-client failure per mode: flag on "`useSearchParams()` in a Client Component outside of `<Suspense>`", flag off "should be wrapped in a suspense boundary".
+const SUSPENSE_ON = /useSearchParams\(\)` in a Client Component outside of|blocking-prerender-client-hook/;
+const SUSPENSE_OFF = /useSearchParams\(\) should be wrapped in a suspense boundary|missing-suspense-with-csr-bailout/;
 
 // route maps a file in the route folder to its source in cases/. results holds the expected outcome per mode.
 export const CASES = [
@@ -43,14 +43,14 @@ export const CASES = [
   {
     id: 'bare-client',
     route: { 'page.jsx': 'cases/bare-client.jsx', 'state-reader.jsx': 'cases/state-reader.jsx' },
-    results: { on: { pass: false, error: SUSPENSE_CSR }, off: { pass: false, error: SUSPENSE_CSR } },
+    results: { on: { pass: false, error: SUSPENSE_ON }, off: { pass: false, error: SUSPENSE_OFF } },
   },
 ];
 
 class SetupError extends Error {}
 
 const npm = (args, cwd) => {
-  const r = spawnSync('npm', args, { cwd, shell: true, stdio: 'inherit' });
+  const r = spawnSync('npm', args, { cwd, shell: process.platform === 'win32', stdio: 'inherit' });
   if (r.status !== 0) throw new SetupError(`npm ${args.join(' ')} failed`);
 };
 
@@ -104,15 +104,15 @@ function run(dir) {
 }
 
 export function main(argv) {
-  const at = argv.indexOf('--next');
-  const version = at >= 0 ? argv[at + 1] : null;
-  if (at >= 0 && !version) throw new SetupError('--next needs a version');
   let dir = FIXTURE;
   let temp = null;
   try {
+    const at = argv.indexOf('--next');
+    const version = at >= 0 ? (argv[at + 1] ?? '').trim() : null;
+    if (at >= 0 && !/^[\w.+-]+$/.test(version)) throw new SetupError(`--next needs a version such as 16.4.6 or latest, got "${argv[at + 1] ?? ''}"`);
     if (version) {
       temp = mkdtempSync(join(tmpdir(), 'next-build-'));
-      cpSync(FIXTURE, temp, { recursive: true, filter: (s) => !/[\/](node_modules|\.next|app)$/.test(s) });
+      cpSync(FIXTURE, temp, { recursive: true, filter: (s) => !/[\\/](node_modules|\.next|app)$/.test(s) });
       dir = temp;
       npm(['install', '--no-audit', '--no-fund', `next@${version}`], dir);
     } else if (!existsSync(join(dir, 'node_modules/next'))) {

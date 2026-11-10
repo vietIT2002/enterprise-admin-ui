@@ -71,7 +71,7 @@ So:
   | same, plus `loading.jsx` | pass | pass |
   | sync page, `<Suspense>` around a client component using `useSearchParams()` (the skill's pattern) | pass | pass |
   | sync page, `<Suspense>` around an async child awaiting `searchParams` | pass | pass |
-  | client component using `useSearchParams()` with no Suspense, prerendered route | fail (16.4.6: "Next.js encountered URL data `useSearchParams()` in a Client Component outside of `<Suspense>`") | fail |
+  | client component using `useSearchParams()` with no Suspense, prerendered route | fail (16.4.6: "Next.js encountered URL data `useSearchParams()` in a Client Component outside of `<Suspense>`") | fail (16.4.6: "`useSearchParams()` should be wrapped in a suspense boundary") |
 
 - The passing cases share one build per mode. Each expected failure gets a build of its own, so one failing route cannot hide another. That is about five builds in all.
 - Root `package.json` gets `"check:next": "node tools/check-next-build.mjs"`. `--next <version>` overrides the pinned version (it installs into a temporary copy).
