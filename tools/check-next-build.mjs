@@ -7,7 +7,7 @@
 //
 // Exit codes: 0 every case matches, 1 a mismatch, 2 a setup error (install, timeout).
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, copyFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -118,6 +118,8 @@ export function main(argv) {
     } else if (!existsSync(join(dir, 'node_modules/next'))) {
       npm(['ci', '--no-audit', '--no-fund'], dir);
     }
+    const installed = JSON.parse(readFileSync(join(dir, 'node_modules/next/package.json'), 'utf8')).version;
+    console.log(`next ${installed} (cacheComponents on/off matrix)`);
     const rows = run(dir);
     for (const r of rows) {
       const want = r.want.pass ? 'pass' : 'fail';
