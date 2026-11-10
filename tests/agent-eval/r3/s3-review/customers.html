@@ -274,8 +274,9 @@
     const ed = e.target.closest('[data-edit]');
     if (ed) {
       const c = customers.find((x) => x.id === ed.dataset.edit);
+      if (c === editing) { $('company').focus(); return; } // already editing this record: keep the input
       const go = () => { fillForm(c); $('company').focus(); };
-      if (dirty && c !== editing) discardDialog(`you open ${c.company}`, go, ed); else go();
+      if (dirty) discardDialog(`you open ${c.company}`, go, ed); else go();
       return;
     }
     const del = e.target.closest('[data-delete]');
