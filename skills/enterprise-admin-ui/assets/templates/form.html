@@ -16,7 +16,8 @@
   Keep:
   - one field per row with the label above it, and the input type that matches the value;
   - the error summary that takes focus, inline errors linked with aria-describedby;
-  - the sticky Cancel · Save draft · Save bar, the unsaved-changes guard and the role="status" region.
+  - the sticky Cancel · Save bar, the unsaved-changes guard and the role="status" region.
+  Save draft is optional: keep it only if the product stores drafts (a Draft status and an API that saves one) or the user asks. Otherwise delete the Save draft button, its click handler and the discard dialog's "Save a draft to keep them." Keep the #draft-status span, which also shows "Unsaved changes" (rename it, e.g. #save-status, if no drafts).
   The page scrolls the window, so the sticky bar sticks (no overflow-y-auto on the shell).
 -->
 <div class="flex min-h-screen">

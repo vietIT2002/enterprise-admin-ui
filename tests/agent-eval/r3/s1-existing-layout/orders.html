@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders · Northwind Distribution</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [hidden] { display: none !important; }
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-white text-sm text-slate-900 antialiased">
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-slate-200 bg-slate-50">
+    <div class="flex h-12 items-center px-4 font-semibold">Northwind</div>
+    <nav aria-label="Main" class="px-2 pb-4">
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Sales</p>
+      <a href="#" aria-current="page" class="flex h-8 items-center rounded bg-slate-200 px-2 font-medium">Orders</a>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Customers</a>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1 px-6 py-4">
+    <header class="flex items-center justify-between gap-4">
+      <h1 class="text-xl font-semibold">Orders</h1>
+      <button type="button" id="btn-create" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Create order</button>
+    </header>
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <input type="search" id="q" aria-label="Search orders by number or customer" placeholder="Search number or customer" class="h-8 w-72 rounded border border-slate-300 px-2">
+      <div id="chips" class="flex flex-wrap items-center gap-1"></div>
+    </div>
+
+    <p class="mt-3 text-slate-600" data-result-count><span id="result-count" class="tnum">0</span> orders</p>
+
+    <section data-region="orders" class="mt-2" aria-label="Orders">
+      <div data-state="ready" class="overflow-x-auto rounded-md border border-slate-200">
+        <table class="w-full border-collapse">
+          <caption class="sr-only">Orders</caption>
+          <thead class="bg-slate-50 text-slate-700">
+            <tr class="h-10 border-b border-slate-200">
+              <th scope="col" class="px-3 text-left font-medium">Order</th>
+              <th scope="col" class="px-3 text-left font-medium">Customer</th>
+              <th scope="col" class="px-3 text-left font-medium">Date</th>
+              <th scope="col" class="px-3 text-left font-medium">Status</th>
+              <th scope="col" class="px-3 text-right font-medium">Total (USD)</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div data-state="empty" hidden class="rounded-md border border-dashed border-slate-300 px-6 py-10 text-center">
+        <p class="font-medium" id="empty-title">No orders match this search</p>
+        <p class="mt-1 text-slate-600" id="empty-text">Try another search, or clear it.</p>
+        <button type="button" id="empty-action" class="mt-3 h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Clear search</button>
+      </div>
+      <div data-state="loading" aria-busy="true" hidden class="rounded-md border border-slate-200" aria-label="Loading orders">
+        <div class="h-10 border-b border-slate-200 bg-slate-50"></div>
+        <div id="skeleton"></div>
+      </div>
+      <div data-state="error" hidden class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+        <p class="font-medium">Orders could not be loaded.</p>
+        <p class="mt-1">Check your connection, then try again.</p>
+        <button type="button" id="retry" class="mt-2 h-8 rounded border border-red-300 bg-white px-3 text-red-800 hover:bg-red-100">Retry</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-4 right-4 z-50"></div>
+
+<script>
+  const LOCALE = 'en-US';
+  const CURRENCY = 'USD';
+  const fmtAmount = (n) => new Intl.NumberFormat(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  const fmtCount = (n) => new Intl.NumberFormat(LOCALE).format(n);
+  const fmtDate = (iso) => new Intl.DateTimeFormat(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso + 'T00:00:00'));
+
+  // Mock data.
+  const CUSTOMERS = [
+    ['Minh Phat Co.', 'purchasing@minhphat.example'],
+    ['Hoa Binh Trading', 'orders@hoabinh.example'],
+    ['An Khang Pharmacy', 'accounts@ankhang.example'],
+    ['Northwind Retail', 'buyers@northwindretail.example'],
+    ['Blue Lotus Hotel', 'supply@bluelotus.example'],
+    ['Saigon Steel', 'procurement@saigonsteel.example'],
+  ];
+  const STATUSES = ['Pending', 'Shipped', 'Delivered', 'Cancelled'];
+  const TONE = { Pending: 'bg-blue-50 text-blue-800', Shipped: 'bg-blue-50 text-blue-800', Delivered: 'bg-green-50 text-green-800', Cancelled: 'bg-red-50 text-red-800' };
+  let orders = Array.from({ length: 24 }, (_, i) => ({
+    id: 'SO-' + (2001 + i),
+    customer: CUSTOMERS[(i * 5) % CUSTOMERS.length][0],
+    email: CUSTOMERS[(i * 5) % CUSTOMERS.length][1],
+    date: new Date(Date.UTC(2026, 10, 9 - Math.floor(i / 2))).toISOString().slice(0, 10),
+    status: STATUSES[(i * 7) % STATUSES.length],
+    total: Math.round(((i * 7919) % 4800) * 10.5 + 120),
+  }));
+
+  const params = new URLSearchParams(location.search);
+  const forced = params.get('state'); // ?state=empty|loading|error shows that state
+  const ui = { q: params.get('q') || '' };
+  if (forced === 'empty') orders = [];
+
+  const $ = (id) => document.getElementById(id);
+  const announce = (text) => { $('toast').innerHTML = `<div class="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md">${text}</div>`; clearTimeout(announce.t); announce.t = setTimeout(() => ($('toast').innerHTML = ''), 6000); };
+  const show = (state) => document.querySelectorAll('[data-region="orders"] [data-state]').forEach((e) => (e.hidden = e.dataset.state !== state));
+
+  function matching() {
+    const q = ui.q.trim().toLowerCase();
+    return orders.filter((o) => !q || (o.id + ' ' + o.customer).toLowerCase().includes(q));
+  }
+  function syncUrl() {
+    const p = new URLSearchParams();
+    if (ui.q) p.set('q', ui.q);
+    if (forced) p.set('state', forced);
+    history.replaceState(null, '', p.toString() ? '?' + p : location.pathname);
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  function renderChips() {
+    $('chips').innerHTML = ui.q
+      ? `<span class="inline-flex h-6 items-center gap-1 rounded-full bg-slate-100 pl-2 pr-1 text-slate-700">Search: ${esc(ui.q)}<button type="button" data-chip="q" class="h-6 w-6 rounded-full hover:bg-slate-200" aria-label="Remove filter Search: ${esc(ui.q)}">×</button></span><button type="button" id="clear-all" class="h-6 px-2 text-blue-700 underline">Clear all</button>`
+      : '';
+  }
+  function render() {
+    syncUrl();
+    renderChips();
+    const list = matching();
+    $('result-count').textContent = fmtCount(list.length);
+    if (!list.length) {
+      const firstUse = orders.length === 0;
+      $('empty-title').textContent = firstUse ? 'No orders yet' : 'No orders match this search';
+      $('empty-text').textContent = firstUse ? 'Orders appear here when you create one.' : 'Try another search, or clear it.';
+      $('empty-action').textContent = firstUse ? 'Create order' : 'Clear search';
+      show('empty');
+      return;
+    }
+    show('ready');
+    $('rows').innerHTML = list.map((o) => `<tr class="h-[52px] border-b border-slate-200 last:border-0 hover:bg-slate-50">
+        <td class="whitespace-nowrap px-3"><a href="#${o.id}" class="text-blue-700 hover:underline">${o.id}</a></td>
+        <td class="px-3"><div class="font-medium">${o.customer}</div><div class="text-xs"><a href="mailto:${o.email}" class="text-slate-600 hover:underline">${o.email}</a></div></td>
+        <td class="tnum whitespace-nowrap px-3">${fmtDate(o.date)}</td>
+        <td class="px-3"><span class="inline-flex h-6 items-center whitespace-nowrap rounded-full px-2 text-xs font-medium ${TONE[o.status]}">${o.status}</span></td>
+        <td class="tnum whitespace-nowrap px-3 text-right">${fmtAmount(o.total)}</td>
+      </tr>`).join('');
+  }
+  function clearSearch() { ui.q = ''; $('q').value = ''; render(); $('q').focus(); }
+
+  let qTimer;
+  $('q').addEventListener('input', (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { ui.q = e.target.value; render(); }, 250); });
+  $('chips').addEventListener('click', (e) => { if (e.target.closest('[data-chip]') || e.target.id === 'clear-all') clearSearch(); });
+  $('empty-action').addEventListener('click', () => (orders.length ? clearSearch() : $('btn-create').click()));
+  $('btn-create').addEventListener('click', () => announce('Create order is not connected in this mock.'));
+  $('retry').addEventListener('click', () => { location.search = ''; });
+
+  $('skeleton').innerHTML = Array.from({ length: 8 }, () => '<div class="flex h-[52px] items-center gap-4 border-b border-slate-200 px-3"><div class="h-3 w-24 rounded bg-slate-200"></div><div class="h-3 w-48 rounded bg-slate-200"></div><div class="ml-auto h-3 w-20 rounded bg-slate-200"></div></div>').join('');
+  $('q').value = ui.q;
+  if (forced === 'loading' || forced === 'error') { show(forced); $('result-count').textContent = '—'; }
+  else { show('loading'); setTimeout(render, 400); }
+</script>
+</body>
+</html>

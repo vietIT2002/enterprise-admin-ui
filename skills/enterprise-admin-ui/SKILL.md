@@ -18,7 +18,7 @@ People use management software all day to find records, change them safely and s
 ## Workflow
 
 1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md`, filling product, roles, locale and status vocabulary from the user or the code. A single standalone file needs no DESIGN.md.
-2. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see.
+2. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, server-side export, approval, background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
 3. **Pick the page type** below and build its anatomy in order.
 4. **Apply** States, Saving, Tables and Foundations.
 5. **Verify** with the audit and the checklist at the end.
@@ -59,7 +59,7 @@ These are the parts most often left out. Build them even for a quick draft:
 1. One column in titled sections: one field per row. The only exception is two short fields that read as one value (City · Postal code, First name · Last name). Never put three fields in a row or lay unrelated fields out on a grid. Visible labels above fields (`<label class="block">`: an inline label sits beside a narrow field), `*` on required fields, field widths sized to their content, and the input type that matches the value (`email`, `tel`, `date`).
 2. Line items (invoice, order): a table with add/remove row, numbers right-aligned with tabular figures, subtotal, tax and total computed below and right-aligned.
 3. Every full-page form keeps Save and Cancel in a sticky bottom bar (`sticky bottom-0 border-t bg-card`, no shadow), Cancel then Save at the right; saving follows the Saving section. The bar only sticks if its scrolling ancestor is the one that scrolls: no `overflow-y-auto` on a `min-h-screen` shell (audit `sticky-inert`).
-4. A form with three or more sections also offers "Save draft" in that bar, between Cancel and Save. A draft keeps the record in Draft status, skips the required-field checks until the final submit, and shows "Draft saved 15:58".
+4. "Save draft" is optional: offer it, between Cancel and Save, only when the product stores drafts (a Draft status and an API that saves one) or the user asks for it. A draft keeps the record in Draft status, skips the required-field checks until the final submit, and shows "Draft saved 15:58".
 
 ### Dashboard
 1. Header: title + date-range control + "Updated 16:30". The header has no greeting and no hero.
