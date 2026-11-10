@@ -140,7 +140,7 @@ Design every state of every data region:
 | Long job (>10 s) | Progress with counts ("Importing 340 of 1.200"), continues in the background, ends with a summary |
 | Partial failure | "48 updated, 2 failed" + the failed items |
 
-**Mock data:** when the page uses mock data, build every state in code and reach each one through the URL. In Next.js, read the parameter in a client component under `<Suspense>`, as `react-shadcn.md` shows; a page that awaits `searchParams` fails `next build`.
+**Mock data:** when the page uses mock data, build every state in code and reach each one through the URL. In Next.js, read it in a client component under `<Suspense>` (`react-shadcn.md`); with `cacheComponents` on in `next.config`, a page that awaits `searchParams` needs `<Suspense>` above it (`loading.tsx` counts) or `next build` fails. Keep a server page that already builds.
 - no parameter: a skeleton on first load that resolves to data within about 500 ms; a filter that matches nothing shows the no-results state;
 - `?state=empty`: the empty state with its next action;
 - `?state=error`: the error state with Retry;

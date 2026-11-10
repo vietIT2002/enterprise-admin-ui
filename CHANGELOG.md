@@ -24,6 +24,7 @@ All notable changes to this project are documented here. The format follows [Kee
   It is not part of the workflow (benchmark SCREEN-A).
 
 ### Fixed
+- SKILL.md and `react-shadcn.md` said a Next.js page that awaits `searchParams` fails `next build`. That holds only with `cacheComponents` on and nothing above the page suspending; with it off the page builds. Both now check `cacheComponents` first, list the fixes and say to keep a server page that already builds. `npm run check:next` builds five routes with the flag on and off against a pinned `next` to back each claim; it is not part of `npm test`.
 - `audit-cli.mjs --states` no longer counts label–value rows as data rows. Such a row is a row header with one value ("Customer | Minh Phat"), so a detail page whose related lists are empty now passes `?state=empty`.
 
 ### Docs

@@ -67,11 +67,11 @@ So:
 
   | Case | Flag on | Flag off |
   |---|---|---|
-  | page awaits `searchParams`, nothing suspends | fail ("Uncached data … outside of `<Suspense>`") | pass |
+  | page awaits `searchParams`, nothing suspends | fail (next 16.4.6: "Next.js encountered uncached or runtime data during prerendering") | pass |
   | same, plus `loading.jsx` | pass | pass |
   | sync page, `<Suspense>` around a client component using `useSearchParams()` (the skill's pattern) | pass | pass |
   | sync page, `<Suspense>` around an async child awaiting `searchParams` | pass | pass |
-  | client component using `useSearchParams()` with no Suspense, prerendered route | expected fail; record the actual result | expected fail; record the actual result |
+  | client component using `useSearchParams()` with no Suspense, prerendered route | fail (16.4.6: "Next.js encountered URL data `useSearchParams()` in a Client Component outside of `<Suspense>`") | fail |
 
 - The passing cases share one build per mode. Each expected failure gets a build of its own, so one failing route cannot hide another. That is about five builds in all.
 - Root `package.json` gets `"check:next": "node tools/check-next-build.mjs"`. `--next <version>` overrides the pinned version (it installs into a temporary copy).
