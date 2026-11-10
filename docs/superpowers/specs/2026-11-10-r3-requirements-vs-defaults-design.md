@@ -1,6 +1,6 @@
 # Separate requirements from defaults, and keep what the app already does (roadmap R3)
 
-Status: proposed, 2026-11-10. Medium-sized.
+Status: narrowed after baseline; implemented as in "Scope after baseline". 2026-11-10. Medium-sized.
 
 ## Why
 
@@ -137,7 +137,7 @@ Constraint: the measured gain (checklist 19% → 44%) comes partly from these st
 
 ## Scope after baseline (2026-11-10)
 
-The baseline with the released skill gave S1 PASS, S3 PASS, S4 100/100 twice, and S2 FAIL: the agent added "Save draft" "because the form has four sections" and saved with a "Draft" status that the product's DESIGN.md and api.js do not have. The user decided to narrow the change to what the evidence needs: Save draft becomes optional (SKILL.md form step 4, forms.md, the form.html comment), SKILL.md workflow step 2 gains a product-capability check, and CHANGELOG records it. The other Design -> Text items (decision order, Required/Defaults split, Review mode, tables.md Density, forms.md Layout) are deferred, not done.
+The baseline with the released skill gave S1 PASS, S3 PASS, S4 100/100 twice, and S2 FAIL: the agent added "Save draft" "because the form has four sections" and saved with a "Draft" status that the product's DESIGN.md and api.js do not have. The user decided to narrow the change to what the evidence needs: Save draft becomes optional (SKILL.md form step 4, forms.md, the form.html comment), SKILL.md workflow step 2 gains a product-capability check, and CHANGELOG records it. The other Design -> Text items (decision order, Required/Defaults split, Review mode, tables.md Density, forms.md Layout) are deferred, not done. SKILL.md growth is capped at 60 words (the original budget allowed about 150).
 
 ## Builder's calls
 

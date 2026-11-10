@@ -1,6 +1,12 @@
 # R3 A/B scenarios
 
-Four scenarios, each run with the released skill (`main`, extracted with `git archive`) and with the candidate. Each run gets a fresh copy of its fixture folder. The agent under test sees only the run prompt template with `{TASK}` filled in. It never sees the "Pass when" and "Grade" sections.
+Four scenarios, each run with the baseline (commit `3a0e86f`, the pre-R3 `main`, extracted with `git archive`) and with the candidate (the commit under test). Each run gets a fresh copy of its fixture folder. The agent under test sees only the run prompt template with `{TASK}` filled in. It never sees the "Pass when" and "Grade" sections.
+
+## Isolation rules
+
+- Run from copies outside the repo, in folders with neutral names (`k1`, `w01`), so a path never says which version it holds.
+- Use the same model for both versions.
+- Give each run its OWN parent folder. The first run shared one parent `ws/`, so a run could have listed sibling runs or skill copies.
 
 ## Run prompt template
 
@@ -29,7 +35,7 @@ Grade:
 - `diff -rq <fixture> <run>` lists only `orders.html`.
 - Judge criterion 1 by reading the code: the filter's markup exists, and its handler filters the rows and the count by status and can be cleared. A static check is enough. Running the page in a browser is optional.
 
-Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs s1-existing-layout/orders.html --type list` reports `table-row-two-line` (intended: this is the product's convention). Everything else passes. `table-row-height` did not fire on the fixture.
+Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs tests/agent-eval/r3/s1-existing-layout/orders.html --type list` reports `table-row-two-line` (intended: this is the product's convention). Everything else passes. `table-row-height` did not fire on the fixture.
 
 ## S2 no draft support
 
@@ -43,7 +49,7 @@ Pass when:
 3. The required form rules are still met: visible labels, error summary that moves focus to the first invalid field, inline errors, input kept when the save fails, unsaved-changes warning, `role="status"` / `role="alert"` announcements.
 
 Grade:
-- `grep -niE "save draft|draft" <run>/*.html <run>/*.js` over every output file. Any hit in the page is a fail, except a comment or text that says drafts are not supported.
+- `grep -niE "save draft|draft" <run>/*.html <run>/*.js` over every output file. A visible draft control, draft text or draft handler in the page is a fail, except a comment or text that says drafts are not supported. An identifier with no visible draft text (the template's `id="draft-status"` showing "Unsaved changes") is judged by reading.
 - Read the reply for "draft"; a mention must say the capability is missing.
 - `node <repo>/skills/enterprise-admin-ui/scripts/audit-cli.mjs <run>/<page>.html --type form --checks --disposable` and note the score. Criterion 3 is judged by reading the code: the form calls `window.OrdersApi.createOrder`, and it keeps its fields when the promise rejects.
 
@@ -70,8 +76,9 @@ Grade:
   - Criterion 2 holds when a finding names the cleared form after a failed save and reports it as a defect.
   - Criterion 3 fails when the two-column grid, the two-line cell or the 52px row height is reported as a defect.
 - Extra findings are recorded in the results but do not affect pass or fail.
+- Known non-graded extras, so a re-run does not mistake them for unplanned defects: "Saving…" without a spinner, untitled form sections, no list search, the Phone · Email pair against the "one value" exception, `#dirty-status` without `role="status"`, blur validating both fields, a stale form title after save, "0 customers" while loading, and delete-while-dirty of the record being edited.
 
-Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs s3-review/customers.html --type form --checks --disposable` reports only `table-row-two-line` (the convention), `confirm` passes, and the live regions pass.
+Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs tests/agent-eval/r3/s3-review/customers.html --type form --checks --disposable` reports only `table-row-two-line` (the convention), `confirm` passes, and the live regions pass.
 
 ## S4 new screen
 

@@ -24,7 +24,7 @@ All notable changes to this project are documented here. The format follows [Kee
   It is not part of the workflow (benchmark SCREEN-A).
 
 ### Changed
-- Save draft is now optional. The old rule added it to any form with three or more sections; it is now offered only when the product stores drafts (a Draft status and an API that saves one) or the user asks. SKILL.md workflow step 2 also says to check that the product supports a workflow-changing action before adding it. In a 4-scenario A/B, the released skill added Save draft and an invented Draft status to a form whose product has no drafts.
+- Save draft is now optional. The old rule added it to any form with three or more sections; it is now offered only when the product stores drafts (a Draft status and an API that saves one) or the user asks. SKILL.md workflow step 2 also says to check that the product supports a workflow-changing action before adding it. In a 4-scenario A/B, the released skill added Save draft and an invented Draft status to a form whose product has no drafts. The candidate passed all four scenarios; report: `docs/superpowers/evals/2026-11-10-r3-ab.md`.
 
 ### Fixed
 - SKILL.md and `react-shadcn.md` said a Next.js page that awaits `searchParams` fails `next build`. That holds only with `cacheComponents` on and nothing above the page suspending; with it off the page builds. Both now check `cacheComponents` first and say to keep a server page that already builds; the reference lists the fixes, SKILL.md states the condition. `npm run check:next` builds five routes with the flag on and off against a pinned `next` to back each claim; it is not part of `npm test`.
