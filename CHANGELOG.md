@@ -9,10 +9,12 @@ All notable changes to this project are documented here. The format follows [Kee
   - a search that matches nothing empties the list and says so, and on a list the count changes;
   - Export names its count;
   - Print hides the navigation and buttons and keeps the title;
-  - Delete opens a dialog first (the browser's `confirm()` also counts);
+  - Delete opens a dialog first (the browser's `confirm()` also counts), with `--disposable` only;
   - a `role="status"` region exists.
 
-  It needs no special markup and no dependencies, and it skips a check when the page has no control for it. It replaces `scripts/check.mjs`, which was never in a release: that script needed Playwright and `data-*` attributes, and its state checks are covered by `--states`.
+  It needs no special markup and no dependencies, and it skips a check when the page has no control for it.
+
+  Clicking Delete can change real data: in a test, a page that deletes at once sent `DELETE /api/orders/SO-1` to its server. So `--checks` clicks Delete only with `--disposable`, which declares the page's data a mock or a test copy you can reset. A localhost URL is not enough, since a local frontend can call a production API. Without the flag, the confirm check prints `? confirm: "Delete" was not clicked …`; in JSON it has `unverified: true`. It does not count as a pass, and it does not change the exit code. With the flag, every request the click sends with a method other than GET, HEAD or OPTIONS is blocked before it leaves the browser. Such requests are listed in `blocked` and named in the message. This is a safeguard, not isolation: a GET, a WebSocket or a service worker can still change data. It replaces `scripts/check.mjs`, which was never in a release: that script needed Playwright and `data-*` attributes, and its state checks are covered by `--states`.
 - Optional page templates in `assets/templates/` (`list.html`, `detail.html`, `form.html`). As shipped, each passes the audit and `--checks`, and the list and detail templates also pass `--states`.
 - SKILL.md lists the templates as optional. A workflow that made agents start from a template and loop on a checker until it passed was measured on 12 blind-reviewed pages:
   - the checklist reached 39%, against 38% for v0.5.8;

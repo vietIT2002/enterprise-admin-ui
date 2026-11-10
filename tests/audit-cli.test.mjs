@@ -90,14 +90,16 @@ else slot.innerHTML = ${JSON.stringify(lines)};</script>`,
 
 // A list page that does what --checks looks for, with no special markup: a search that empties the table, says so and
 // updates "3 orders"; Export with its count; print CSS that hides the shell; Delete that opens a dialog; a status
-// region. Each option breaks one part. native: Delete asks with the browser's confirm() instead of a dialog.
-function checksPage({ count = true, exportCount = true, confirmDelete = true, native = false, printCss = true, live = true, noResults = true } = {}) {
+// region. Each option breaks one part. native: Delete asks with the browser's confirm() instead of a dialog. api: a
+// delete also sends DELETE /api/orders/<id> to the test server, which records it in `mutations`.
+function checksPage({ count = true, exportCount = true, confirmDelete = true, native = false, printCss = true, live = true, noResults = true, api = false } = {}) {
   const data = JSON.stringify([{ id: 'SO-1', c: 'Minh Phat' }, { id: 'SO-2', c: 'Hoa Binh' }, { id: 'SO-3', c: 'An Khang' }]);
+  const send = api ? "fetch('/api/orders/' + id, { method: 'DELETE' });" : '';
   const onDelete = native
-    ? "if (confirm('Delete order ' + id + '?')) b.closest('tr').remove();"
+    ? `if (confirm('Delete order ' + id + '?')) { ${send} b.closest('tr').remove(); }`
     : confirmDelete
-      ? "document.getElementById('dlg').hidden = false; document.getElementById('cancel').focus();"
-      : "b.closest('tr').remove();";
+      ? "pending = id; document.getElementById('dlg').hidden = false; document.getElementById('cancel').focus();"
+      : `${send} b.closest('tr').remove();`;
   return html(
     `<nav aria-label="Order views"><a href="#all">All orders</a></nav>
 <h1>Orders</h1>
@@ -108,9 +110,11 @@ ${count ? '<p><span id="n">3</span> orders</p>' : ''}
 <table><thead><tr><th>Order</th><th>Customer</th><th>Actions</th></tr></thead><tbody id="rows"></tbody></table>
 <div id="none" hidden>${noResults ? '<p>No orders match this search</p><button type="button" id="clear">Clear search</button>' : ''}</div>
 ${live ? '<div role="status" id="live"></div>' : ''}
-<div role="alertdialog" aria-modal="true" aria-labelledby="dt" id="dlg" hidden><h2 id="dt">Delete order?</h2><button type="button" id="cancel">Cancel</button></div>
+<div role="alertdialog" aria-modal="true" aria-labelledby="dt" id="dlg" hidden><h2 id="dt">Delete order?</h2><button type="button" id="cancel">Cancel</button><button type="button" id="really">Delete order</button></div>
 <script>
 var data = ${data};
+var pending = null;
+document.getElementById('really').addEventListener('click', function () { var id = pending; ${send} document.getElementById('dlg').hidden = true; });
 function render(list) {
   document.getElementById('rows').innerHTML = list.map(function (r) { return '<tr><td>' + r.id + '</td><td>' + r.c + '</td><td><button type="button" class="del" data-id="' + r.id + '">Delete</button></td></tr>'; }).join('');
   if (document.getElementById('n')) document.getElementById('n').textContent = list.length;
@@ -136,6 +140,10 @@ const PAGES = {
   '/checks-no-confirm': () => checksPage({ confirmDelete: false }),
   '/checks-native': () => checksPage({ native: true }),
   '/checks-no-live': () => checksPage({ live: false }),
+  // The same pages backed by the test server's /api: Delete at once, after a dialog, or after the browser's confirm().
+  '/checks-api-now': () => checksPage({ confirmDelete: false, api: true }),
+  '/checks-api-dialog': () => checksPage({ api: true }),
+  '/checks-api-native': () => checksPage({ native: true, api: true }),
   // Nothing to search, export, print or delete: those checks are skipped. A status region is still needed.
   '/checks-settings': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>'),
   // Removing a form line or a filter chip is undone in place and needs no confirmation.
@@ -190,11 +198,17 @@ const PAGES = {
 
 let server;
 let base;
+// Every request to /api other than GET, HEAD and OPTIONS that reached the server, as "DELETE /api/orders/SO-1".
+const mutations = [];
 
 before(async () => {
   server = createServer((req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname; // ?state= and other parameters are for the page's script
     if (path === '/hang') return; // never answers, so a page with <img src="/hang"> never fires its load event
+    if (path.startsWith('/api/')) {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) mutations.push(`${req.method} ${path}`);
+      return res.writeHead(204).end();
+    }
     if (path === '/old') return res.writeHead(302, { location: '/new' }).end();
     const page = PAGES[path];
     if (!page) return res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
@@ -329,8 +343,9 @@ test('without --states, no state is checked', async () => {
   assert.equal(page.states, null);
 });
 
-const checksOf = async (path, type = 'list') => {
-  const r = await run([`${base}${path}`, '--type', type, '--checks', '--json']);
+// The test server's data is disposable, so --checks may click Delete; pass [] for the default, which does not.
+const checksOf = async (path, type = 'list', extra = ['--disposable']) => {
+  const r = await run([`${base}${path}`, '--type', type, '--checks', ...extra, '--json']);
   const [page] = JSON.parse(r.stdout || '[]');
   assert.ok(page && page.checks, `${path}: no checks in the output\n${r.output}`);
   return Object.fromEntries(page.checks.map((c) => [c.check, c]));
@@ -341,7 +356,7 @@ test('--checks passes a list page that searches, exports, prints, confirms and a
   for (const id of ['search', 'export', 'print', 'confirm', 'live-region']) {
     assert.equal(c[id].ok && !c[id].skipped && !c[id].error, true, `${id}: ${JSON.stringify(c[id])}`);
   }
-  const r = await run([`${base}/checks`, '--type', 'list', '--checks']);
+  const r = await run([`${base}/checks`, '--type', 'list', '--checks', '--disposable']);
   assert.match(r.stdout, /Checks:\n✓ search: [^\n]+\n✓ export: "Export 3 orders"\n✓ print: [^\n]+\n✓ confirm: "Delete" opens a dialog first\n✓ live-region:/);
 });
 
@@ -376,6 +391,37 @@ test('--checks skips what a page does not have, and does not take removing a lin
   assert.equal(settings['live-region'].ok, true);
   const form = await checksOf('/checks-remove-line', 'form');
   assert.equal(form.confirm.skipped, true, JSON.stringify(form.confirm));
+});
+
+test('--checks does not click Delete unless the data is declared --disposable, so a page that deletes at once changes nothing', async () => {
+  mutations.length = 0;
+  const r = await run([`${base}/checks-api-now`, '--type', 'list', '--checks']);
+  assert.deepEqual(mutations, [], 'no request reached the server');
+  assert.match(r.stdout, /\n\? confirm: "Delete" was not clicked[^\n]*--disposable/, r.output);
+  const c = await checksOf('/checks-api-now', 'list', []);
+  assert.equal(c.confirm.unverified, true, JSON.stringify(c.confirm));
+  assert.deepEqual(mutations, [], 'no request reached the server');
+});
+
+test('--disposable: Delete is clicked, a page that deletes at once fails, and the request it sends is blocked', async () => {
+  mutations.length = 0;
+  const c = await checksOf('/checks-api-now');
+  assert.equal(c.confirm.ok, false, JSON.stringify(c.confirm));
+  assert.match(c.confirm.problems[0], /"Delete" acts at once/);
+  assert.deepEqual(c.confirm.blocked, [`DELETE ${base}/api/orders/SO-1`]);
+  assert.match(c.confirm.problems[0], /DELETE http:\/\/127\.0\.0\.1:\d+\/api\/orders\/SO-1/);
+  assert.deepEqual(mutations, [], 'the blocked request never reached the server');
+});
+
+test('--disposable: neither a dialog\'s own Delete button nor a dismissed confirm() sends anything', async () => {
+  mutations.length = 0;
+  const dialog = await checksOf('/checks-api-dialog');
+  assert.equal(dialog.confirm.ok && !dialog.confirm.skipped, true, JSON.stringify(dialog.confirm));
+  const native = await checksOf('/checks-api-native');
+  assert.equal(native.confirm.ok && !native.confirm.skipped, true, JSON.stringify(native.confirm));
+  // Nothing was even attempted: the page itself sent no request, so none needed blocking.
+  assert.deepEqual([dialog.confirm.blocked, native.confirm.blocked], [[], []]);
+  assert.deepEqual(mutations, []);
 });
 
 test('without --checks, no behaviour is checked', async () => {

@@ -34,9 +34,9 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, timeout: 90, browser: null, help: false });
-  const all = parseCli(['--json', '--strict', '--states', '--checks', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, timeout: 120, browser: '/x/chrome', help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, disposable: false, timeout: 90, browser: null, help: false });
+  const all = parseCli(['--json', '--strict', '--states', '--checks', '--disposable', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, disposable: true, timeout: 120, browser: '/x/chrome', help: false });
 });
 
 test('parseCli: --timeout takes a positive number of seconds', () => {
@@ -299,6 +299,38 @@ test('judgeConfirm: a destructive action opens a dialog first; the browser confi
   const none = judgeConfirm({ label: 'Delete SO-1', dialog: false, native: false });
   assert.equal(none.ok, false);
   assert.match(none.problems[0], /"Delete SO-1" acts at once/);
+});
+
+test('judgeConfirm: a Delete that was not clicked is unverified, not passed, and says how to check it', () => {
+  const r = judgeConfirm({ label: 'Delete SO-1', clicked: false });
+  assert.equal(r.unverified, true);
+  assert.equal(r.skipped, true);
+  assert.deepEqual(r.problems, []);
+  assert.match(r.note, /"Delete SO-1" was not clicked/);
+  assert.match(r.note, /--disposable/);
+  // Without a Delete there is nothing to verify: skipped, but not unverified.
+  assert.equal(judgeConfirm({ label: null }).unverified, false);
+  assert.equal(judgeConfirm({ label: 'Delete SO-1', dialog: true }).unverified, false);
+});
+
+test('judgeConfirm: names the requests a click on Delete sent, which --checks blocked', () => {
+  const now = judgeConfirm({ label: 'Delete', blocked: ['DELETE https://x.test/api/orders/1'] });
+  assert.equal(now.ok, false);
+  assert.deepEqual(now.blocked, ['DELETE https://x.test/api/orders/1']);
+  assert.match(now.problems[0], /^"Delete" acts at once \(it sent DELETE https:\/\/x\.test\/api\/orders\/1, which --checks blocked\): open a dialog/);
+  // A dialog that shows after the request went out, such as "Deleted. Undo?", still passes, but the note says what was sent.
+  const undo = judgeConfirm({ label: 'Delete', dialog: true, blocked: ['POST https://x.test/api/orders/1/delete', 'POST https://x.test/log'] });
+  assert.equal(undo.ok, true);
+  assert.match(undo.note, /, but the click also sent POST https:\/\/x\.test\/api\/orders\/1\/delete and 1 more, which --checks blocked/);
+  assert.deepEqual(judgeConfirm({ label: null }).blocked, []);
+  assert.deepEqual(judgeConfirm({ label: 'Delete', dialog: true }).blocked, []);
+});
+
+test('exitCode and formatText: an unverified check does not fail the run, and prints as ? rather than ✓ or –', () => {
+  const p = { ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [judgeConfirm({ label: 'Delete', clicked: false }), judgeLive(1)] };
+  assert.equal(exitCode([p], false), 0);
+  assert.equal(exitCode([p], true), 0);
+  assert.match(formatText([p], 'list'), /Checks:\n\? confirm: "Delete" was not clicked[^\n]*\n✓ live-region/);
 });
 
 test('judgeLive: a role="status", role="alert" or aria-live region exists', () => {
