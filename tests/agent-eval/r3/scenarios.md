@@ -27,13 +27,13 @@ Grade:
 - `git diff --no-index <fixture>/orders.html <run>/orders.html` (the copies are not in a repo). Check the `<tr class="h-[52px] ...">` line and the Customer `<td>` (name `div`, email `div` below) appear as context, not as removed or added lines, apart from unrelated additions the filter needs.
 - `grep -c "h-\[52px\]" <run>/orders.html` must be at least the fixture's count (the row template plus the skeleton rows).
 - `diff -rq <fixture> <run>` lists only `orders.html`.
-- Open `<run>/orders.html` in a browser or run the audit; pick a status in the new filter and confirm the count and the rows change.
+- Judge criterion 1 by reading the code: the filter's markup exists, and its handler filters the rows and the count by status and can be cleared. A static check is enough. Running the page in a browser is optional.
 
 Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs s1-existing-layout/orders.html --type list` reports `table-row-two-line` (intended: this is the product's convention). Everything else passes. `table-row-height` did not fire on the fixture.
 
 ## S2 no draft support
 
-Fixture: `s2-no-draft/` (`api.js`, `DESIGN.md`). `api.js` exports only `createOrder(data)` and `updateOrder(id, data)`. Neither the API nor the status vocabulary has a draft concept.
+Fixture: `s2-no-draft/` (`api.js`, `DESIGN.md`). `api.js` is a classic script that defines `window.OrdersApi` with only `createOrder(data)` and `updateOrder(id, data)`. Neither the API nor the status vocabulary has a draft concept.
 
 Prompt: Build the create-order form: sections Customer, Items, Shipping, Notes (single HTML file, uses `api.js`).
 
@@ -45,7 +45,7 @@ Pass when:
 Grade:
 - `grep -niE "save draft|draft" <run>/*.html <run>/*.js` over every output file. Any hit in the page is a fail, except a comment or text that says drafts are not supported.
 - Read the reply for "draft"; a mention must say the capability is missing.
-- `node <repo>/skills/enterprise-admin-ui/scripts/audit-cli.mjs <run>/<page>.html --type form --checks --disposable` and note the score. For criterion 3, check that the form calls `createOrder` and keeps its fields when the promise rejects.
+- `node <repo>/skills/enterprise-admin-ui/scripts/audit-cli.mjs <run>/<page>.html --type form --checks --disposable` and note the score. Criterion 3 is judged by reading the code: the form calls `window.OrdersApi.createOrder`, and it keeps its fields when the promise rejects.
 
 ## S3 review only
 
@@ -65,9 +65,11 @@ Pass when:
 3. The reply does not report the two-column form or the 52px rows as defects. Naming them as a preference, or as consistent with `DESIGN.md`, is acceptable.
 
 Grade:
-- Before the run, record a checksum of every fixture file, for example `sha256sum <run>/* > before.txt`. After the run, `sha256sum -c before.txt` must pass, and `diff -rq <fixture> <run>` must print nothing.
-- Read the reply's findings. Criterion 2 holds when a finding names the cleared form after a failed save and labels it a defect (or a high-severity or "must fix" finding, if the old skill has no labels). Criterion 3 fails when a finding calls the two-column grid, the two-line cell or the row height a defect, a violation or a fix needed, or asks to change them without saying they follow the project's convention.
-- Record every other finding too: the fixture was built to have no other breaches of a required rule, so any extra defect is worth reading and noting.
+- Before the run, write the checksums next to the run folder, not inside it: `(cd <run> && sha256sum *) > <run>.before.txt`. After the run, `(cd <run> && sha256sum -c ../<run-name>.before.txt)` must pass, and `diff -rq <fixture> <run>` must print nothing.
+- Read the reply's findings. "Reported as a defect" means the reply presents the item as a problem to fix (a finding with a fix) without marking it optional, a preference or consistent with `DESIGN.md`. The same rule applies to the old skill (which has no defect/preference labels) and the new one.
+  - Criterion 2 holds when a finding names the cleared form after a failed save and reports it as a defect.
+  - Criterion 3 fails when the two-column grid, the two-line cell or the 52px row height is reported as a defect.
+- Extra findings are recorded in the results but do not affect pass or fail.
 
 Expected audit result for the fixture itself: `node skills/enterprise-admin-ui/scripts/audit-cli.mjs s3-review/customers.html --type form --checks --disposable` reports only `table-row-two-line` (the convention), `confirm` passes, and the live regions pass.
 

@@ -116,9 +116,10 @@
     if (forced) p.set('state', forced);
     history.replaceState(null, '', p.toString() ? '?' + p : location.pathname);
   }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   function renderChips() {
     $('chips').innerHTML = ui.q
-      ? `<span class="inline-flex h-6 items-center gap-1 rounded-full bg-slate-100 pl-2 pr-1 text-slate-700">Search: ${ui.q}<button type="button" data-chip="q" class="h-6 w-6 rounded-full hover:bg-slate-200" aria-label="Remove filter Search: ${ui.q}">×</button></span><button type="button" id="clear-all" class="h-6 px-2 text-blue-700 underline">Clear all</button>`
+      ? `<span class="inline-flex h-6 items-center gap-1 rounded-full bg-slate-100 pl-2 pr-1 text-slate-700">Search: ${esc(ui.q)}<button type="button" data-chip="q" class="h-6 w-6 rounded-full hover:bg-slate-200" aria-label="Remove filter Search: ${esc(ui.q)}">×</button></span><button type="button" id="clear-all" class="h-6 px-2 text-blue-700 underline">Clear all</button>`
       : '';
   }
   function render() {

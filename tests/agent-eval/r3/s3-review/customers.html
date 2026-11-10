@@ -24,7 +24,7 @@
   <main class="min-w-0 flex-1">
     <div class="px-6 pt-4">
       <header class="flex items-center justify-between gap-4">
-        <h1 class="text-xl font-semibold">Customers</h1>
+        <h1 id="page-title" tabindex="-1" class="text-xl font-semibold">Customers</h1>
         <button type="button" id="btn-create" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Create customer</button>
       </header>
       <p class="mt-3 text-slate-600"><span id="result-count" class="tnum">0</span> customers</p>
@@ -176,8 +176,10 @@
 
   function fillForm(c) {
     editing = c;
+    $('form').hidden = !c; // no record to edit: the form is not shown
+    if (!c) { dirty = false; return; }
     FIELDS.forEach((f) => { $(f).value = c ? c[f] : ''; setError(f, ''); });
-    $('form-title').textContent = c ? `Edit customer ${c.company}` : 'Edit customer';
+    $('form-title').textContent = `Edit customer ${c.company}`;
     $('summary').hidden = $('save-error').hidden = true;
     dirty = false;
     $('dirty-status').textContent = '';
@@ -233,44 +235,69 @@
   });
   $('summary').addEventListener('click', (e) => { const a = e.target.closest('a'); if (a) { e.preventDefault(); $(a.getAttribute('href').slice(1)).focus(); } });
 
-  // Delete with confirmation
-  let pending = null;
-  const closeConfirm = () => { $('backdrop').hidden = $('confirm').hidden = true; if (pending && pending.trigger) pending.trigger.focus(); };
+  // One dialog for delete and discard: title names the record and the consequence, focus starts on Cancel,
+  // Tab and Shift+Tab cycle inside, Esc closes, focus returns to the trigger (or the page heading if it is gone).
+  let dlg = null;
+  function openDialog({ title, text, ok, onOk, trigger }) {
+    dlg = { trigger, onOk };
+    $('confirm-title').textContent = title;
+    $('confirm-text').textContent = text;
+    $('confirm-ok').textContent = ok;
+    $('backdrop').hidden = $('confirm').hidden = false;
+    $('confirm-cancel').focus();
+  }
+  function closeDialog() {
+    $('backdrop').hidden = $('confirm').hidden = true;
+    const t = dlg && dlg.trigger;
+    dlg = null;
+    (t && document.contains(t) && !t.closest('[hidden]') ? t : $('page-title')).focus();
+  }
+  $('confirm-cancel').addEventListener('click', closeDialog);
+  $('confirm-ok').addEventListener('click', () => { const { onOk } = dlg; closeDialog(); onOk(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('confirm').hidden) return;
+    if (e.key === 'Escape') { closeDialog(); return; }
+    if (e.key !== 'Tab') return;
+    const items = [$('confirm-cancel'), $('confirm-ok')];
+    const i = items.indexOf(document.activeElement);
+    e.preventDefault();
+    items[e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === items.length - 1 ? 0 : i + 1)].focus();
+  });
+
+  const discardDialog = (what, onOk, trigger) => openDialog({
+    title: `Discard changes to ${editing.company}?`,
+    text: `Your unsaved changes to ${editing.company} are lost when ${what}.`,
+    ok: 'Discard changes', onOk, trigger,
+  });
+
   $('rows').addEventListener('click', (e) => {
     const ed = e.target.closest('[data-edit]');
     if (ed) {
       const c = customers.find((x) => x.id === ed.dataset.edit);
-      if (dirty && !window.confirm('Discard your unsaved changes?')) return;
-      fillForm(c);
-      $('company').focus();
+      const go = () => { fillForm(c); $('company').focus(); };
+      if (dirty && c !== editing) discardDialog(`you open ${c.company}`, go, ed); else go();
       return;
     }
     const del = e.target.closest('[data-delete]');
     if (!del) return;
     const c = customers.find((x) => x.id === del.dataset.delete);
-    pending = { c, trigger: del };
-    $('confirm-title').textContent = `Delete customer ${c.company}?`;
-    $('confirm-text').textContent = `${c.company} and its ${c.open} open orders are removed from the order desk. This cannot be undone.`;
-    $('confirm-ok').textContent = 'Delete customer';
-    $('backdrop').hidden = $('confirm').hidden = false;
-    $('confirm-cancel').focus();
+    openDialog({
+      title: `Delete customer ${c.company}?`,
+      text: `${c.company} and its ${c.open} open orders are removed from the order desk. This cannot be undone.`,
+      ok: 'Delete customer',
+      trigger: del,
+      onOk: () => {
+        customers = customers.filter((x) => x !== c);
+        if (editing === c) fillForm(customers[0] || null);
+        renderList();
+        announce(`Customer ${c.company} deleted.`);
+        $('page-title').focus();
+      },
+    });
   });
-  $('confirm-cancel').addEventListener('click', closeConfirm);
-  $('confirm-ok').addEventListener('click', () => {
-    const { c } = pending;
-    customers = customers.filter((x) => x !== c);
-    pending = null;
-    $('backdrop').hidden = $('confirm').hidden = true;
-    if (editing === c) fillForm(customers[0] || null);
-    renderList();
-    announce(`Customer ${c.company} deleted.`);
-    $('btn-create').focus();
-  });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('confirm').hidden) closeConfirm(); });
 
   $('cancel').addEventListener('click', () => {
-    if (dirty && !window.confirm('Discard your unsaved changes?')) return;
-    fillForm(editing);
+    if (dirty) discardDialog('you cancel', () => fillForm(editing), $('cancel')); else fillForm(editing);
   });
   $('btn-create').addEventListener('click', () => announce('Create customer is not connected in this mock.'));
   $('empty-action').addEventListener('click', () => $('btn-create').click());
