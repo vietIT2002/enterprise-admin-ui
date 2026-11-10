@@ -3,10 +3,12 @@
  * enterprise-admin-ui audit CLI — MIT License
  * Runs scripts/audit.js on pages in an installed headless Chrome, Edge or Chromium. No dependencies; Node 22 or later.
  *
- *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks] [--json] [--strict] [--browser <path>]
+ *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
  *
- * --states also opens ?state=empty, error and loading; --checks also searches, exports, prints and deletes the way a
- * person would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page.
+ * --states also opens ?state=empty, error and loading; --checks also searches, exports and prints the way a person
+ * would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page. --checks clicks Delete
+ * only with --disposable, which says the page's data is mock data or a test copy that may change; even then it blocks
+ * the requests that click sends with a method other than GET, HEAD or OPTIONS.
  *
  * Each page opens the way the enterprise-admin-ui benchmark opens it: a light colour scheme on a 1440×900 screen, then
  * load, network idle for 500 ms (at most 15 s), and the benchmark's settle (no DOM change for 800 ms, loading skeletons
@@ -53,6 +55,7 @@ export function parseCli(argv) {
         browser: { type: 'string' },
         states: { type: 'boolean' },
         checks: { type: 'boolean' },
+        disposable: { type: 'boolean' },
         timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -69,6 +72,7 @@ export function parseCli(argv) {
     strict: Boolean(values.strict),
     states: Boolean(values.states),
     checks: Boolean(values.checks),
+    disposable: Boolean(values.disposable),
     timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
     help: Boolean(values.help),
@@ -234,8 +238,10 @@ const PATTERNS = Object.freeze({
   noResultsRe: String.raw`\bno\b.{0,60}\b(match|matches|matching|results?|found)\b|nothing (matches|found)|không (có|tìm thấy)|没有.{0,20}(结果|匹配)|无结果|未找到`,
 });
 
-// CheckResult: { check, ok, skipped, problems: string[], note, error: string|null }. A skipped check is ok.
-const outcome = (check, { skipped = false, problems = [], note = '' } = {}) => ({ check, ok: problems.length === 0, skipped, problems, note, error: null });
+// CheckResult: { check, ok, skipped, unverified, blocked: string[], problems: string[], note, error: string|null }. A
+// skipped check is ok. unverified: the page has what the check needs, but the check did not run, so nothing was
+// verified (the note says why). blocked: requests the check stopped before they left the browser, as "DELETE https://…".
+const outcome = (check, { skipped = false, unverified = false, blocked = [], problems = [], note = '' } = {}) => ({ check, ok: problems.length === 0, skipped, unverified, blocked, problems, note, error: null });
 
 // before and after the search: { rows, numbers, noResults } from the page (data rows; short texts with a number outside
 // the table body and the controls; whether it says nothing matches). Only a list must show a count that changes.
@@ -267,13 +273,26 @@ export function judgePrint(printed) {
   return outcome('print', { problems, note: 'printing keeps the title and hides navigation and buttons' });
 }
 
-// label: the first visible delete, remove or deactivate action, or null; dialog: a dialog showed after the click;
-// native: the browser's confirm() opened.
-export function judgeConfirm({ label, dialog = false, native = false }) {
+// label: the first visible delete, remove or deactivate action, or null; clicked: false when it was left alone, as it
+// is without --disposable; dialog: a dialog showed after the click; native: the browser's confirm() opened; blocked:
+// the requests the click sent that confirmCheck stopped.
+export function judgeConfirm({ label, clicked = true, dialog = false, native = false, blocked = [] }) {
   if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action' });
-  if (dialog) return outcome('confirm', { note: `"${label}" opens a dialog first` });
-  if (native) return outcome('confirm', { note: `"${label}" asks with the browser's confirm(); a dialog that names the record and the consequence is better` });
-  return outcome('confirm', { problems: [`"${label}" acts at once: open a dialog (role="alertdialog") that names the record and the consequence, with focus on Cancel`] });
+  if (!clicked) {
+    return outcome('confirm', {
+      skipped: true,
+      unverified: true,
+      note: `"${label}" was not clicked, since that could change real data. On mock data or a test copy you can reset, run again with --disposable to check that it asks first`,
+    });
+  }
+  const sent = blocked.length ? `${blocked[0]}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}, which --checks blocked` : '';
+  const also = sent ? `, but the click also sent ${sent}` : '';
+  if (dialog) return outcome('confirm', { blocked, note: `"${label}" opens a dialog first${also}` });
+  if (native) return outcome('confirm', { blocked, note: `"${label}" asks with the browser's confirm()${also}; a dialog that names the record and the consequence is better` });
+  return outcome('confirm', {
+    blocked,
+    problems: [`"${label}" acts at once${sent ? ` (it sent ${sent})` : ''}: open a dialog (role="alertdialog") that names the record and the consequence, with focus on Cancel`],
+  });
 }
 
 // count: role="status", role="alert" and aria-live regions on the page.
@@ -294,6 +313,7 @@ export function exitCode(pages, strict) {
 
 function checkLine(c) {
   if (c.error) return `✗ ${c.check}: could not check: ${c.error}`;
+  if (c.unverified) return `? ${c.check}: ${c.note}`;
   if (c.skipped) return `– ${c.check}: ${c.note}`;
   if (!c.ok) return `✗ ${c.check}: ${c.problems.join('; ')}`;
   return `✓ ${c.check}: ${c.note}`;
@@ -862,8 +882,9 @@ const MEDIA_FEATURES = Object.freeze([
 ]);
 
 // Opens url in a new tab of its own browser context (no storage or cookies from other targets), waits for it to load
-// and settle, and returns work(send, { loadingPlaceholders, dialogs }); dialogs() counts the alert(), confirm() and
-// prompt() dialogs the page has opened (each is dismissed). The tab and its context close afterwards.
+// and settle, and returns work(send, { loadingPlaceholders, dialogs, on }); dialogs() counts the alert(), confirm() and
+// prompt() dialogs the page has opened (each is dismissed); on(fn) calls fn(method, params) for each later event of the
+// tab. The tab and its context close afterwards.
 async function withPage(browser, url, { waitForPlaceholders = true } = {}, work) {
   const { browserContextId } = await browser.send('Target.createBrowserContext');
   try {
@@ -876,9 +897,11 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
     let response = null;
     let dialogs = 0;
     const inflight = new Set();
+    const listeners = new Set();
     const offEvents = browser.on((message) => {
       if (!ours(message)) return;
       const { method, params } = message;
+      for (const fn of listeners) fn(method, params);
       if (method === 'Page.javascriptDialogOpening') {
         dialogs++;
         send('Page.handleJavaScriptDialog', { accept: false }).catch(() => {}); // as Playwright does with no dialog handler
@@ -916,7 +939,7 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
 
       const settle = { ...SETTLE, waitForPlaceholders };
       const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(settle)})`, true, SETTLE_TIMEOUT_MS);
-      return await work(send, { loadingPlaceholders, dialogs: () => dialogs });
+      return await work(send, { loadingPlaceholders, dialogs: () => dialogs, on: (fn) => listeners.add(fn) });
     } finally {
       loaded.cancel();
       offEvents();
@@ -986,25 +1009,43 @@ function searchCheck(browser, url, pageType) {
   });
 }
 
-// Clicks the first destructive action with the mouse and looks for a dialog, or the browser's confirm().
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+// Clicks the first destructive action with the mouse and looks for a dialog, or the browser's confirm(). From just
+// before the click, each request the tab sends with a method other than GET, HEAD or OPTIONS is failed before it leaves
+// the browser, and listed. That is a safeguard, not isolation: a GET, a WebSocket, a service worker or a frame of its
+// own can still change data, which is why the click needs --disposable.
 function confirmCheck(browser, url) {
-  return withPage(browser, url, {}, async (send, { dialogs }) => {
+  return withPage(browser, url, {}, async (send, { dialogs, on }) => {
     const { destructive } = await controlsOf(send);
     const point = destructive ? await evaluate(send, `(${confirmTargetInPage})()`) : null;
     if (!point) return judgeConfirm({ label: null });
+    const blocked = [];
+    on((method, params) => {
+      if (method !== 'Fetch.requestPaused') return;
+      const { requestId, request } = params;
+      if (READ_METHODS.has(request.method)) {
+        send('Fetch.continueRequest', { requestId }).catch(() => {});
+      } else {
+        blocked.push(`${request.method} ${request.url}`);
+        send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {});
+      }
+    });
+    await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
     const before = dialogs();
     await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1 });
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
     await settleAfterAction(send, 400);
     const dialog = await evaluate(send, `(${dialogInPage})()`);
-    return judgeConfirm({ label: destructive, dialog, native: dialogs() > before });
+    return judgeConfirm({ label: destructive, dialog, native: dialogs() > before, blocked });
   });
 }
 
 // The five checks of CHECKS, in order, each tab under the same per-page time limit. A check that fails to run gets an error.
-async function behaviourChecks(limited, url, pageType) {
-  const failed = (check, err) => ({ check, ok: false, skipped: false, problems: [], note: '', error: err.message });
+// Only with disposable is the destructive action clicked; without it, confirm is unverified.
+async function behaviourChecks(limited, url, pageType, disposable) {
+  const failed = (check, err) => ({ check, ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: err.message });
   let controls;
   try {
     controls = await limited((b) => readControls(b, url));
@@ -1022,7 +1063,11 @@ async function behaviourChecks(limited, url, pageType) {
     controls.search ? await attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false }),
     judgeExport(controls.exports),
     judgePrint(controls.printed),
-    controls.destructive ? await attempt('confirm', (b) => confirmCheck(b, url)) : judgeConfirm({ label: null }),
+    !controls.destructive
+      ? judgeConfirm({ label: null })
+      : disposable
+        ? await attempt('confirm', (b) => confirmCheck(b, url))
+        : judgeConfirm({ label: controls.destructive, clicked: false }),
     judgeLive(controls.live),
   ];
 }
@@ -1031,7 +1076,7 @@ async function behaviourChecks(limited, url, pageType) {
 // With states, each page that was audited is also opened with ?state=empty, error and loading; with checks, it gets the
 // behaviour checks. Each page, state and check tab gets at most timeoutS; one that takes longer may have hung the
 // browser, so it is stopped and a new one started.
-export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
       return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null, checks: null };
@@ -1093,7 +1138,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
           }
         }
       }
-      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType);
+      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable);
     }
   } finally {
     if (browser) await browser.close();
@@ -1103,7 +1148,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
 
 // ------------------------------------------------------------------ command line
 
-const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks] [--json] [--strict] [--browser <path>]
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
 
 Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
 
@@ -1116,8 +1161,12 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
                      and Retry; loading: a skeleton. For pages with mock data, as SKILL.md asks
   --checks           also use the page as a person would and check what SKILL.md asks of its behaviour: a search that
                      matches nothing empties the list, says so and (on a list) changes the count; Export names its
-                     count; Print hides navigation and buttons and keeps the title; Delete opens a dialog first; a
-                     role="status" region exists. A check the page gives no control for is skipped
+                     count; Print hides navigation and buttons and keeps the title; Delete opens a dialog first (only
+                     with --disposable); a role="status" region exists. A check the page gives no control for is skipped
+  --disposable       the page's data is mock data or a test copy you can reset, so --checks may click Delete. Even
+                     then, requests that click sends with a method other than GET, HEAD or OPTIONS are blocked, but a
+                     GET, a WebSocket or a service worker can still change data: never use it on real data. Without
+                     it, "? confirm" means Delete was not checked. Every run loads each page and runs its scripts
   --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
@@ -1157,7 +1206,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, timeoutS: opts.timeout });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, disposable: opts.disposable, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;
