@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customers · Northwind Distribution</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  [hidden] { display: none !important; }
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body class="bg-white text-sm text-slate-900 antialiased">
+<div class="flex min-h-screen">
+  <aside class="w-56 shrink-0 border-r border-slate-200 bg-slate-50">
+    <div class="flex h-12 items-center px-4 font-semibold">Northwind</div>
+    <nav aria-label="Main" class="px-2 pb-4">
+      <p class="px-2 pb-1 pt-3 text-xs font-medium text-slate-600">Sales</p>
+      <a href="#" class="flex h-8 items-center rounded px-2 text-slate-700 hover:bg-slate-100">Orders</a>
+      <a href="#" aria-current="page" class="flex h-8 items-center rounded bg-slate-200 px-2 font-medium">Customers</a>
+    </nav>
+  </aside>
+
+  <main class="min-w-0 flex-1">
+    <div class="px-6 pt-4">
+      <header class="flex items-center justify-between gap-4">
+        <h1 class="text-xl font-semibold">Customers</h1>
+        <button type="button" id="btn-create" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Create customer</button>
+      </header>
+      <p class="mt-3 text-slate-600"><span id="result-count" class="tnum">0</span> customers</p>
+
+      <section data-region="customers" class="mt-2" aria-label="Customers">
+        <div data-state="ready" class="overflow-x-auto rounded-md border border-slate-200">
+          <table class="w-full border-collapse">
+            <caption class="sr-only">Customers</caption>
+            <thead class="bg-slate-50 text-slate-700">
+              <tr class="h-10 border-b border-slate-200">
+                <th scope="col" class="px-3 text-left font-medium">Customer</th>
+                <th scope="col" class="px-3 text-left font-medium">City</th>
+                <th scope="col" class="px-3 text-left font-medium">Status</th>
+                <th scope="col" class="px-3 text-right font-medium">Open orders</th>
+                <th scope="col" class="w-40 px-3"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+        <div data-state="empty" hidden class="rounded-md border border-dashed border-slate-300 px-6 py-10 text-center">
+          <p class="font-medium">No customers yet</p>
+          <p class="mt-1 text-slate-600">Customers appear here when you create one.</p>
+          <button type="button" id="empty-action" class="mt-3 h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Create customer</button>
+        </div>
+        <div data-state="loading" aria-busy="true" hidden class="rounded-md border border-slate-200" aria-label="Loading customers">
+          <div class="h-10 border-b border-slate-200 bg-slate-50"></div>
+          <div id="skeleton"></div>
+        </div>
+        <div data-state="error" hidden class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
+          <p class="font-medium">Customers could not be loaded.</p>
+          <p class="mt-1">Check your connection, then try again.</p>
+          <button type="button" id="retry" class="mt-2 h-8 rounded border border-red-300 bg-white px-3 text-red-800 hover:bg-red-100">Retry</button>
+        </div>
+      </section>
+    </div>
+
+    <form id="form" novalidate class="px-6 pt-8" aria-labelledby="form-title">
+      <h2 id="form-title" class="text-xl font-semibold">Edit customer</h2>
+
+      <div id="summary" role="alert" tabindex="-1" hidden class="mt-4 max-w-2xl rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+        <p class="font-medium">Fix <span id="summary-count"></span> before saving:</p>
+        <ul id="summary-list" class="mt-1 list-disc pl-5"></ul>
+      </div>
+      <div id="save-error" role="alert" hidden class="mt-4 max-w-2xl rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-800"></div>
+
+      <div class="max-w-2xl py-6">
+        <div class="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+          <div class="md:col-span-2">
+            <label class="block font-medium" for="company">Company name <span class="text-red-700" aria-hidden="true">*</span></label>
+            <input id="company" name="company" required aria-describedby="company-error" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+            <p id="company-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium" for="contact">Contact person</label>
+            <input id="contact" name="contact" autocomplete="name" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+          </div>
+          <div>
+            <label class="block font-medium" for="phone">Phone</label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+          </div>
+          <div>
+            <label class="block font-medium" for="email">Email <span class="text-red-700" aria-hidden="true">*</span></label>
+            <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-error" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+            <p id="email-error" class="mt-1 text-red-700" hidden></p>
+          </div>
+          <div class="md:col-span-2">
+            <label class="block font-medium" for="address">Street address</label>
+            <input id="address" name="address" autocomplete="street-address" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+          </div>
+          <div>
+            <label class="block font-medium" for="city">City</label>
+            <input id="city" name="city" autocomplete="address-level2" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+          </div>
+          <div>
+            <label class="block font-medium" for="postal">Postal code</label>
+            <input id="postal" name="postal" autocomplete="postal-code" inputmode="numeric" class="mt-1 h-8 w-full rounded border border-slate-300 px-2">
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky bottom-0 -mx-6 flex items-center justify-end gap-2 border-t border-slate-200 bg-white px-6 py-3">
+        <span id="dirty-status" class="mr-auto text-slate-600"></span>
+        <button type="button" id="cancel" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Cancel</button>
+        <button type="submit" id="save" class="h-8 rounded bg-blue-700 px-3 font-medium text-white hover:bg-blue-800">Save customer</button>
+      </div>
+    </form>
+  </main>
+</div>
+
+<div id="backdrop" hidden class="fixed inset-0 z-30 bg-slate-900/40"></div>
+<div id="confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-text" hidden class="fixed left-1/2 top-24 z-40 w-[420px] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-5 shadow-lg">
+  <h2 id="confirm-title" class="text-base font-semibold"></h2>
+  <p id="confirm-text" class="mt-2 text-slate-700"></p>
+  <div class="mt-4 flex justify-end gap-2">
+    <button type="button" id="confirm-cancel" class="h-8 rounded border border-slate-300 bg-white px-3 hover:bg-slate-50">Cancel</button>
+    <button type="button" id="confirm-ok" class="h-8 rounded bg-red-700 px-3 font-medium text-white hover:bg-red-800"></button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite" class="fixed bottom-20 right-4 z-50"></div>
+
+<script>
+  // Mock data.
+  const TONE = { Active: 'bg-green-50 text-green-800', 'On hold': 'bg-amber-50 text-amber-800' };
+  let customers = [
+    { id: 'C-101', company: 'Minh Phat Co.', contact: 'Nguyen Minh', phone: '+84 28 3822 1100', email: 'purchasing@minhphat.example', address: '12 Le Loi', city: 'Ho Chi Minh City', postal: '700000', status: 'Active', open: 4 },
+    { id: 'C-102', company: 'Hoa Binh Trading', contact: 'Tran Hoa', phone: '+84 24 3933 2200', email: 'orders@hoabinh.example', address: '88 Kim Ma', city: 'Hanoi', postal: '100000', status: 'Active', open: 2 },
+    { id: 'C-103', company: 'An Khang Pharmacy', contact: 'Le An', phone: '+84 236 355 1212', email: 'accounts@ankhang.example', address: '5 Bach Dang', city: 'Da Nang', postal: '550000', status: 'On hold', open: 0 },
+    { id: 'C-104', company: 'Blue Lotus Hotel', contact: 'Pham Lan', phone: '+84 254 382 4400', email: 'supply@bluelotus.example', address: '30 Tran Phu', city: 'Vung Tau', postal: '790000', status: 'Active', open: 7 },
+  ];
+  let editing = customers[0];
+  let dirty = false;
+
+  const params = new URLSearchParams(location.search);
+  const forced = params.get('state'); // ?state=empty|loading|error shows that state
+  if (forced === 'empty') customers = [];
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const announce = (text) => { $('toast').innerHTML = `<div class="rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md">${esc(text)}</div>`; clearTimeout(announce.t); announce.t = setTimeout(() => ($('toast').innerHTML = ''), 6000); };
+  const show = (state) => document.querySelectorAll('[data-region="customers"] [data-state]').forEach((e) => (e.hidden = e.dataset.state !== state));
+  const FIELDS = ['company', 'contact', 'phone', 'email', 'address', 'city', 'postal'];
+
+  // Simulated request. The first attempt for each customer is rejected, the next one succeeds.
+  const attempts = {};
+  function saveCustomer(id, data) {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        attempts[id] = (attempts[id] || 0) + 1;
+        if (attempts[id] === 1) reject(new Error('The server did not respond.'));
+        else resolve({ id, ...data });
+      }, 500);
+    });
+  }
+
+  function renderList() {
+    $('result-count').textContent = customers.length;
+    if (!customers.length) { show('empty'); return; }
+    show('ready');
+    $('rows').innerHTML = customers.map((c) => `<tr class="h-[52px] border-b border-slate-200 last:border-0 hover:bg-slate-50">
+        <td class="px-3"><div class="font-medium">${esc(c.company)}</div><div class="text-xs"><a href="mailto:${esc(c.email)}" class="text-slate-600 hover:underline">${esc(c.email)}</a></div></td>
+        <td class="px-3">${esc(c.city)}</td>
+        <td class="px-3"><span class="inline-flex h-6 items-center whitespace-nowrap rounded-full px-2 text-xs font-medium ${TONE[c.status]}">${c.status}</span></td>
+        <td class="tnum px-3 text-right">${c.open}</td>
+        <td class="px-3 text-right"><button type="button" data-edit="${c.id}" aria-label="Edit ${esc(c.company)}" class="h-8 rounded px-2 text-blue-700 hover:bg-slate-100">Edit</button><button type="button" data-delete="${c.id}" aria-label="Delete ${esc(c.company)}" class="h-8 rounded px-2 text-red-700 hover:bg-slate-100">Delete</button></td>
+      </tr>`).join('');
+  }
+
+  function fillForm(c) {
+    editing = c;
+    FIELDS.forEach((f) => { $(f).value = c ? c[f] : ''; setError(f, ''); });
+    $('form-title').textContent = c ? `Edit customer ${c.company}` : 'Edit customer';
+    $('summary').hidden = $('save-error').hidden = true;
+    dirty = false;
+    $('dirty-status').textContent = '';
+  }
+
+  function setError(id, message) {
+    const field = $(id), error = $(id + '-error');
+    field.setAttribute('aria-invalid', message ? 'true' : 'false');
+    field.classList.toggle('border-red-600', !!message);
+    if (error) { error.textContent = message || ''; error.hidden = !message; }
+  }
+  function validate() {
+    const errors = [];
+    const check = (id, ok, message) => { setError(id, ok ? '' : message); if (!ok) errors.push([id, message]); };
+    check('company', $('company').value.trim(), 'Enter the company name.');
+    check('email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test($('email').value), $('email').value ? 'Enter an email like name@company.com.' : 'Enter the email.');
+    return errors;
+  }
+
+  $('form').addEventListener('input', () => { dirty = true; $('dirty-status').textContent = 'Unsaved changes'; });
+  $('form').addEventListener('focusout', (e) => { if (e.target.id === 'company' || e.target.id === 'email') validate(); });
+
+  $('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errors = validate();
+    if (errors.length) {
+      $('summary-count').textContent = errors.length === 1 ? '1 problem' : `${errors.length} problems`;
+      $('summary-list').innerHTML = errors.map(([id, m]) => `<li><a href="#${id}" class="underline">${m}</a></li>`).join('');
+      $('summary').hidden = false;
+      $('save-error').hidden = true;
+      $(errors[0][0]).focus();
+      return;
+    }
+    $('summary').hidden = $('save-error').hidden = true;
+    $('save').disabled = true;
+    $('save').textContent = 'Saving…';
+    const data = Object.fromEntries(FIELDS.map((f) => [f, $(f).value.trim()]));
+    try {
+      const saved = await saveCustomer(editing.id, data);
+      Object.assign(editing, saved);
+      dirty = false;
+      $('dirty-status').textContent = '';
+      renderList();
+      announce(`Customer ${saved.company} saved.`);
+    } catch (err) {
+      FIELDS.forEach((f) => { $(f).value = ''; setError(f, ''); });
+      $('save-error').textContent = `${editing.company} was not saved. ${err.message} Try again.`;
+      $('save-error').hidden = false;
+    } finally {
+      $('save').disabled = false;
+      $('save').textContent = 'Save customer';
+    }
+  });
+  $('summary').addEventListener('click', (e) => { const a = e.target.closest('a'); if (a) { e.preventDefault(); $(a.getAttribute('href').slice(1)).focus(); } });
+
+  // Delete with confirmation
+  let pending = null;
+  const closeConfirm = () => { $('backdrop').hidden = $('confirm').hidden = true; if (pending && pending.trigger) pending.trigger.focus(); };
+  $('rows').addEventListener('click', (e) => {
+    const ed = e.target.closest('[data-edit]');
+    if (ed) {
+      const c = customers.find((x) => x.id === ed.dataset.edit);
+      if (dirty && !window.confirm('Discard your unsaved changes?')) return;
+      fillForm(c);
+      $('company').focus();
+      return;
+    }
+    const del = e.target.closest('[data-delete]');
+    if (!del) return;
+    const c = customers.find((x) => x.id === del.dataset.delete);
+    pending = { c, trigger: del };
+    $('confirm-title').textContent = `Delete customer ${c.company}?`;
+    $('confirm-text').textContent = `${c.company} and its ${c.open} open orders are removed from the order desk. This cannot be undone.`;
+    $('confirm-ok').textContent = 'Delete customer';
+    $('backdrop').hidden = $('confirm').hidden = false;
+    $('confirm-cancel').focus();
+  });
+  $('confirm-cancel').addEventListener('click', closeConfirm);
+  $('confirm-ok').addEventListener('click', () => {
+    const { c } = pending;
+    customers = customers.filter((x) => x !== c);
+    pending = null;
+    $('backdrop').hidden = $('confirm').hidden = true;
+    if (editing === c) fillForm(customers[0] || null);
+    renderList();
+    announce(`Customer ${c.company} deleted.`);
+    $('btn-create').focus();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('confirm').hidden) closeConfirm(); });
+
+  $('cancel').addEventListener('click', () => {
+    if (dirty && !window.confirm('Discard your unsaved changes?')) return;
+    fillForm(editing);
+  });
+  $('btn-create').addEventListener('click', () => announce('Create customer is not connected in this mock.'));
+  $('empty-action').addEventListener('click', () => $('btn-create').click());
+  $('retry').addEventListener('click', () => { location.search = ''; });
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  $('skeleton').innerHTML = Array.from({ length: 4 }, () => '<div class="flex h-[52px] items-center gap-4 border-b border-slate-200 px-3"><div class="h-3 w-40 rounded bg-slate-200"></div><div class="h-3 w-24 rounded bg-slate-200"></div><div class="ml-auto h-3 w-12 rounded bg-slate-200"></div></div>').join('');
+  fillForm(forced === 'empty' ? null : editing);
+  if (forced === 'loading' || forced === 'error') { show(forced); $('result-count').textContent = '—'; }
+  else { show('loading'); setTimeout(renderList, 400); }
+</script>
+</body>
+</html>
