@@ -146,6 +146,8 @@ const PAGES = {
   '/checks-api-native': () => checksPage({ native: true, api: true }),
   // Nothing to search, export, print or delete: those checks are skipped. A status region is still needed.
   '/checks-settings': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>'),
+  // The same page with an audit-clean title, for tests of the exit code.
+  '/checks-settings-clean': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>', 'h1{font-size:14px}'),
   // Removing a form line or a filter chip is undone in place and needs no confirmation.
   '/checks-remove-line': () =>
     html('<h1>New order</h1><button type="button" aria-label="Remove line 1" onclick="this.remove()">×</button><button type="button" onclick="this.remove()">Remove filter: Online</button><div role="status"></div>'),
@@ -422,6 +424,61 @@ test('--disposable: neither a dialog\'s own Delete button nor a dismissed confir
   // Nothing was even attempted: the page itself sent no request, so none needed blocking.
   assert.deepEqual([dialog.confirm.blocked, native.confirm.blocked], [[], []]);
   assert.deepEqual(mutations, []);
+});
+
+test('--require: a required check with no control fails, and the text names it', async () => {
+  const r = await run([`${base}/checks-settings-clean`, '--type', 'settings', '--checks', '--require', 'export', '--json']);
+  const c = Object.fromEntries(JSON.parse(r.stdout)[0].checks.map((x) => [x.check, x]));
+  assert.equal(c.export.status, 'fail', JSON.stringify(c.export));
+  assert.equal(c.export.required, true);
+  assert.equal(r.code, 1, r.output);
+  const t = await run([`${base}/checks-settings-clean`, '--type', 'settings', '--checks', '--require', 'export']);
+  assert.equal(t.code, 1, t.output);
+  assert.match(t.stdout, /Required but not shown to pass: export/);
+});
+
+test('--not-applicable: a declared check is not_applicable and exit is 0; undeclared is not_verified', async () => {
+  const r = await run([`${base}/checks-settings-clean`, '--type', 'settings', '--checks', '--not-applicable', 'export', '--json']);
+  const c = Object.fromEntries(JSON.parse(r.stdout)[0].checks.map((x) => [x.check, x]));
+  assert.equal(c.export.status, 'not_applicable');
+  assert.equal(r.code, 0, r.output);
+  const plain = await checksOf('/checks-settings-clean', 'settings');
+  assert.equal(plain.export.status, 'not_verified');
+  const r2 = await run([`${base}/checks-settings-clean`, '--type', 'settings', '--checks']);
+  assert.equal(r2.code, 0, r2.output);
+});
+
+test('--require confirm: not_verified without --disposable (exit 1), pass with it', async () => {
+  const without = await run([`${base}/checks`, '--type', 'list', '--checks', '--require', 'confirm', '--json']);
+  const c = Object.fromEntries(JSON.parse(without.stdout)[0].checks.map((x) => [x.check, x]));
+  assert.equal(c.confirm.status, 'not_verified');
+  assert.equal(without.code, 1, without.output);
+  assert.equal((await run([`${base}/checks`, '--type', 'list', '--checks'])).code, 0, 'the page itself audits clean, so the exit 1 above is the requirement');
+  const withIt = await checksOf('/checks', 'list', ['--disposable', '--require', 'confirm']);
+  assert.equal(withIt.confirm.status, 'pass');
+});
+
+test('--not-applicable confirm --disposable does not click Delete', async () => {
+  mutations.length = 0;
+  const c = await checksOf('/checks-api-now', 'list', ['--disposable', '--not-applicable', 'confirm']);
+  assert.equal(c.confirm.status, 'not_applicable');
+  assert.deepEqual(mutations, []);
+  assert.deepEqual(c.confirm.blocked ?? [], [], 'the click was never made, so nothing was blocked');
+});
+
+test('--require applies to every URL: pass on the page with a search, fail on the one without', async () => {
+  const r = await run([`${base}/checks`, `${base}/checks-settings`, '--type', 'list', '--checks', '--disposable', '--require', 'search', '--json']);
+  const pages = JSON.parse(r.stdout);
+  assert.equal(pages[0].checks.find((x) => x.check === 'search').status, 'pass');
+  assert.equal(pages[1].checks.find((x) => x.check === 'search').status, 'fail');
+  assert.equal(r.code, 1, r.output);
+});
+
+test('--states results carry a status', async () => {
+  const [page] = JSON.parse((await run([`${base}/stateful`, '--type', 'list', '--states', '--json'])).stdout);
+  assert.deepEqual(page.states.map((s) => s.status), ['pass', 'pass', 'pass']);
+  const [bad] = JSON.parse((await run([`${base}/stateless`, '--type', 'list', '--states', '--json'])).stdout);
+  assert.deepEqual(bad.states.map((s) => s.status), ['fail', 'fail', 'fail']);
 });
 
 test('without --checks, no behaviour is checked', async () => {

@@ -3,7 +3,7 @@
  * enterprise-admin-ui audit CLI — MIT License
  * Runs scripts/audit.js on pages in an installed headless Chrome, Edge or Chromium. No dependencies; Node 22 or later.
  *
- *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
+ *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable] [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
  *
  * --states also opens ?state=empty, error and loading; --checks also searches, exports and prints the way a person
  * would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page. --checks clicks Delete
@@ -16,7 +16,12 @@
  * dismissed, and a page that stops responding is reported instead of waited for. The browser is driven over the
  * DevTools protocol on a pipe, with a throwaway profile; on Linux it runs without the sandbox, as Playwright does.
  *
- * Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.
+ * Each check ends with a status: pass, fail, not_verified (no matching control, or Delete not clicked without
+ * --disposable: an absent control is never a pass), not_applicable (declared with --not-applicable; the check is not
+ * run) or error. --require makes a check that finds no control fail, and one that is not_verified exit 1.
+ *
+ * Exit code: 0 nothing failed; 1 an ✗ error (or any violation with --strict), a failed state, a check with status
+ * fail, or a required check that is not_verified; 2 a usage error, or a page, state or check that could not run.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
@@ -41,6 +46,16 @@ export class UsageError extends Error {
 
 // ------------------------------------------------------------------ arguments
 
+// A comma-separated list of check names; an unknown name is a usage error that lists the valid ones.
+function checkList(value, flag) {
+  if (value === undefined) return [];
+  const names = value.split(',').map((n) => n.trim()).filter(Boolean);
+  for (const name of names) {
+    if (!CHECKS.includes(name)) throw new UsageError(`Unknown check "${name}" in ${flag}. Use one of: ${CHECKS.join(', ')}.`);
+  }
+  return [...new Set(names)];
+}
+
 export function parseCli(argv) {
   let parsed;
   try {
@@ -55,6 +70,8 @@ export function parseCli(argv) {
         browser: { type: 'string' },
         states: { type: 'boolean' },
         checks: { type: 'boolean' },
+        require: { type: 'string' },
+        'not-applicable': { type: 'string' },
         disposable: { type: 'boolean' },
         timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
@@ -72,6 +89,8 @@ export function parseCli(argv) {
     strict: Boolean(values.strict),
     states: Boolean(values.states),
     checks: Boolean(values.checks),
+    require: checkList(values.require, '--require'),
+    notApplicable: checkList(values['not-applicable'], '--not-applicable'),
     disposable: Boolean(values.disposable),
     timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
@@ -83,6 +102,11 @@ export function parseCli(argv) {
     throw new UsageError(`Unknown --type "${opts.pageType}". Use one of: ${PAGE_TYPES.join(', ')}.`);
   }
   if (!opts.targets.length) throw new UsageError('Give a URL or an HTML file to audit.');
+  for (const [flag, list] of [['--require', opts.require], ['--not-applicable', opts.notApplicable]]) {
+    if (list.length && !opts.checks) throw new UsageError(`${flag} needs --checks.`);
+  }
+  const both = opts.require.filter((c) => opts.notApplicable.includes(c));
+  if (both.length) throw new UsageError(`A check cannot be in both --require and --not-applicable: ${both.join(', ')}.`);
   return opts;
 }
 
@@ -1037,7 +1061,7 @@ function auditPage(browser, url, pageType, auditSource, { snapshot = false } = {
 async function auditState(browser, target, state, base) {
   const snap = await withPage(browser, target, { waitForPlaceholders: state !== 'loading' }, (send) => evaluate(send, `(${snapshotInPage})()`));
   const { ok, problems, details } = checkState(state, base, snap);
-  return { state, url: target, ok, problems, details, error: null };
+  return { state, url: target, ok, problems, details, error: null, status: ok ? 'pass' : 'fail' };
 }
 
 // After typing or clicking: wait for a debounced handler, then for the page to settle again.
@@ -1111,14 +1135,19 @@ function confirmCheck(browser, url) {
 }
 
 // The five checks of CHECKS, in order, each tab under the same per-page time limit. A check that fails to run gets an error.
-// Only with disposable is the destructive action clicked; without it, confirm is unverified.
-async function behaviourChecks(limited, url, pageType, disposable) {
+// Only with disposable is the destructive action clicked; without it, confirm is unverified. A check declared not
+// applicable is not run at all (no tab, no click); every other result gets its status from withRequirement.
+async function behaviourChecks(limited, url, pageType, disposable, { require = [], notApplicable: declared = [] } = {}) {
   const failed = (check, err) => ({ check, ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: err.message });
+  const wrap = (check, result) => withRequirement(result, { required: require.includes(check) });
+  const todo = CHECKS.filter((check) => !declared.includes(check));
   let controls;
-  try {
-    controls = await limited((b) => readControls(b, url));
-  } catch (err) {
-    return CHECKS.map((check) => failed(check, err));
+  if (todo.length) {
+    try {
+      controls = await limited((b) => readControls(b, url));
+    } catch (err) {
+      return CHECKS.map((check) => (declared.includes(check) ? notApplicable(check) : wrap(check, failed(check, err))));
+    }
   }
   const attempt = async (check, work) => {
     try {
@@ -1127,24 +1156,28 @@ async function behaviourChecks(limited, url, pageType, disposable) {
       return failed(check, err);
     }
   };
-  return [
-    controls.search ? await attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false }),
-    judgeExport(controls.exports),
-    judgePrint(controls.printed),
-    !controls.destructive
-      ? judgeConfirm({ label: null })
-      : disposable
-        ? await attempt('confirm', (b) => confirmCheck(b, url))
-        : judgeConfirm({ label: controls.destructive, clicked: false }),
-    judgeLive(controls.live),
-  ];
+  const run = {
+    search: () => (controls.search ? attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false })),
+    export: () => judgeExport(controls.exports),
+    print: () => judgePrint(controls.printed),
+    confirm: () =>
+      !controls.destructive
+        ? judgeConfirm({ label: null })
+        : disposable
+          ? attempt('confirm', (b) => confirmCheck(b, url))
+          : judgeConfirm({ label: controls.destructive, clicked: false }),
+    'live-region': () => judgeLive(controls.live),
+  };
+  const results = [];
+  for (const check of CHECKS) results.push(declared.includes(check) ? notApplicable(check) : wrap(check, await run[check]()));
+  return results;
 }
 
 // One browser for all targets, a new tab for each. A target that fails gets an error; a browser that cannot start rejects.
 // With states, each page that was audited is also opened with ?state=empty, error and loading; with checks, it gets the
 // behaviour checks. Each page, state and check tab gets at most timeoutS; one that takes longer may have hung the
 // browser, so it is stopped and a new one started.
-export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, require = [], notApplicable = [], disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
       return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null, checks: null };
@@ -1202,11 +1235,11 @@ export async function auditTargets(targets, { pageType = null, browser: executab
           try {
             page.states.push(await limited((b) => auditState(b, url, state, base)));
           } catch (err) {
-            page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message });
+            page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message, status: 'error' });
           }
         }
       }
-      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable);
+      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable, { require, notApplicable });
     }
   } finally {
     if (browser) await browser.close();
@@ -1216,7 +1249,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
 
 // ------------------------------------------------------------------ command line
 
-const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable] [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
 
 Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
 
@@ -1230,7 +1263,12 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --checks           also use the page as a person would and check what SKILL.md asks of its behaviour: a search that
                      matches nothing empties the list, says so and (on a list) changes the count; Export names its
                      count; Print hides navigation and buttons and keeps the title; Delete opens a dialog first (only
-                     with --disposable); a role="status" region exists. A check the page gives no control for is skipped
+                     with --disposable); a role="status" region exists. A check the page gives no control for is "? not verified", never
+                     a pass, unless you declare it with --require or --not-applicable. Each check ends as pass, fail,
+                     not_verified, not_applicable or error
+  --require <checks>  with --checks: comma-separated checks (${CHECKS.join(', ')}) this page must have. One with no
+                     matching control fails; one that is still not verified (Delete without --disposable) exits 1
+  --not-applicable <checks>  with --checks: checks this page has no use for. They are not run, and print as "– name"
   --disposable       the page's data is mock data or a test copy you can reset, so --checks may click Delete. Even
                      then, requests that click sends with a method other than GET, HEAD or OPTIONS are blocked, but a
                      GET, a WebSocket or a service worker can still change data: never use it on real data. Without
@@ -1238,7 +1276,8 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
-Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.`;
+Exit code: 0 nothing failed; 1 an ✗ error (or any violation with --strict), a failed state, a check that failed, or a
+required check that is not verified; 2 a usage error, or a page, state or check that could not run.`;
 
 export async function main(argv = process.argv.slice(2)) {
   let opts;
@@ -1274,7 +1313,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, disposable: opts.disposable, timeoutS: opts.timeout });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, require: opts.require, notApplicable: opts.notApplicable, disposable: opts.disposable, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;

@@ -36,9 +36,22 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, disposable: false, timeout: 90, browser: null, help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, require: [], notApplicable: [], disposable: false, timeout: 90, browser: null, help: false });
   const all = parseCli(['--json', '--strict', '--states', '--checks', '--disposable', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, disposable: true, timeout: 120, browser: '/x/chrome', help: false });
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, require: [], notApplicable: [], disposable: true, timeout: 120, browser: '/x/chrome', help: false });
+});
+
+test('parseCli: --require and --not-applicable take check names', () => {
+  const o = parseCli(['a', '--checks', '--require', 'export,confirm', '--not-applicable', 'print']);
+  assert.deepEqual([o.require, o.notApplicable], [['export', 'confirm'], ['print']]);
+});
+
+test('parseCli: --require and --not-applicable usage errors', () => {
+  assert.throws(() => parseCli(['a', '--checks', '--require', 'export,nope']), (err) => err instanceof UsageError && /Unknown check "nope"/.test(err.message) && /search, export, print, confirm, live-region/.test(err.message));
+  assert.throws(() => parseCli(['a', '--checks', '--not-applicable', 'nope']), (err) => err instanceof UsageError && /Unknown check "nope"/.test(err.message));
+  assert.throws(() => parseCli(['a', '--checks', '--require', 'print', '--not-applicable', 'print,export']), (err) => err instanceof UsageError && /both --require and --not-applicable: print/.test(err.message));
+  assert.throws(() => parseCli(['a', '--require', 'print']), (err) => err instanceof UsageError && /--require needs --checks/.test(err.message));
+  assert.throws(() => parseCli(['a', '--not-applicable', 'print']), (err) => err instanceof UsageError && /--not-applicable needs --checks/.test(err.message));
 });
 
 test('parseCli: --timeout takes a positive number of seconds', () => {
