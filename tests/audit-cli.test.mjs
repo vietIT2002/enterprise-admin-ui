@@ -91,10 +91,11 @@ else slot.innerHTML = ${JSON.stringify(lines)};</script>`,
 // A list page that does what --checks looks for, with no special markup: a search that empties the table, says so and
 // updates "3 orders"; Export with its count; print CSS that hides the shell; Delete that opens a dialog; a status
 // region. Each option breaks one part. native: Delete asks with the browser's confirm() instead of a dialog. api: a
-// delete also sends DELETE /api/orders/<id> to the test server, which records it in `mutations`.
-function checksPage({ count = true, exportCount = true, confirmDelete = true, native = false, printCss = true, live = true, noResults = true, api = false } = {}) {
+// delete also sends DELETE /api/orders/<id> to the test server, which records it in `mutations`. beacon: it also
+// sends GET /api/beacon?delete=<id>, which --disposable does not block; the server records it in `beacons`.
+function checksPage({ count = true, exportCount = true, confirmDelete = true, native = false, printCss = true, live = true, noResults = true, api = false, beacon = false } = {}) {
   const data = JSON.stringify([{ id: 'SO-1', c: 'Minh Phat' }, { id: 'SO-2', c: 'Hoa Binh' }, { id: 'SO-3', c: 'An Khang' }]);
-  const send = api ? "fetch('/api/orders/' + id, { method: 'DELETE' });" : '';
+  const send = (api ? "fetch('/api/orders/' + id, { method: 'DELETE' });" : '') + (beacon ? "fetch('/api/beacon?delete=' + id);" : '');
   const onDelete = native
     ? `if (confirm('Delete order ' + id + '?')) { ${send} b.closest('tr').remove(); }`
     : confirmDelete
@@ -142,9 +143,10 @@ const PAGES = {
   '/checks-no-live': () => checksPage({ live: false }),
   // The same pages backed by the test server's /api: Delete at once, after a dialog, or after the browser's confirm().
   '/checks-api-now': () => checksPage({ confirmDelete: false, api: true }),
+  '/checks-api-beacon': () => checksPage({ confirmDelete: false, api: true, beacon: true }),
   '/checks-api-dialog': () => checksPage({ api: true }),
   '/checks-api-native': () => checksPage({ native: true, api: true }),
-  // Nothing to search, export, print or delete: those checks are skipped. A status region is still needed.
+  // Nothing to search, export, print or delete: those checks are not verified. A status region is still needed.
   '/checks-settings': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>'),
   // The same page with an audit-clean title, for tests of the exit code.
   '/checks-settings-clean': () => html('<h1>Clinic settings</h1><form><label>Clinic name <input value="An Khang"></label></form><div role="status"></div>', 'h1{font-size:14px}'),
@@ -202,12 +204,15 @@ let server;
 let base;
 // Every request to /api other than GET, HEAD and OPTIONS that reached the server, as "DELETE /api/orders/SO-1".
 const mutations = [];
+// Every GET /api/beacon request that reached the server, as "/api/beacon?delete=SO-1": proof that a click was made.
+const beacons = [];
 
 before(async () => {
   server = createServer((req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname; // ?state= and other parameters are for the page's script
     if (path === '/hang') return; // never answers, so a page with <img src="/hang"> never fires its load event
     if (path.startsWith('/api/')) {
+      if (path === '/api/beacon') beacons.push(`${path}${new URL(req.url, 'http://localhost').search}`);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) mutations.push(`${req.method} ${path}`);
       return res.writeHead(204).end();
     }
@@ -387,7 +392,7 @@ test('--checks accepts the browser\'s own confirm() before a delete', async () =
   assert.match(c.confirm.note, /confirm\(\)/);
 });
 
-test('--checks skips what a page does not have, and does not take removing a line or a filter for a delete', async () => {
+test('--checks marks what a page does not have as not verified, and does not take removing a line or a filter for a delete', async () => {
   const settings = await checksOf('/checks-settings', 'settings');
   for (const id of ['search', 'export', 'print', 'confirm']) assert.equal(settings[id].skipped, true, id);
   assert.equal(settings['live-region'].ok, true);
@@ -459,15 +464,24 @@ test('--require confirm: not_verified without --disposable (exit 1), pass with i
 });
 
 test('--not-applicable confirm --disposable does not click Delete', async () => {
+  // Positive control: without --not-applicable the click is made and its GET beacon reaches the server (the DELETE is blocked).
   mutations.length = 0;
-  const c = await checksOf('/checks-api-now', 'list', ['--disposable', '--not-applicable', 'confirm']);
+  beacons.length = 0;
+  const clicked = await checksOf('/checks-api-beacon', 'list', ['--disposable']);
+  assert.equal(clicked.confirm.ok, false, JSON.stringify(clicked.confirm));
+  assert.deepEqual(beacons, ['/api/beacon?delete=SO-1'], 'the click path reaches the beacon');
+  assert.deepEqual(mutations, []);
+  mutations.length = 0;
+  beacons.length = 0;
+  const c = await checksOf('/checks-api-beacon', 'list', ['--disposable', '--not-applicable', 'confirm']);
   assert.equal(c.confirm.status, 'not_applicable');
+  assert.deepEqual(beacons, [], 'Delete was never clicked');
   assert.deepEqual(mutations, []);
   assert.deepEqual(c.confirm.blocked ?? [], [], 'the click was never made, so nothing was blocked');
 });
 
 test('--require applies to every URL: pass on the page with a search, fail on the one without', async () => {
-  const r = await run([`${base}/checks`, `${base}/checks-settings`, '--type', 'list', '--checks', '--disposable', '--require', 'search', '--json']);
+  const r = await run([`${base}/checks`, `${base}/checks-settings-clean`, '--type', 'list', '--checks', '--disposable', '--require', 'search', '--json']);
   const pages = JSON.parse(r.stdout);
   assert.equal(pages[0].checks.find((x) => x.check === 'search').status, 'pass');
   assert.equal(pages[1].checks.find((x) => x.check === 'search').status, 'fail');
@@ -656,4 +670,24 @@ test('a browser path that does not exist exits 2', async () => {
   const r = await run([CLEAN, '--browser', join(tmpdir(), 'nope', 'chrome')]);
   assert.equal(r.code, 2);
   assert.match(r.output, /Browser not found/);
+});
+
+test('repeated --require and --not-applicable accumulate: both repeats take effect', async () => {
+  mutations.length = 0;
+  beacons.length = 0;
+  const c = await checksOf('/checks-api-beacon', 'list', ['--disposable', '--not-applicable', 'confirm', '--not-applicable', 'print', '--require', 'search', '--require', 'export']);
+  assert.deepEqual([c.confirm.status, c.print.status], ['not_applicable', 'not_applicable']);
+  assert.deepEqual([c.search.required, c.export.required], [true, true]);
+  assert.deepEqual(beacons, [], 'confirm was declared in the first of two --not-applicable flags, and Delete was not clicked');
+});
+
+test('--not-applicable print: print is not run, and the other checks still pass', async () => {
+  const c = await checksOf('/checks', 'list', ['--not-applicable', 'print']);
+  assert.equal(c.print.status, 'not_applicable');
+  for (const id of ['search', 'export', 'live-region']) assert.equal(c[id].status, 'pass', id);
+});
+
+test('status: an unverified confirm has dom/heuristic evidence', async () => {
+  const c = await checksOf('/checks', 'list', []);
+  assert.deepEqual([c.confirm.evidence.method, c.confirm.evidence.basis], ['dom', 'heuristic']);
 });

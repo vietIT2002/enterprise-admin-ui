@@ -13,6 +13,7 @@ import {
   checkState,
   createMessageReader,
   exitCode,
+  failedCheck,
   findBrowser,
   formatText,
   judgeConfirm,
@@ -44,6 +45,20 @@ test('parseCli: targets and flags', () => {
 test('parseCli: --require and --not-applicable take check names', () => {
   const o = parseCli(['a', '--checks', '--require', 'export,confirm', '--not-applicable', 'print']);
   assert.deepEqual([o.require, o.notApplicable], [['export', 'confirm'], ['print']]);
+});
+
+test('parseCli: repeated --require and --not-applicable accumulate, without duplicates', () => {
+  const o = parseCli(['a', '--checks', '--require', 'export', '--require', 'confirm,export', '--not-applicable', 'print', '--not-applicable', 'search']);
+  assert.deepEqual([o.require, o.notApplicable], [['export', 'confirm'], ['print', 'search']]);
+});
+
+test('parseCli: an empty --require or --not-applicable list is a usage error', () => {
+  for (const flag of ['--require', '--not-applicable']) {
+    for (const value of ['', ' , ']) {
+      assert.throws(() => parseCli(['a', '--checks', flag, value]), (err) => err instanceof UsageError && err.message.includes(`${flag} takes check names, such as ${flag} export,confirm`), `${flag} "${value}"`);
+    }
+  }
+  assert.throws(() => parseCli(['a', '--require', '']), (err) => err instanceof UsageError);
 });
 
 test('parseCli: --require and --not-applicable usage errors', () => {
@@ -434,5 +449,46 @@ test('formatText: summary line and unresolved requirements', () => {
   assert.match(text, /\? confirm \(required\): /);
   assert.match(text, /– print: /);
   assert.match(text, /Checks: 1 pass · 1 fail · 1 not verified · 1 not applicable\n/);
-  assert.match(text, /Required but not shown to pass: export \(no matching control found\), confirm \(run with --disposable\)/);
+  assert.match(text, /Required but not shown to pass: export \(no matching control found\), confirm \(not clicked: needs --disposable, on mock data or a test copy only\)/);
+});
+
+test('formatText: a required check with no control says so once', () => {
+  const text = formatText([{ ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [withRequirement(judgeExport([]), { required: true })] }], 'list');
+  assert.match(text, /\n✗ export \(required\): no matching control found\n/);
+  assert.doesNotMatch(text, /required export:/);
+});
+
+test('formatText: the summary reason for each way a required check is not shown to pass', () => {
+  const reasonOf = (check) => formatText([{ ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [check] }], 'list').match(/Required but not shown to pass: (.*)/)[1];
+  assert.equal(reasonOf(withRequirement(judgeExport([]), { required: true })), 'export (no matching control found)');
+  assert.equal(reasonOf(withRequirement(judgeConfirm({ label: 'Delete', clicked: false }), { required: true })), 'confirm (not clicked: needs --disposable, on mock data or a test copy only)');
+  assert.equal(reasonOf(withRequirement(judgeLive(0), { required: true })), 'live-region (failed)');
+  assert.equal(reasonOf(withRequirement(failedCheck('search', new Error('boom')), { required: true })), 'search (could not run)');
+});
+
+test('failedCheck: a check that could not run has an error and no evidence', () => {
+  assert.deepEqual(failedCheck('print', new Error('boom')), { check: 'print', ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: 'boom', evidence: null });
+  const r = withRequirement(failedCheck('print', new Error('boom')));
+  assert.equal(r.status, 'error');
+  assert.equal(r.evidence, null);
+});
+
+test('evidence: [method, basis] of every judge output and path', () => {
+  const found = { rows: 1, numbers: [], noResults: false };
+  const none = { rows: 0, numbers: [], noResults: true };
+  const table = [
+    ['search absent', judgeSearch({ found: false }), ['dom', 'heuristic']],
+    ['search found', judgeSearch({ found: true, before: found, after: none }), ['interaction', 'direct']],
+    ['export without control', judgeExport([]), ['dom', 'heuristic']],
+    ['export with control', judgeExport(['Export 3 orders']), ['dom', 'direct']],
+    ['print without control', judgePrint(null), ['dom', 'heuristic']],
+    ['print with control', judgePrint({ h1: true, nav: 0, buttons: 0 }), ['print-media', 'direct']],
+    ['confirm absent', judgeConfirm({ label: null }), ['dom', 'heuristic']],
+    ['confirm not clicked', judgeConfirm({ label: 'Delete', clicked: false }), ['dom', 'heuristic']],
+    ['confirm clicked, dialog', judgeConfirm({ label: 'Delete', dialog: true }), ['interaction', 'direct']],
+    ['confirm clicked, native', judgeConfirm({ label: 'Delete', native: true }), ['interaction', 'direct']],
+    ['confirm clicked, acts at once', judgeConfirm({ label: 'Delete' }), ['interaction', 'direct']],
+    ['live-region', judgeLive(1), ['dom', 'direct']],
+  ];
+  for (const [name, r, expected] of table) assert.deepEqual([r.evidence.method, r.evidence.basis], expected, name);
 });
