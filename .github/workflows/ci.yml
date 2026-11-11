@@ -28,8 +28,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # --with-deps also installs extra fonts through apt. When the Ubuntu mirror cannot be reached, the runner's
+      # preinstalled libraries are enough, so install the browser alone instead of failing the run.
       - name: Install Chromium for the fixture tests
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
 
       # Unit tests for audit.js, the fixture pages in Chromium, adapters in step with SKILL.md,
       # and the numbers the READMEs, manifests and CHANGELOG state.
