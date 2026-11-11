@@ -238,59 +238,100 @@ const PATTERNS = Object.freeze({
   noResultsRe: String.raw`\bno\b.{0,60}\b(match|matches|matching|results?|found)\b|nothing (matches|found)|không (có|tìm thấy)|没有.{0,20}(结果|匹配)|无结果|未找到`,
 });
 
-// CheckResult: { check, ok, skipped, unverified, blocked: string[], problems: string[], note, error: string|null }. A
+// CheckResult: { check, ok, skipped, unverified, blocked: string[], problems: string[], note, error: string|null,
+//   evidence: { method, basis, observed, limitation }, status?, required? }. status (pass | fail | not_applicable |
+//   not_verified | error) and required are set by withRequirement / notApplicable, not by the judge functions. A
 // skipped check is ok. unverified: the page has what the check needs, but the check did not run, so nothing was
 // verified (the note says why). blocked: requests the check stopped before they left the browser, as "DELETE https://…".
-const outcome = (check, { skipped = false, unverified = false, blocked = [], problems = [], note = '' } = {}) => ({ check, ok: problems.length === 0, skipped, unverified, blocked, problems, note, error: null });
+const outcome = (check, { skipped = false, unverified = false, blocked = [], problems = [], note = '', evidence } = {}) => ({ check, ok: problems.length === 0, skipped, unverified, blocked, problems, note, error: null, evidence });
+
+// evidence: what a check saw and what it does not establish. method: interaction | dom | print-media | manual;
+// basis: direct | heuristic | manual.
+const evidence = (method, basis, observed, limitation = null) => ({ method, basis, observed, limitation });
+const absent = (what) => evidence('dom', 'heuristic', `no ${what} matched the name patterns`, 'the control may exist under another name');
+
+// Adds status and required to a judged result. Undeclared (required false): a control not found or a click not made is
+// not_verified. Required: a control not found fails, and a click not made stays not_verified.
+export function withRequirement(result, { required = false } = {}) {
+  if (result.status === 'not_applicable') return result;
+  let out = { ...result, required };
+  if (out.error) return { ...out, status: 'error' };
+  if (required && out.skipped && !out.unverified) {
+    const problem = `required ${out.check}: no matching control found`;
+    out = { ...out, ok: false, problems: out.problems.includes(problem) ? out.problems : [...out.problems, problem] };
+  }
+  const status = out.problems.length ? 'fail' : out.unverified || out.skipped ? 'not_verified' : 'pass';
+  return { ...out, status };
+}
+
+// A check the person declared not applicable: it does not run.
+export function notApplicable(check) {
+  const note = 'declared not applicable with --not-applicable';
+  return { ...outcome(check, { skipped: true, note, evidence: evidence('manual', 'manual', note) }), status: 'not_applicable', required: false };
+}
 
 // before and after the search: { rows, numbers, noResults } from the page (data rows; short texts with a number outside
 // the table body and the controls; whether it says nothing matches). Only a list must show a count that changes.
 export function judgeSearch({ found, before, after, pageType = null }) {
-  if (!found) return outcome('search', { skipped: true, note: 'no search box' });
+  if (!found) return outcome('search', { skipped: true, note: 'no search box', evidence: absent('search box') });
   const problems = [];
   if (after.rows > 0) problems.push(`${after.rows} data row${after.rows === 1 ? '' : 's'} still show after a search that matches nothing`);
   if (!after.noResults) problems.push('no "no results" message, such as "No orders match this search" with Clear search');
   const changed = [...before.numbers].sort().join('\n') !== [...after.numbers].sort().join('\n');
   if (!changed && pageType === 'list') problems.push('no count changed: show how many records match ("12 of 48 orders") and update it on every search');
-  return outcome('search', { problems, note: `a search for "${NO_MATCH_QUERY}" empties the list and says so${changed ? ', and the count changes' : ''}` });
+  return outcome('search', {
+    problems,
+    note: `a search for "${NO_MATCH_QUERY}" empties the list and says so${changed ? ', and the count changes' : ''}`,
+    evidence: evidence('interaction', 'direct', `a search for "${NO_MATCH_QUERY}" left ${after.rows} data row${after.rows === 1 ? '' : 's'}${after.noResults ? ' and a no-results message' : ' and no no-results message'}`, 'only one no-match query; real matching is not checked'),
+  });
 }
 
 // names: the visible Export controls.
 export function judgeExport(names) {
-  if (!names.length) return outcome('export', { skipped: true, note: 'no Export control' });
+  if (!names.length) return outcome('export', { skipped: true, note: 'no Export control', evidence: absent('Export control') });
   const bare = names.filter((name) => !/\d/.test(name));
   const problems = bare.length ? [`"${bare[0]}" does not name what it exports: give the scope and count, as "Export 1.245 orders" or "Export 3 selected"`] : [];
-  return outcome('export', { problems, note: `"${names[0]}"` });
+  return outcome('export', {
+    problems,
+    note: `"${names[0]}"`,
+    evidence: evidence('dom', 'direct', `the Export control reads "${names[0]}"`, "the export was not run; the file's scope and rows are not checked"),
+  });
 }
 
 // printed: null without a Print control, else what shows in print media: { h1, nav, buttons }.
 export function judgePrint(printed) {
-  if (!printed) return outcome('print', { skipped: true, note: 'no Print control' });
+  if (!printed) return outcome('print', { skipped: true, note: 'no Print control', evidence: absent('Print control') });
   const problems = [];
   if (!printed.h1) problems.push('the title (h1) does not print: keep it, with the period and totals');
   if (printed.nav) problems.push(`${printed.nav} navigation element${printed.nav === 1 ? ' still prints' : 's still print'} (hide the shell in @media print)`);
   if (printed.buttons) problems.push(`${printed.buttons} button${printed.buttons === 1 ? ' still prints' : 's still print'} (hide controls in @media print)`);
-  return outcome('print', { problems, note: 'printing keeps the title and hides navigation and buttons' });
+  return outcome('print', {
+    problems,
+    note: 'printing keeps the title and hides navigation and buttons',
+    evidence: evidence('print-media', 'direct', `under print media: title ${printed.h1 ? 'shows' : 'missing'}, ${printed.nav} navigation and ${printed.buttons} button${printed.buttons === 1 ? '' : 's'} still show`, 'pagination and a full printed document are not checked'),
+  });
 }
 
 // label: the first visible delete, remove or deactivate action, or null; clicked: false when it was left alone, as it
 // is without --disposable; dialog: a dialog showed after the click; native: the browser's confirm() opened; blocked:
 // the requests the click sent that confirmCheck stopped.
 export function judgeConfirm({ label, clicked = true, dialog = false, native = false, blocked = [] }) {
-  if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action' });
+  if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action', evidence: absent('delete, remove or deactivate action') });
   if (!clicked) {
     return outcome('confirm', {
       skipped: true,
       unverified: true,
+      evidence: evidence('interaction', 'direct', `"${label}" was found but not clicked`, 'the click was not made without --disposable, so whether it asks first is not established'),
       note: `"${label}" was not clicked, since that could change real data. On mock data or a test copy you can reset, run again with --disposable to check that it asks first`,
     });
   }
   const sent = blocked.length ? `${blocked[0]}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}, which --checks blocked` : '';
   const also = sent ? `, but the click also sent ${sent}` : '';
-  if (dialog) return outcome('confirm', { blocked, note: `"${label}" opens a dialog first${also}` });
-  if (native) return outcome('confirm', { blocked, note: `"${label}" asks with the browser's confirm()${also}; a dialog that names the record and the consequence is better` });
+  if (dialog) return outcome('confirm', { blocked, note: `"${label}" opens a dialog first${also}`, evidence: evidence('interaction', 'direct', `clicking "${label}" ${dialog ? 'opened a dialog' : native ? "opened the browser's confirm()" : 'acted at once'}; ${blocked.length} request${blocked.length === 1 ? '' : 's'} blocked`, 'only the first destructive control; the confirm action is never submitted') });
+  if (native) return outcome('confirm', { blocked, note: `"${label}" asks with the browser's confirm()${also}; a dialog that names the record and the consequence is better`, evidence: evidence('interaction', 'direct', `clicking "${label}" ${dialog ? 'opened a dialog' : native ? "opened the browser's confirm()" : 'acted at once'}; ${blocked.length} request${blocked.length === 1 ? '' : 's'} blocked`, 'only the first destructive control; the confirm action is never submitted') });
   return outcome('confirm', {
     blocked,
+    evidence: evidence('interaction', 'direct', `clicking "${label}" ${dialog ? 'opened a dialog' : native ? "opened the browser's confirm()" : 'acted at once'}; ${blocked.length} request${blocked.length === 1 ? '' : 's'} blocked`, 'only the first destructive control; the confirm action is never submitted'),
     problems: [`"${label}" acts at once${sent ? ` (it sent ${sent})` : ''}: open a dialog (role="alertdialog") that names the record and the consequence, with focus on Cancel`],
   });
 }
@@ -298,25 +339,52 @@ export function judgeConfirm({ label, clicked = true, dialog = false, native = f
 // count: role="status", role="alert" and aria-live regions on the page.
 export function judgeLive(count) {
   const problems = count ? [] : ['no role="status", role="alert" or aria-live region, so screen readers hear no messages: add <div role="status" aria-live="polite">'];
-  return outcome('live-region', { problems, note: `${count} live region${count === 1 ? '' : 's'}` });
+  return outcome('live-region', {
+    problems,
+    note: `${count} live region${count === 1 ? '' : 's'}`,
+    evidence: evidence('dom', 'direct', `${count} role="status", role="alert" or aria-live region${count === 1 ? '' : 's'}`, 'whether messages are announced is not checked'),
+  });
 }
 
 // PageResult: { target, url, error: string|null, loadingPlaceholders: number, result: audit result|null,
 //               states: null | [{ state, url, ok, problems, details, error }], checks: null | [CheckResult] }
+// A result from behaviourChecks may have no status yet: read it as undeclared.
+const statusOf = (c) => c.status ?? withRequirement(c).status;
+
 export function exitCode(pages, strict) {
   const states = (p) => p.states || [];
   const checks = (p) => p.checks || [];
   if (pages.some((p) => p.error || states(p).some((s) => s.error) || checks(p).some((c) => c.error))) return 2;
   const fails = (v) => strict || v.severity === 'error';
-  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok) || checks(p).some((c) => !c.ok)) ? 1 : 0;
+  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok) || checks(p).some((c) => !c.ok || statusOf(c) === 'fail' || (c.required && statusOf(c) === 'not_verified'))) ? 1 : 0;
 }
 
 function checkLine(c) {
-  if (c.error) return `✗ ${c.check}: could not check: ${c.error}`;
-  if (c.unverified) return `? ${c.check}: ${c.note}`;
-  if (c.skipped) return `– ${c.check}: ${c.note}`;
-  if (!c.ok) return `✗ ${c.check}: ${c.problems.join('; ')}`;
-  return `✓ ${c.check}: ${c.note}`;
+  const name = c.required ? `${c.check} (required)` : c.check;
+  const status = statusOf(c);
+  if (status === 'error') return `✗ ${name}: could not check: ${c.error}`;
+  if (status === 'fail') return `✗ ${name}: ${c.problems.join('; ')}`;
+  if (status === 'not_verified') return `? ${name}: ${c.note}`;
+  if (status === 'not_applicable') return `– ${name}: ${c.note}`;
+  return `✓ ${name}: ${c.note}`;
+}
+
+// 'Checks: 2 pass · 1 fail …' (counts above zero only), then the required checks that are not shown to pass.
+function checkSummary(checks) {
+  const count = (s) => checks.filter((c) => statusOf(c) === s).length;
+  const parts = [['pass', 'pass'], ['fail', 'fail'], ['not_verified', 'not verified'], ['not_applicable', 'not applicable'], ['error', 'error']]
+    .filter(([s]) => count(s) > 0)
+    .map(([s, label]) => `${count(s)} ${label}`);
+  const lines = [`Checks: ${parts.join(' · ')}`];
+  const reason = (c) => {
+    if (statusOf(c) === 'error') return 'could not run';
+    if (c.unverified) return 'run with --disposable';
+    if (statusOf(c) === 'fail') return c.problems.some((p) => p.startsWith('required ')) ? 'no matching control found' : 'failed';
+    return c.note;
+  };
+  const open = checks.filter((c) => c.required && statusOf(c) !== 'pass');
+  if (open.length) lines.push(`Required but not shown to pass: ${open.map((c) => `${c.check} (${reason(c)})`).join(', ')}`);
+  return lines;
 }
 
 function stateLine(s) {
@@ -336,7 +404,7 @@ export function formatText(pages, pageType = null) {
         lines.push(`! Still loading after 8 s: ${p.loadingPlaceholders} loading placeholder(s) on the page, so the audit saw a loading state.`);
       }
       if (p.states) lines.push('States (?state=):', ...p.states.map(stateLine));
-      if (p.checks) lines.push('Checks:', ...p.checks.map(checkLine));
+      if (p.checks) lines.push('Checks:', ...p.checks.map(checkLine), ...(p.checks.length ? checkSummary(p.checks) : []));
       return lines.join('\n');
     })
     .join('\n\n');
