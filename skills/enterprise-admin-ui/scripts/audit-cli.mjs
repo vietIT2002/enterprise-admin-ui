@@ -3,7 +3,8 @@
  * enterprise-admin-ui audit CLI — MIT License
  * Runs scripts/audit.js on pages in an installed headless Chrome, Edge or Chromium. No dependencies; Node 22 or later.
  *
- *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
+ *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]
+                     [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
  *
  * --states also opens ?state=empty, error and loading; --checks also searches, exports and prints the way a person
  * would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page. --checks clicks Delete
@@ -16,7 +17,12 @@
  * dismissed, and a page that stops responding is reported instead of waited for. The browser is driven over the
  * DevTools protocol on a pipe, with a throwaway profile; on Linux it runs without the sandbox, as Playwright does.
  *
- * Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.
+ * Each check ends with a status: pass, fail, not_verified (no matching control, or Delete not clicked without
+ * --disposable: an absent control is never a pass), not_applicable (declared with --not-applicable; the check is not
+ * run) or error. --require makes a check that finds no control fail, and one that is not_verified exit 1.
+ *
+ * Exit code: 0 nothing failed; 1 an ✗ error (or any violation with --strict), a failed state, a check with status
+ * fail, or a required check that is not_verified; 2 a usage error, or a page, state or check that could not run.
  */
 import { spawn } from 'node:child_process';
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs';
@@ -41,6 +47,18 @@ export class UsageError extends Error {
 
 // ------------------------------------------------------------------ arguments
 
+// A comma-separated list of check names; an unknown name is a usage error that lists the valid ones.
+// A flag given more than once adds up: values is every value it was given.
+function checkList(values, flag) {
+  if (values === undefined) return [];
+  const names = values.flatMap((v) => v.split(',')).map((n) => n.trim()).filter(Boolean);
+  if (!names.length) throw new UsageError(`${flag} takes check names, such as ${flag} export,confirm.`);
+  for (const name of names) {
+    if (!CHECKS.includes(name)) throw new UsageError(`Unknown check "${name}" in ${flag}. Use one of: ${CHECKS.join(', ')}.`);
+  }
+  return [...new Set(names)];
+}
+
 export function parseCli(argv) {
   let parsed;
   try {
@@ -55,6 +73,8 @@ export function parseCli(argv) {
         browser: { type: 'string' },
         states: { type: 'boolean' },
         checks: { type: 'boolean' },
+        require: { type: 'string', multiple: true },
+        'not-applicable': { type: 'string', multiple: true },
         disposable: { type: 'boolean' },
         timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
@@ -72,6 +92,8 @@ export function parseCli(argv) {
     strict: Boolean(values.strict),
     states: Boolean(values.states),
     checks: Boolean(values.checks),
+    require: checkList(values.require, '--require'),
+    notApplicable: checkList(values['not-applicable'], '--not-applicable'),
     disposable: Boolean(values.disposable),
     timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
@@ -83,6 +105,11 @@ export function parseCli(argv) {
     throw new UsageError(`Unknown --type "${opts.pageType}". Use one of: ${PAGE_TYPES.join(', ')}.`);
   }
   if (!opts.targets.length) throw new UsageError('Give a URL or an HTML file to audit.');
+  for (const [flag, list] of [['--require', opts.require], ['--not-applicable', opts.notApplicable]]) {
+    if (list.length && !opts.checks) throw new UsageError(`${flag} needs --checks.`);
+  }
+  const both = opts.require.filter((c) => opts.notApplicable.includes(c));
+  if (both.length) throw new UsageError(`A check cannot be in both --require and --not-applicable: ${both.join(', ')}.`);
   return opts;
 }
 
@@ -238,59 +265,109 @@ const PATTERNS = Object.freeze({
   noResultsRe: String.raw`\bno\b.{0,60}\b(match|matches|matching|results?|found)\b|nothing (matches|found)|không (có|tìm thấy)|没有.{0,20}(结果|匹配)|无结果|未找到`,
 });
 
-// CheckResult: { check, ok, skipped, unverified, blocked: string[], problems: string[], note, error: string|null }. A
+// CheckResult: { check, ok, skipped, unverified, blocked: string[], problems: string[], note, error: string|null,
+//   evidence: { method, basis, observed, limitation } (null when status is error), status?, required? }. status (pass | fail | not_applicable |
+//   not_verified | error) and required are set by withRequirement / notApplicable, not by the judge functions. A
 // skipped check is ok. unverified: the page has what the check needs, but the check did not run, so nothing was
 // verified (the note says why). blocked: requests the check stopped before they left the browser, as "DELETE https://…".
-const outcome = (check, { skipped = false, unverified = false, blocked = [], problems = [], note = '' } = {}) => ({ check, ok: problems.length === 0, skipped, unverified, blocked, problems, note, error: null });
+const outcome = (check, { skipped = false, unverified = false, blocked = [], problems = [], note = '', evidence } = {}) => ({ check, ok: problems.length === 0, skipped, unverified, blocked, problems, note, error: null, evidence });
+
+// evidence: what a check saw and what it does not establish. method: interaction | dom | print-media | manual;
+// basis: direct | heuristic | manual.
+const evidence = (method, basis, observed, limitation = null) => ({ method, basis, observed, limitation });
+const absent = (what) => evidence('dom', 'heuristic', `no ${what} matched the name patterns`, 'the control may exist under another name');
+
+// Adds status and required to a judged result. Undeclared (required false): a control not found or a click not made is
+// not_verified. Required: a control not found fails, and a click not made stays not_verified.
+export function withRequirement(result, { required = false } = {}) {
+  if (result.status === 'not_applicable') return result;
+  let out = { ...result, required };
+  if (out.error) return { ...out, status: 'error' };
+  if (required && out.skipped && !out.unverified) {
+    const problem = `required ${out.check}: no matching control found`;
+    out = { ...out, ok: false, problems: out.problems.includes(problem) ? out.problems : [...out.problems, problem] };
+  }
+  const status = out.problems.length ? 'fail' : out.unverified || out.skipped ? 'not_verified' : 'pass';
+  return { ...out, status };
+}
+
+// A check that could not run: an error, with no evidence.
+export const failedCheck = (check, err) => ({ check, ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: err.message, evidence: null });
+
+// A check the person declared not applicable: it does not run.
+export function notApplicable(check) {
+  const note = 'declared not applicable with --not-applicable';
+  return { ...outcome(check, { skipped: true, note, evidence: evidence('manual', 'manual', note) }), status: 'not_applicable', required: false };
+}
 
 // before and after the search: { rows, numbers, noResults } from the page (data rows; short texts with a number outside
 // the table body and the controls; whether it says nothing matches). Only a list must show a count that changes.
 export function judgeSearch({ found, before, after, pageType = null }) {
-  if (!found) return outcome('search', { skipped: true, note: 'no search box' });
+  if (!found) return outcome('search', { skipped: true, note: 'no search box', evidence: absent('search box') });
   const problems = [];
   if (after.rows > 0) problems.push(`${after.rows} data row${after.rows === 1 ? '' : 's'} still show after a search that matches nothing`);
   if (!after.noResults) problems.push('no "no results" message, such as "No orders match this search" with Clear search');
   const changed = [...before.numbers].sort().join('\n') !== [...after.numbers].sort().join('\n');
   if (!changed && pageType === 'list') problems.push('no count changed: show how many records match ("12 of 48 orders") and update it on every search');
-  return outcome('search', { problems, note: `a search for "${NO_MATCH_QUERY}" empties the list and says so${changed ? ', and the count changes' : ''}` });
+  return outcome('search', {
+    problems,
+    note: `a search for "${NO_MATCH_QUERY}" empties the list and says so${changed ? ', and the count changes' : ''}`,
+    evidence: evidence('interaction', 'direct', `a search for "${NO_MATCH_QUERY}" left ${after.rows} data row${after.rows === 1 ? '' : 's'}${after.noResults ? ' and a no-results message' : ' and no no-results message'}`, 'only one no-match query; real matching is not checked'),
+  });
 }
 
 // names: the visible Export controls.
 export function judgeExport(names) {
-  if (!names.length) return outcome('export', { skipped: true, note: 'no Export control' });
+  if (!names.length) return outcome('export', { skipped: true, note: 'no Export control', evidence: absent('Export control') });
   const bare = names.filter((name) => !/\d/.test(name));
   const problems = bare.length ? [`"${bare[0]}" does not name what it exports: give the scope and count, as "Export 1.245 orders" or "Export 3 selected"`] : [];
-  return outcome('export', { problems, note: `"${names[0]}"` });
+  return outcome('export', {
+    problems,
+    note: `"${names[0]}"`,
+    evidence: evidence('dom', 'direct', `the Export control reads "${names[0]}"`, "the export was not run; the file's scope and rows are not checked"),
+  });
 }
 
 // printed: null without a Print control, else what shows in print media: { h1, nav, buttons }.
 export function judgePrint(printed) {
-  if (!printed) return outcome('print', { skipped: true, note: 'no Print control' });
+  if (!printed) return outcome('print', { skipped: true, note: 'no Print control', evidence: absent('Print control') });
   const problems = [];
   if (!printed.h1) problems.push('the title (h1) does not print: keep it, with the period and totals');
   if (printed.nav) problems.push(`${printed.nav} navigation element${printed.nav === 1 ? ' still prints' : 's still print'} (hide the shell in @media print)`);
   if (printed.buttons) problems.push(`${printed.buttons} button${printed.buttons === 1 ? ' still prints' : 's still print'} (hide controls in @media print)`);
-  return outcome('print', { problems, note: 'printing keeps the title and hides navigation and buttons' });
+  return outcome('print', {
+    problems,
+    note: 'printing keeps the title and hides navigation and buttons',
+    evidence: evidence('print-media', 'direct', `under print media: title ${printed.h1 ? 'shows' : 'missing'}, ${printed.nav} navigation and ${printed.buttons} button${printed.buttons === 1 ? '' : 's'} still show`, 'pagination and a full printed document are not checked'),
+  });
 }
 
 // label: the first visible delete, remove or deactivate action, or null; clicked: false when it was left alone, as it
 // is without --disposable; dialog: a dialog showed after the click; native: the browser's confirm() opened; blocked:
 // the requests the click sent that confirmCheck stopped.
 export function judgeConfirm({ label, clicked = true, dialog = false, native = false, blocked = [] }) {
-  if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action' });
+  if (!label) return outcome('confirm', { skipped: true, note: 'no visible delete, remove or deactivate action', evidence: absent('delete, remove or deactivate action') });
   if (!clicked) {
     return outcome('confirm', {
       skipped: true,
       unverified: true,
+      evidence: evidence('dom', 'heuristic', `"${label}" was found by its name but not clicked`, 'the click was not made without --disposable, so whether it asks first is not established'),
       note: `"${label}" was not clicked, since that could change real data. On mock data or a test copy you can reset, run again with --disposable to check that it asks first`,
     });
   }
   const sent = blocked.length ? `${blocked[0]}${blocked.length > 1 ? ` and ${blocked.length - 1} more` : ''}, which --checks blocked` : '';
   const also = sent ? `, but the click also sent ${sent}` : '';
-  if (dialog) return outcome('confirm', { blocked, note: `"${label}" opens a dialog first${also}` });
-  if (native) return outcome('confirm', { blocked, note: `"${label}" asks with the browser's confirm()${also}; a dialog that names the record and the consequence is better` });
+  const seen = evidence(
+    'interaction',
+    'direct',
+    `clicking "${label}" ${dialog ? 'opened a dialog' : native ? "opened the browser's confirm()" : 'acted at once'}; ${blocked.length} request${blocked.length === 1 ? '' : 's'} blocked`,
+    'only the first destructive control; the confirm action is never submitted'
+  );
+  if (dialog) return outcome('confirm', { blocked, note: `"${label}" opens a dialog first${also}`, evidence: seen });
+  if (native) return outcome('confirm', { blocked, note: `"${label}" asks with the browser's confirm()${also}; a dialog that names the record and the consequence is better`, evidence: seen });
   return outcome('confirm', {
     blocked,
+    evidence: seen,
     problems: [`"${label}" acts at once${sent ? ` (it sent ${sent})` : ''}: open a dialog (role="alertdialog") that names the record and the consequence, with focus on Cancel`],
   });
 }
@@ -298,25 +375,52 @@ export function judgeConfirm({ label, clicked = true, dialog = false, native = f
 // count: role="status", role="alert" and aria-live regions on the page.
 export function judgeLive(count) {
   const problems = count ? [] : ['no role="status", role="alert" or aria-live region, so screen readers hear no messages: add <div role="status" aria-live="polite">'];
-  return outcome('live-region', { problems, note: `${count} live region${count === 1 ? '' : 's'}` });
+  return outcome('live-region', {
+    problems,
+    note: `${count} live region${count === 1 ? '' : 's'}`,
+    evidence: evidence('dom', 'direct', `${count} role="status", role="alert" or aria-live region${count === 1 ? '' : 's'}`, 'whether messages are announced is not checked'),
+  });
 }
 
 // PageResult: { target, url, error: string|null, loadingPlaceholders: number, result: audit result|null,
 //               states: null | [{ state, url, ok, problems, details, error }], checks: null | [CheckResult] }
+// A result from behaviourChecks may have no status yet: read it as undeclared.
+const statusOf = (c) => c.status ?? withRequirement(c).status;
+
 export function exitCode(pages, strict) {
   const states = (p) => p.states || [];
   const checks = (p) => p.checks || [];
   if (pages.some((p) => p.error || states(p).some((s) => s.error) || checks(p).some((c) => c.error))) return 2;
   const fails = (v) => strict || v.severity === 'error';
-  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok) || checks(p).some((c) => !c.ok)) ? 1 : 0;
+  return pages.some((p) => (p.result && p.result.violations.some(fails)) || states(p).some((s) => !s.ok) || checks(p).some((c) => !c.ok || statusOf(c) === 'fail' || (c.required && statusOf(c) === 'not_verified'))) ? 1 : 0;
 }
 
 function checkLine(c) {
-  if (c.error) return `✗ ${c.check}: could not check: ${c.error}`;
-  if (c.unverified) return `? ${c.check}: ${c.note}`;
-  if (c.skipped) return `– ${c.check}: ${c.note}`;
-  if (!c.ok) return `✗ ${c.check}: ${c.problems.join('; ')}`;
-  return `✓ ${c.check}: ${c.note}`;
+  const name = c.required ? `${c.check} (required)` : c.check;
+  const status = statusOf(c);
+  if (status === 'error') return `✗ ${name}: could not check: ${c.error}`;
+  if (status === 'fail') return `✗ ${name}: ${c.problems.map((p) => p.replace(`required ${c.check}: `, '')).join('; ')}`;
+  if (status === 'not_verified') return `? ${name}: ${c.note}`;
+  if (status === 'not_applicable') return `– ${name}: ${c.note}`;
+  return `✓ ${name}: ${c.note}`;
+}
+
+// 'Checks: 2 pass · 1 fail …' (counts above zero only), then the required checks that are not shown to pass.
+function checkSummary(checks) {
+  const count = (s) => checks.filter((c) => statusOf(c) === s).length;
+  const parts = [['pass', 'pass'], ['fail', 'fail'], ['not_verified', 'not verified'], ['not_applicable', 'not applicable'], ['error', 'error']]
+    .filter(([s]) => count(s) > 0)
+    .map(([s, label]) => `${count(s)} ${label}`);
+  const lines = [`Checks: ${parts.join(' · ')}`];
+  const reason = (c) => {
+    if (statusOf(c) === 'error') return 'could not run';
+    if (c.check === 'confirm' && c.unverified) return 'not clicked: needs --disposable, on mock data or a test copy only';
+    if (statusOf(c) === 'fail') return c.problems.some((p) => p.startsWith('required ')) ? 'no matching control found' : 'failed';
+    return c.note;
+  };
+  const open = checks.filter((c) => c.required && statusOf(c) !== 'pass');
+  if (open.length) lines.push(`Required but not shown to pass: ${open.map((c) => `${c.check} (${reason(c)})`).join(', ')}`);
+  return lines;
 }
 
 function stateLine(s) {
@@ -336,7 +440,7 @@ export function formatText(pages, pageType = null) {
         lines.push(`! Still loading after 8 s: ${p.loadingPlaceholders} loading placeholder(s) on the page, so the audit saw a loading state.`);
       }
       if (p.states) lines.push('States (?state=):', ...p.states.map(stateLine));
-      if (p.checks) lines.push('Checks:', ...p.checks.map(checkLine));
+      if (p.checks) lines.push('Checks:', ...p.checks.map(checkLine), ...(p.checks.length ? checkSummary(p.checks) : []));
       return lines.join('\n');
     })
     .join('\n\n');
@@ -969,7 +1073,7 @@ function auditPage(browser, url, pageType, auditSource, { snapshot = false } = {
 async function auditState(browser, target, state, base) {
   const snap = await withPage(browser, target, { waitForPlaceholders: state !== 'loading' }, (send) => evaluate(send, `(${snapshotInPage})()`));
   const { ok, problems, details } = checkState(state, base, snap);
-  return { state, url: target, ok, problems, details, error: null };
+  return { state, url: target, ok, problems, details, error: null, status: ok ? 'pass' : 'fail' };
 }
 
 // After typing or clicking: wait for a debounced handler, then for the page to settle again.
@@ -981,12 +1085,12 @@ async function settleAfterAction(send, ms) {
 
 const controlsOf = (send) => evaluate(send, `(${controlsInPage})(${JSON.stringify(PATTERNS)})`);
 
-// The read-only checks, from one tab: the controls, then what prints (print media last, as it changes the page).
-function readControls(browser, url) {
+// The read-only checks, from one tab: the controls, then what prints (print media last, as it changes the page). With print false (declared not applicable), print media is never emulated.
+function readControls(browser, url, { print = true } = {}) {
   return withPage(browser, url, {}, async (send) => {
     const controls = await controlsOf(send);
     controls.printed = null;
-    if (controls.print) {
+    if (print && controls.print) {
       await send('Emulation.setEmulatedMedia', { media: 'print', features: MEDIA_FEATURES });
       controls.printed = await evaluate(send, `(${printInPage})()`);
     }
@@ -1043,14 +1147,19 @@ function confirmCheck(browser, url) {
 }
 
 // The five checks of CHECKS, in order, each tab under the same per-page time limit. A check that fails to run gets an error.
-// Only with disposable is the destructive action clicked; without it, confirm is unverified.
-async function behaviourChecks(limited, url, pageType, disposable) {
-  const failed = (check, err) => ({ check, ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: err.message });
+// Only with disposable is the destructive action clicked; without it, confirm is unverified. A check declared not
+// applicable is not run at all (no tab, no click); every other result gets its status from withRequirement.
+async function behaviourChecks(limited, url, pageType, disposable, { require = [], notApplicable: declared = [] } = {}) {
+  const failed = failedCheck;
+  const wrap = (check, result) => withRequirement(result, { required: require.includes(check) });
+  const todo = CHECKS.filter((check) => !declared.includes(check));
   let controls;
-  try {
-    controls = await limited((b) => readControls(b, url));
-  } catch (err) {
-    return CHECKS.map((check) => failed(check, err));
+  if (todo.length) {
+    try {
+      controls = await limited((b) => readControls(b, url, { print: !declared.includes('print') }));
+    } catch (err) {
+      return CHECKS.map((check) => (declared.includes(check) ? notApplicable(check) : wrap(check, failed(check, err))));
+    }
   }
   const attempt = async (check, work) => {
     try {
@@ -1059,24 +1168,28 @@ async function behaviourChecks(limited, url, pageType, disposable) {
       return failed(check, err);
     }
   };
-  return [
-    controls.search ? await attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false }),
-    judgeExport(controls.exports),
-    judgePrint(controls.printed),
-    !controls.destructive
-      ? judgeConfirm({ label: null })
-      : disposable
-        ? await attempt('confirm', (b) => confirmCheck(b, url))
-        : judgeConfirm({ label: controls.destructive, clicked: false }),
-    judgeLive(controls.live),
-  ];
+  const run = {
+    search: () => (controls.search ? attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false })),
+    export: () => judgeExport(controls.exports),
+    print: () => judgePrint(controls.printed),
+    confirm: () =>
+      !controls.destructive
+        ? judgeConfirm({ label: null })
+        : disposable
+          ? attempt('confirm', (b) => confirmCheck(b, url))
+          : judgeConfirm({ label: controls.destructive, clicked: false }),
+    'live-region': () => judgeLive(controls.live),
+  };
+  const results = [];
+  for (const check of CHECKS) results.push(declared.includes(check) ? notApplicable(check) : wrap(check, await run[check]()));
+  return results;
 }
 
 // One browser for all targets, a new tab for each. A target that fails gets an error; a browser that cannot start rejects.
 // With states, each page that was audited is also opened with ?state=empty, error and loading; with checks, it gets the
 // behaviour checks. Each page, state and check tab gets at most timeoutS; one that takes longer may have hung the
 // browser, so it is stopped and a new one started.
-export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, require = [], notApplicable = [], disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
       return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null, checks: null };
@@ -1134,11 +1247,11 @@ export async function auditTargets(targets, { pageType = null, browser: executab
           try {
             page.states.push(await limited((b) => auditState(b, url, state, base)));
           } catch (err) {
-            page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message });
+            page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message, status: 'error' });
           }
         }
       }
-      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable);
+      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable, { require, notApplicable });
     }
   } finally {
     if (browser) await browser.close();
@@ -1148,7 +1261,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
 
 // ------------------------------------------------------------------ command line
 
-const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]] [--json] [--strict] [--browser <path>]
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable] [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
 
 Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
 
@@ -1162,7 +1275,15 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --checks           also use the page as a person would and check what SKILL.md asks of its behaviour: a search that
                      matches nothing empties the list, says so and (on a list) changes the count; Export names its
                      count; Print hides navigation and buttons and keeps the title; Delete opens a dialog first (only
-                     with --disposable); a role="status" region exists. A check the page gives no control for is skipped
+                     with --disposable); a role="status" region exists. A check the page gives no control for is
+                     "? not verified", never a pass, unless you declare it with --require or --not-applicable. Each
+                     check ends as pass, fail, not_verified, not_applicable or error; an error has evidence null
+  --require <checks> with --checks: the checks (comma-separated: ${CHECKS.join(', ')})
+                     this page must have. One with no matching control fails; one still not verified (Delete
+                     without --disposable) exits 1
+  --not-applicable <checks>
+                     with --checks: the checks (comma-separated) this page has no use for. They are not run, and
+                     print as "– name"
   --disposable       the page's data is mock data or a test copy you can reset, so --checks may click Delete. Even
                      then, requests that click sends with a method other than GET, HEAD or OPTIONS are blocked, but a
                      GET, a WebSocket or a service worker can still change data: never use it on real data. Without
@@ -1170,7 +1291,8 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
   --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
-Exit code: 0 no ✗ error, 1 an ✗ error (or any violation with --strict), 2 a page could not be audited.`;
+Exit code: 0 nothing failed; 1 an ✗ error (or any violation with --strict), a failed state, a check that failed, or a
+required check that is not verified; 2 a usage error, or a page, state or check that could not run.`;
 
 export async function main(argv = process.argv.slice(2)) {
   let opts;
@@ -1206,7 +1328,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, disposable: opts.disposable, timeoutS: opts.timeout });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, require: opts.require, notApplicable: opts.notApplicable, disposable: opts.disposable, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;

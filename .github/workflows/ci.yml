@@ -28,8 +28,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      # --with-deps also installs extra fonts through apt. When the Ubuntu mirror cannot be reached, apt waits about
+      # 10 minutes before failing, so give it 3 (it normally takes under 1). The runner's preinstalled libraries are
+      # enough, so then install the browser alone instead of failing the run.
       - name: Install Chromium for the fixture tests
-        run: npx playwright install --with-deps chromium
+        run: timeout 180 npx playwright install --with-deps chromium || npx playwright install chromium
 
       # Unit tests for audit.js, the fixture pages in Chromium, adapters in step with SKILL.md,
       # and the numbers the READMEs, manifests and CHANGELOG state.

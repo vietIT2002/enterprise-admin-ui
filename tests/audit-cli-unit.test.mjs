@@ -13,6 +13,7 @@ import {
   checkState,
   createMessageReader,
   exitCode,
+  failedCheck,
   findBrowser,
   formatText,
   judgeConfirm,
@@ -20,10 +21,12 @@ import {
   judgeLive,
   judgePrint,
   judgeSearch,
+  notApplicable,
   parseCli,
   stateUrl,
   sweepStaleProfiles,
   toUrl,
+  withRequirement,
 } from '../skills/enterprise-admin-ui/scripts/audit-cli.mjs';
 import { ROOT } from '../tools/build-adapters.mjs';
 
@@ -34,9 +37,36 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, disposable: false, timeout: 90, browser: null, help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, require: [], notApplicable: [], disposable: false, timeout: 90, browser: null, help: false });
   const all = parseCli(['--json', '--strict', '--states', '--checks', '--disposable', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, disposable: true, timeout: 120, browser: '/x/chrome', help: false });
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, require: [], notApplicable: [], disposable: true, timeout: 120, browser: '/x/chrome', help: false });
+});
+
+test('parseCli: --require and --not-applicable take check names', () => {
+  const o = parseCli(['a', '--checks', '--require', 'export,confirm', '--not-applicable', 'print']);
+  assert.deepEqual([o.require, o.notApplicable], [['export', 'confirm'], ['print']]);
+});
+
+test('parseCli: repeated --require and --not-applicable accumulate, without duplicates', () => {
+  const o = parseCli(['a', '--checks', '--require', 'export', '--require', 'confirm,export', '--not-applicable', 'print', '--not-applicable', 'search']);
+  assert.deepEqual([o.require, o.notApplicable], [['export', 'confirm'], ['print', 'search']]);
+});
+
+test('parseCli: an empty --require or --not-applicable list is a usage error', () => {
+  for (const flag of ['--require', '--not-applicable']) {
+    for (const value of ['', ' , ']) {
+      assert.throws(() => parseCli(['a', '--checks', flag, value]), (err) => err instanceof UsageError && err.message.includes(`${flag} takes check names, such as ${flag} export,confirm`), `${flag} "${value}"`);
+    }
+  }
+  assert.throws(() => parseCli(['a', '--require', '']), (err) => err instanceof UsageError);
+});
+
+test('parseCli: --require and --not-applicable usage errors', () => {
+  assert.throws(() => parseCli(['a', '--checks', '--require', 'export,nope']), (err) => err instanceof UsageError && /Unknown check "nope"/.test(err.message) && /search, export, print, confirm, live-region/.test(err.message));
+  assert.throws(() => parseCli(['a', '--checks', '--not-applicable', 'nope']), (err) => err instanceof UsageError && /Unknown check "nope"/.test(err.message));
+  assert.throws(() => parseCli(['a', '--checks', '--require', 'print', '--not-applicable', 'print,export']), (err) => err instanceof UsageError && /both --require and --not-applicable: print/.test(err.message));
+  assert.throws(() => parseCli(['a', '--require', 'print']), (err) => err instanceof UsageError && /--require needs --checks/.test(err.message));
+  assert.throws(() => parseCli(['a', '--not-applicable', 'print']), (err) => err instanceof UsageError && /--not-applicable needs --checks/.test(err.message));
 });
 
 test('parseCli: --timeout takes a positive number of seconds', () => {
@@ -345,8 +375,120 @@ test('exitCode: a failed check exits 1, a skipped one passes, a check that could
   assert.equal(exitCode([withChecks([{ check: 'search', ok: false, skipped: false, problems: [], note: '', error: 'The page did not respond' }])], false), 2);
 });
 
-test('formatText: one line per check, ✓ passed, ✗ failed, – skipped', () => {
+test('formatText: one line per check, ✓ passed, ✗ failed, ? not found (not verified)', () => {
   const p = { ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [judgeSearch({ found: false }), judgeExport(['Export']), judgeLive(1)] };
   const text = formatText([p], 'list');
-  assert.match(text, /Checks:\n– search: no search box\n✗ export: "Export" does not name[^\n]*\n✓ live-region: 1 live region/);
+  assert.match(text, /Checks:\n\? search: no search box\n✗ export: "Export" does not name[^\n]*\n✓ live-region: 1 live region/);
+});
+
+// ------------------------------------------------------------------ status, requirement and evidence (R4)
+
+test('withRequirement: status follows the spec table', () => {
+  const absent = judgeExport([]);
+  assert.equal(withRequirement(absent).status, 'not_verified');
+  assert.equal(withRequirement(absent).required, false);
+  const req = withRequirement(absent, { required: true });
+  assert.equal(req.status, 'fail');
+  assert.equal(req.required, true);
+  assert.equal(req.ok, false);
+  assert.ok(req.problems.some((p) => /required export/.test(p)), req.problems.join('; '));
+  assert.equal(withRequirement(judgeConfirm({ label: 'Delete', clicked: false }), { required: true }).status, 'not_verified');
+  assert.equal(withRequirement(judgeLive(1)).status, 'pass');
+  assert.equal(withRequirement(judgeLive(0)).status, 'fail');
+  assert.equal(withRequirement({ ...judgeLive(1), error: 'boom', ok: false }).status, 'error');
+  assert.equal(judgeExport([]).status, undefined, 'the judge functions alone leave status unset');
+});
+
+test('notApplicable: a declared check has the manual shape', () => {
+  assert.deepEqual(notApplicable('print'), {
+    check: 'print', ok: true, skipped: true, unverified: false, blocked: [], problems: [], note: 'declared not applicable with --not-applicable', error: null,
+    status: 'not_applicable', required: false,
+    evidence: { method: 'manual', basis: 'manual', observed: 'declared not applicable with --not-applicable', limitation: null },
+  });
+});
+
+test('every judge result carries evidence', () => {
+  const results = [
+    judgeSearch({ found: false }), judgeSearch({ found: true, before: { rows: 1, numbers: [], noResults: false }, after: { rows: 0, numbers: [], noResults: true } }),
+    judgeExport([]), judgeExport(['Export 3 orders']), judgePrint(null), judgePrint({ h1: true, nav: 0, buttons: 0 }),
+    judgeConfirm({ label: null }), judgeConfirm({ label: 'Delete', clicked: false }), judgeConfirm({ label: 'Delete', dialog: true }), judgeLive(0), judgeLive(2),
+  ];
+  for (const r of results) {
+    const e = r.evidence;
+    assert.ok(e, r.check);
+    assert.ok(['interaction', 'dom', 'print-media', 'manual'].includes(e.method), r.check);
+    assert.ok(['direct', 'heuristic', 'manual'].includes(e.basis), r.check);
+    assert.equal(typeof e.observed, 'string');
+    assert.ok(e.limitation === null || typeof e.limitation === 'string');
+  }
+  assert.match(judgeExport(['Export 3 orders']).evidence.limitation, /not run/);
+  const none = judgeExport([]).evidence;
+  assert.deepEqual([none.method, none.basis, none.observed, none.limitation], ['dom', 'heuristic', 'no Export control matched the name patterns', 'the control may exist under another name']);
+});
+
+test('exitCode: a required not_verified exits 1; optional not_verified and not_applicable exit 0', () => {
+  const withChecks = (checks) => ({ ...page([]), checks });
+  const nv = judgeConfirm({ label: 'Delete', clicked: false });
+  assert.equal(exitCode([withChecks([withRequirement(nv, { required: true })])], false), 1);
+  assert.equal(exitCode([withChecks([withRequirement(nv)])], false), 0);
+  assert.equal(exitCode([withChecks([notApplicable('print')])], false), 0);
+  assert.equal(exitCode([withChecks([withRequirement(judgeLive(0))])], false), 1);
+  assert.equal(exitCode([withChecks([nv])], false), 0, 'a result without status is read as undeclared');
+});
+
+test('formatText: summary line and unresolved requirements', () => {
+  const checks = [
+    withRequirement(judgeLive(1)),
+    withRequirement(judgeExport([]), { required: true }),
+    withRequirement(judgeConfirm({ label: 'Delete', clicked: false }), { required: true }),
+    notApplicable('print'),
+  ];
+  const text = formatText([{ ...page([]), result: { violations: [], summary: 'Score 100' }, checks }], 'list');
+  assert.match(text, /✓ live-region: 1 live region/);
+  assert.match(text, /✗ export \(required\): /);
+  assert.match(text, /\? confirm \(required\): /);
+  assert.match(text, /– print: /);
+  assert.match(text, /Checks: 1 pass · 1 fail · 1 not verified · 1 not applicable\n/);
+  assert.match(text, /Required but not shown to pass: export \(no matching control found\), confirm \(not clicked: needs --disposable, on mock data or a test copy only\)/);
+});
+
+test('formatText: a required check with no control says so once', () => {
+  const text = formatText([{ ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [withRequirement(judgeExport([]), { required: true })] }], 'list');
+  assert.match(text, /\n✗ export \(required\): no matching control found\n/);
+  assert.doesNotMatch(text, /required export:/);
+});
+
+test('formatText: the summary reason for each way a required check is not shown to pass', () => {
+  const reasonOf = (check) => formatText([{ ...page([]), result: { violations: [], summary: 'Score 100' }, checks: [check] }], 'list').match(/Required but not shown to pass: (.*)/)[1];
+  assert.equal(reasonOf(withRequirement(judgeExport([]), { required: true })), 'export (no matching control found)');
+  assert.equal(reasonOf(withRequirement(judgeConfirm({ label: 'Delete', clicked: false }), { required: true })), 'confirm (not clicked: needs --disposable, on mock data or a test copy only)');
+  assert.equal(reasonOf(withRequirement(judgeLive(0), { required: true })), 'live-region (failed)');
+  assert.equal(reasonOf(withRequirement(failedCheck('search', new Error('boom')), { required: true })), 'search (could not run)');
+});
+
+test('failedCheck: a check that could not run has an error and no evidence', () => {
+  assert.deepEqual(failedCheck('print', new Error('boom')), { check: 'print', ok: false, skipped: false, unverified: false, blocked: [], problems: [], note: '', error: 'boom', evidence: null });
+  const r = withRequirement(failedCheck('print', new Error('boom')));
+  assert.equal(r.status, 'error');
+  assert.equal(r.evidence, null);
+});
+
+test('evidence: [method, basis] of every judge output and path', () => {
+  const found = { rows: 1, numbers: [], noResults: false };
+  const none = { rows: 0, numbers: [], noResults: true };
+  const table = [
+    ['search absent', judgeSearch({ found: false }), ['dom', 'heuristic']],
+    ['search found', judgeSearch({ found: true, before: found, after: none }), ['interaction', 'direct']],
+    ['export without control', judgeExport([]), ['dom', 'heuristic']],
+    ['export with control', judgeExport(['Export 3 orders']), ['dom', 'direct']],
+    ['print without control', judgePrint(null), ['dom', 'heuristic']],
+    ['print with control', judgePrint({ h1: true, nav: 0, buttons: 0 }), ['print-media', 'direct']],
+    ['confirm absent', judgeConfirm({ label: null }), ['dom', 'heuristic']],
+    ['confirm not clicked', judgeConfirm({ label: 'Delete', clicked: false }), ['dom', 'heuristic']],
+    ['confirm clicked, dialog', judgeConfirm({ label: 'Delete', dialog: true }), ['interaction', 'direct']],
+    ['confirm clicked, native', judgeConfirm({ label: 'Delete', native: true }), ['interaction', 'direct']],
+    ['confirm clicked, acts at once', judgeConfirm({ label: 'Delete' }), ['interaction', 'direct']],
+    ['live-region', judgeLive(1), ['dom', 'direct']],
+  ];
+  for (const [name, r, expected] of table) assert.deepEqual([r.evidence.method, r.evidence.basis], expected, name);
 });
