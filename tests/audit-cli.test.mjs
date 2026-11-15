@@ -38,11 +38,21 @@ const POSIX = process.platform !== 'win32';
 const FAKE_BROWSER = join(ROOT, 'tests/helpers/fake-browser.mjs');
 const profiles = () => readdirSync(tmpdir()).filter((name) => name.startsWith('eaui-audit-'));
 
-function run(args, { cwd = ROOT, timeout = 90000, cli = CLI, env = {} } = {}) {
+// The CLI gives each page, state and check --timeout seconds (90 by default) and prints only when it is done. A run
+// with --states or --checks opens several tabs, so it gets 30 s per step here and 180 s in all. Then a stalled step
+// reports itself ("did not finish within 30 s") before this kills the run, and the test shows which one it was.
+const STEP_TIMEOUT = ['--timeout', '30'];
+
+function run(args, { cwd = ROOT, timeout = 180000, cli = CLI, env = {} } = {}) {
+  const steps = (args.includes('--states') || args.includes('--checks')) && !args.includes('--timeout');
+  const argv = steps ? [...args, ...STEP_TIMEOUT] : args;
   const started = Date.now();
   return new Promise((resolve) => {
-    execFile(process.execPath, [cli, ...args], { cwd, env: { ...ENV, ...env }, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
-      resolve({ code: err ? err.code : 0, stdout, stderr, output: stdout + stderr, ms: Date.now() - started });
+    execFile(process.execPath, [cli, ...argv], { cwd, env: { ...ENV, ...env }, timeout, maxBuffer: 32 * 1024 * 1024 }, (err, stdout, stderr) => {
+      const ms = Date.now() - started;
+      const killed = Boolean(err && err.killed);
+      const note = killed ? `[killed after ${ms} ms with no answer]\n` : '';
+      resolve({ code: err ? err.code : 0, killed, stdout, stderr, output: note + stdout + stderr, ms });
     });
   });
 }
@@ -354,7 +364,7 @@ test('without --states, no state is checked', async () => {
 const checksOf = async (path, type = 'list', extra = ['--disposable']) => {
   const r = await run([`${base}${path}`, '--type', type, '--checks', ...extra, '--json']);
   const [page] = JSON.parse(r.stdout || '[]');
-  assert.ok(page && page.checks, `${path}: no checks in the output\n${r.output}`);
+  assert.ok(page && page.checks, `${path}: no checks in the output after ${r.ms} ms (exit ${r.code})\n${r.output}`);
   return Object.fromEntries(page.checks.map((c) => [c.check, c]));
 };
 
