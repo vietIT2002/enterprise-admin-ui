@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { STATUSES, USERS, seedOrders } from './data.mjs';
+import { editPage, ordersPage } from './pages.mjs';
 
 export const VARIANTS = ['reference', 'loses-input', 'no-permission-check', 'page-only-select-all'];
 export const FAIL_MESSAGE = 'The server could not save the order. Try again.';
@@ -13,9 +14,10 @@ const PAGE_SIZE = 20;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const CSS = `
-body{margin:0;font:16px/1.5 system-ui,sans-serif;color:#1f2937;background:#f9fafb}
+body{margin:0;font:14px/20px system-ui,sans-serif;color:#1f2937;background:#f9fafb}
 header{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;background:#fff;border-bottom:1px solid #d1d5db}
-header a,header button{color:#1d4ed8}
+header a{color:#1d4ed8}
+header button{height:32px;padding:0 12px;background:#fff;color:#1d4ed8;border-color:#9ca3af}
 main{padding:24px;max-width:1100px;margin:0 auto}
 label{display:block;font-weight:600;margin-bottom:4px}
 input,select,textarea{font:inherit;padding:8px;border:1px solid #6b7280;border-radius:4px}
@@ -161,8 +163,12 @@ export async function startApp({ port = 0, variant = 'reference' } = {}) {
     if (method === 'GET' && (path === '/orders' || editMatch)) {
       const user = userOf(req);
       if (!user) return redirect(res, `/login?next=${encodeURIComponent(path)}`);
-      // Task 3 replaces the empty main with the orders list / edit form.
-      return sendHtml(res, 200, renderShell({ user, variant, title: editMatch ? 'Edit order' : 'Orders' }));
+      if (!editMatch) return sendHtml(res, 200, renderShell({ user, variant, title: 'Orders', ...ordersPage({ user, variant }) }));
+      let id;
+      try { id = decodeURIComponent(editMatch[1]); } catch { return sendHtml(res, 400, renderShell({ user, variant, title: 'Bad request', main: '<h1>Bad request</h1>' })); }
+      const order = orders.find((o) => o.id === id);
+      if (!order) return sendHtml(res, 404, renderShell({ user, variant, title: 'Not found', main: '<h1>Order not found</h1><p><a href="/orders">Back to orders</a></p>' }));
+      return sendHtml(res, 200, renderShell({ user, variant, title: `Edit order ${order.id}`, ...editPage({ user, variant, order }) }));
     }
 
     if (path.startsWith('/api/')) {

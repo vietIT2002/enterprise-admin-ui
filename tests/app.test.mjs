@@ -1,6 +1,7 @@
 // Backend tests for the fixture app (tests/app/). fetch only, no browser.
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
 import { startApp } from './app/server.mjs';
 import { seedOrders } from './app/data.mjs';
 
@@ -8,6 +9,7 @@ const FAIL_MESSAGE = 'The server could not save the order. Try again.';
 let app;
 let lan;
 let minh;
+let browser;
 
 const json = (cookie, body, method = 'POST') => ({
   method,
@@ -23,8 +25,26 @@ before(async () => {
   app = await startApp();
   lan = await session('lan');
   minh = await session('minh');
+  try {
+    browser = await chromium.launch();
+  } catch (err) {
+    if (!/Executable doesn't exist|browserType\.launch/i.test(String(err && err.message))) throw err;
+    browser = await chromium.launch({ channel: 'chrome' });
+  }
 });
-after(async () => app.close());
+after(async () => {
+  if (browser) await browser.close();
+  await app.close();
+});
+
+// Opens a page as a signed-in user; the caller closes the context.
+async function open(cookie, path) {
+  const context = await browser.newContext();
+  await context.addCookies([{ name: 'sid', value: cookie.slice(4), url: app.url }]);
+  const page = await context.newPage();
+  await page.goto(app.url + path);
+  return { page, context };
+}
 
 test('seed has 60 orders and 23 Pending', () => {
   const rows = seedOrders();
@@ -197,4 +217,59 @@ test('malformed or non-object bodies answer 400', async () => {
       method === 'GET' ? { headers: { cookie: lan } } : json(lan, {}, 'PUT'));
     assert.equal(r.status, 400, method);
   }
+});
+
+test('ui: admin list shows 60 orders, then 23 for Pending', async () => {
+  await post('/__test/reset', {});
+  const { page, context } = await open(lan, '/orders');
+  await page.getByText('60 orders').waitFor();
+  await page.getByLabel('Status').selectOption('Pending');
+  await page.getByText('23 orders').waitFor();
+  assert.ok(await page.getByRole('button', { name: 'Cancel orders' }).isVisible());
+  await context.close();
+});
+
+test('ui: the viewer has no Cancel orders button', async () => {
+  const { page, context } = await open(minh, '/orders');
+  await page.getByText('60 orders').waitFor();
+  assert.equal(await page.getByRole('button', { name: /Cancel orders/i }).count(), 0);
+  await context.close();
+});
+
+test('ui: the edit page shows Customer, Note and Status', async () => {
+  const { page, context } = await open(lan, '/orders/SO-1005/edit');
+  for (const name of ['Customer', 'Note', 'Status']) assert.ok(await page.getByLabel(name).isVisible(), name);
+  assert.ok(await page.getByRole('button', { name: 'Save order' }).isVisible());
+  await context.close();
+});
+
+test('ui: select all matching cancels every Pending order, not just the page', async () => {
+  await post('/__test/reset', {});
+  const { page, context } = await open(lan, '/orders');
+  await page.getByText('60 orders').waitFor();
+  await page.getByLabel('Status').selectOption('Pending');
+  await page.getByText('23 orders').waitFor();
+  await page.getByLabel('Select all on this page').check();
+  await page.getByRole('button', { name: 'Select all 23 matching' }).click();
+  await page.getByRole('button', { name: 'Cancel orders' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Cancel', exact: true }).evaluate((b) => b === document.activeElement), true);
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel 23 orders' }).click();
+  await page.getByRole('status').getByText('23 orders cancelled').waitFor();
+  assert.equal((await raw()).filter((o) => o.status === 'Pending').length, 0);
+  await context.close();
+});
+
+test('ui: a failed save keeps the input and shows an alert, then saving works', async () => {
+  await post('/__test/reset', {});
+  const { page, context } = await open(lan, '/orders/SO-1005/edit');
+  await page.getByLabel('Customer').fill('Kept Name');
+  await page.getByLabel('Note').fill('Kept note');
+  await post('/__test/fail', { method: 'PUT', path: '/api/orders/SO-1005' });
+  await page.getByRole('button', { name: 'Save order' }).click();
+  await page.getByRole('alert').getByText(FAIL_MESSAGE).waitFor();
+  assert.equal(await page.getByLabel('Customer').inputValue(), 'Kept Name');
+  await page.getByRole('button', { name: 'Save order' }).click();
+  await page.getByRole('status').getByText('Order SO-1005 saved').waitFor();
+  assert.equal((await order('SO-1005')).customer, 'Kept Name');
+  await context.close();
 });

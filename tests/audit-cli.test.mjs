@@ -768,3 +768,21 @@ test('Setup: without the cookie the --states and --checks run is a setup failure
   assert.equal(r.code, 2, r.output);
   assert.match(r.output, /Setup: redirected to \/login/);
 });
+
+test('reference UI: /orders and the edit form audit with no error', async () => {
+  const cookie = await sessionCookie('lan');
+  for (const [path, type] of [['/orders', 'list'], ['/orders/SO-1005/edit', 'form']]) {
+    const r = await run([`${app.url}${path}`, '--cookie', cookie, '--type', type, '--expect-text', 'Signed in as Lan', '--json']);
+    const [page] = JSON.parse(r.stdout);
+    assert.equal(page.error, null, r.output);
+    const errors = page.result.violations.filter((v) => v.severity === 'error');
+    assert.deepEqual(errors, [], path);
+  }
+});
+
+test('reference UI: the search check passes on /orders', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--checks', '--disposable', '--require', 'search', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.equal(page.checks.find((c) => c.check === 'search').status, 'pass', r.output);
+});
