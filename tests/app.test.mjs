@@ -158,3 +158,43 @@ test('no-permission-check skips the role check', async () => {
     await loose.close();
   }
 });
+
+// Fix round 1: input handling.
+const FORM = { 'content-type': 'application/x-www-form-urlencoded' };
+const login = (body, headers = FORM) =>
+  fetch(app.url + '/login', { method: 'POST', redirect: 'manual', headers, body });
+
+test('login next never leaves the site', async () => {
+  for (const next of ['/\\evil.com', '//evil.com', 'https://evil.com', '/a\nb']) {
+    const r = await login(`username=lan&password=test&next=${encodeURIComponent(next)}`);
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('location'), '/orders', next);
+  }
+});
+
+test('bulk-cancel needs ids or a filter', async () => {
+  await post('/__test/reset', {});
+  const r = await fetch(app.url + '/api/orders/bulk-cancel', json(lan, {}));
+  assert.equal(r.status, 400);
+  assert.deepEqual(await raw(), seedOrders());
+});
+
+test('inherited property names are not users', async () => {
+  const r = await login('username=constructor&password=');
+  assert.equal(r.status, 401);
+  assert.equal(r.headers.get('set-cookie'), null);
+  assert.equal((await post('/__test/session', { user: 'constructor' })).status, 400);
+});
+
+test('malformed or non-object bodies answer 400', async () => {
+  const bad = await login('{oops', { 'content-type': 'application/json' });
+  assert.equal(bad.status, 400);
+  assert.equal((await post('/__test/fail', null)).status, 400);
+  const put = await fetch(app.url + '/api/orders/SO-1001', json(lan, null, 'PUT'));
+  assert.equal(put.status, 400);
+  for (const method of ['GET', 'PUT']) {
+    const r = await fetch(app.url + '/api/orders/SO-%E0%A4%A',
+      method === 'GET' ? { headers: { cookie: lan } } : json(lan, {}, 'PUT'));
+    assert.equal(r.status, 400, method);
+  }
+});

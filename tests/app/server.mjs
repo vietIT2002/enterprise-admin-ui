@@ -50,7 +50,11 @@ function loginPage(next, error) {
   return renderDocument({ title: 'Sign in', body });
 }
 
-const safeNext = (n) => (typeof n === 'string' && n.startsWith('/') && !n.startsWith('//') ? n : '/orders');
+// Same-site paths only: no //host, no backslash (browsers read it as /), no control characters.
+const safeNext = (n) => (typeof n === 'string' && n.startsWith('/') && !n.startsWith('//') && !/[\\\u0000-\u001f\u007f]/.test(n) ? n : '/orders');
+const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const userNamed = (name) => (typeof name === 'string' && Object.hasOwn(USERS, name) ? USERS[name] : null);
 
 async function readBody(req) {
   const chunks = [];
@@ -66,7 +70,10 @@ async function readBody(req) {
 async function readJson(req) {
   const text = await readBody(req);
   if (!text) return {};
-  try { return JSON.parse(text); } catch { throw Object.assign(new Error('Invalid JSON'), { status: 400 }); }
+  let data;
+  try { data = JSON.parse(text); } catch { throw badRequest('Invalid JSON'); }
+  if (!isObject(data)) throw badRequest('Body must be a JSON object');
+  return data;
 }
 
 export async function startApp({ port = 0, variant = 'reference' } = {}) {
@@ -121,9 +128,9 @@ export async function startApp({ port = 0, variant = 'reference' } = {}) {
       if (method === 'GET' && path === '/__test/orders') return sendJson(res, 200, orders);
       if (method === 'POST' && path === '/__test/session') {
         const { user } = await readJson(req);
-        if (!USERS[user]) return sendJson(res, 400, { message: 'Unknown user' });
+        if (!userNamed(user)) return sendJson(res, 400, { message: 'Unknown user' });
         const sid = randomUUID();
-        sessions.set(sid, USERS[user]);
+        sessions.set(sid, userNamed(user));
         return sendJson(res, 200, { cookie: `sid=${sid}` });
       }
       return sendJson(res, 404, { message: 'Not found' });
@@ -132,8 +139,12 @@ export async function startApp({ port = 0, variant = 'reference' } = {}) {
     if (path === '/login' && method === 'GET') return sendHtml(res, 200, loginPage(safeNext(url.searchParams.get('next')), ''));
     if (path === '/login' && method === 'POST') {
       const text = await readBody(req);
-      const form = (req.headers['content-type'] || '').includes('json') ? JSON.parse(text || '{}') : Object.fromEntries(new URLSearchParams(text));
-      const user = USERS[form.username];
+      let form;
+      if ((req.headers['content-type'] || '').includes('json')) {
+        try { form = JSON.parse(text || '{}'); } catch { throw badRequest('Invalid JSON'); }
+        if (!isObject(form)) throw badRequest('Body must be a JSON object');
+      } else form = Object.fromEntries(new URLSearchParams(text));
+      const user = userNamed(form.username);
       const next = safeNext(form.next);
       if (!user || user.password !== form.password) return sendHtml(res, 401, loginPage(next, 'Wrong username or password.'));
       const sid = randomUUID();
@@ -157,6 +168,7 @@ export async function startApp({ port = 0, variant = 'reference' } = {}) {
     if (path.startsWith('/api/')) {
       const user = userOf(req);
       if (!user) return sendJson(res, 401, { message: 'Sign in required' });
+      try { decodeURIComponent(path); } catch { return sendJson(res, 400, { message: 'Malformed path' }); }
 
       if (method === 'GET' && path === '/api/orders') {
         const size = Math.max(1, Number(url.searchParams.get('size')) || PAGE_SIZE);
@@ -168,9 +180,10 @@ export async function startApp({ port = 0, variant = 'reference' } = {}) {
       if (method === 'POST' && path === '/api/orders/bulk-cancel') {
         const body = await readJson(req);
         if (!canWrite(user)) return sendJson(res, 403, { message: 'You do not have permission to cancel orders.' });
+        if (!Array.isArray(body.ids) && !isObject(body.filter)) return sendJson(res, 400, { message: 'Send ids or a filter.' });
         const hits = Array.isArray(body.ids)
           ? orders.filter((o) => body.ids.includes(o.id))
-          : orders.filter((o) => match(o, body.filter || {}));
+          : orders.filter((o) => match(o, body.filter));
         let changed = 0;
         for (const o of hits) {
           if (o.status === 'Cancelled') continue;
