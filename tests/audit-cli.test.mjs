@@ -166,6 +166,8 @@ const PAGES = {
     html('<h1>New order</h1><button type="button" aria-label="Remove line 1" onclick="this.remove()">×</button><button type="button" onclick="this.remove()">Remove filter: Online</button><div role="status"></div>'),
   '/clean': () => readFileSync(CLEAN, 'utf8'),
   '/new': () => readFileSync(CLEAN, 'utf8'),
+  '/login-page': () => readFileSync(CLEAN, 'utf8'),
+  '/js-redirect': () => readFileSync(CLEAN, 'utf8').replace('</body>', "<script>addEventListener('load', () => setTimeout(() => location.replace('/login-page'), 50))</script></body>"),
   // The only issue: one ALL-CAPS label, a warning.
   '/caps': () => html('<h1>Tổng quan</h1><p><span style="text-transform:uppercase">Trạng thái</span> của kho Hà Nội hôm nay.</p>'),
   // Mock data: a skeleton for 300 ms, then a table whose amounts are left-aligned (an error the audit must see).
@@ -739,4 +741,30 @@ test('signed-in: the cookie reaches the --checks tabs (no setup error)', async (
   assert.equal(page.error, null, r.output);
   assert.ok(page.checks, r.output);
   assert.ok(!JSON.stringify(page.checks).includes('Setup:'), JSON.stringify(page.checks));
+});
+
+test('Setup: a client-side redirect after load is a setup failure with --cookie', async () => {
+  const r = await run([`${base}/js-redirect`, '--cookie', 'a=b']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login-page/);
+});
+
+test('a client-side redirect without the new flags is audited as before', async () => {
+  const r = await run([`${base}/js-redirect`, '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.ok(!String(page.error).startsWith('Setup:'), r.output);
+});
+
+test('signed-in: --cookie alone reaches the --states and --checks tabs', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--states', '--checks', '--disposable', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.equal(page.states.length, 3, r.output);
+  assert.ok(!JSON.stringify([page.states, page.checks]).includes('Setup:'), r.output);
+});
+
+test('Setup: without the cookie the --states and --checks run is a setup failure', async () => {
+  const r = await run([`${app.url}/orders`, '--expect-text', 'Signed in as', '--states', '--checks', '--disposable']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login/);
 });

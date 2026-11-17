@@ -1082,10 +1082,18 @@ async function withPage(browser, url, { waitForPlaceholders = true, cookies = []
 
       const settle = { ...SETTLE, waitForPlaceholders };
       const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(settle)})`, true, SETTLE_TIMEOUT_MS);
+      let landedUrl = finalUrl;
+      if (identity) {
+        // A script may have navigated after load (location.replace): the page it is on now is the one that counts.
+        landedUrl = await evaluate(send, 'location.href');
+        if (!samePath(url, landedUrl)) {
+          throw new Error(`Setup: redirected to ${new URL(landedUrl).pathname} — sign in first (--cookie), or audit the page it redirected to`);
+        }
+      }
       if (expectText.length) {
         const shown = await evaluate(send, 'document.body ? document.body.innerText : ""');
         const missing = expectText.find((text) => !shown.includes(text));
-        if (missing !== undefined) throw new Error(`Setup: "${missing}" not found on ${new URL(finalUrl).pathname} — wrong user, role or page`);
+        if (missing !== undefined) throw new Error(`Setup: "${missing}" not found on ${new URL(landedUrl).pathname} — wrong user, role or page`);
       }
       return await work(send, { loadingPlaceholders, dialogs: () => dialogs, on: (fn) => listeners.add(fn) });
     } finally {
