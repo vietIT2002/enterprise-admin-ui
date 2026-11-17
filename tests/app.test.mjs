@@ -273,3 +273,63 @@ test('ui: a failed save keeps the input and shows an alert, then saving works', 
   assert.equal((await order('SO-1005')).customer, 'Kept Name');
   await context.close();
 });
+
+// Task 4: workflow checks, each proven on the reference app and on its broken variant.
+const { inputKept, permissionBoundary, selectAllMatching, WORKFLOWS } = await import('./workflows/checks.mjs');
+
+async function onVariant(variant, check) {
+  const broken = await startApp({ variant });
+  try {
+    return await check({ url: broken.url, browser });
+  } finally {
+    await broken.close();
+  }
+}
+
+test('workflows: every check passes on the reference app', async () => {
+  assert.deepEqual(WORKFLOWS, [inputKept, permissionBoundary, selectAllMatching]);
+  for (const check of WORKFLOWS) {
+    const r = await check({ url: app.url, browser });
+    assert.equal(r.status, 'pass', `${r.workflow}: ${r.problems.join(' | ')}`);
+    assert.deepEqual(r.problems, []);
+  }
+});
+
+test('workflows: selectAllMatching evidences 23 cancelled, 37 unchanged', async () => {
+  const r = await selectAllMatching({ url: app.url, browser });
+  assert.ok(r.evidence.some((e) => /23 cancelled, 37 unchanged/.test(e)), r.evidence.join(' | '));
+});
+
+test('workflows: inputKept fails on loses-input', async () => {
+  const r = await onVariant('loses-input', inputKept);
+  assert.equal(r.status, 'fail');
+  assert.ok(r.problems.some((p) => /Customer .* cleared|kept/i.test(p)), r.problems.join(' | '));
+});
+
+test('workflows: permissionBoundary fails on no-permission-check', async () => {
+  const r = await onVariant('no-permission-check', permissionBoundary);
+  assert.equal(r.status, 'fail');
+  assert.ok(r.problems.some((p) => /Cancel orders|403/.test(p)), r.problems.join(' | '));
+});
+
+test('workflows: selectAllMatching fails on page-only-select-all', async () => {
+  const r = await onVariant('page-only-select-all', selectAllMatching);
+  assert.equal(r.status, 'fail');
+  const text = r.problems.join(' | ');
+  assert.match(text, /23/);
+  assert.match(text, /20/);
+});
+
+test('workflows: the order of the checks does not change the results', async () => {
+  const names = [];
+  for (const check of [selectAllMatching, inputKept, permissionBoundary]) {
+    const r = await check({ url: app.url, browser });
+    names.push(`${r.workflow}:${r.status}`);
+    assert.equal(r.status, 'pass', r.problems.join(' | '));
+  }
+  assert.equal(names.length, 3);
+  const w3 = await onVariant('page-only-select-all', selectAllMatching);
+  const w1 = await onVariant('loses-input', inputKept);
+  const w2 = await onVariant('no-permission-check', permissionBoundary);
+  assert.deepEqual([w3.status, w1.status, w2.status], ['fail', 'fail', 'fail']);
+});
