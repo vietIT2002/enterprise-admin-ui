@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { ROOT } from '../tools/build-adapters.mjs';
 import { FIXTURES, loadFixtures } from './fixture-pages.mjs';
+import { startApp } from './app/server.mjs';
 
 const CLI = join(ROOT, 'skills/enterprise-admin-ui/scripts/audit-cli.mjs');
 const CLEAN = join(FIXTURES, 'list-clean.html');
@@ -700,4 +701,42 @@ test('--not-applicable print: print is not run, and the other checks still pass'
 test('status: an unverified confirm has dom/heuristic evidence', async () => {
   const c = await checksOf('/checks', 'list', []);
   assert.deepEqual([c.confirm.evidence.method, c.confirm.evidence.basis], ['dom', 'heuristic']);
+});
+
+// Signed-in mode, against the fixture app.
+let app;
+const sessionCookie = async (user) => {
+  const res = await fetch(`${app.url}/__test/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user }) });
+  return (await res.json()).cookie;
+};
+before(async () => {
+  app = await startApp();
+});
+after(() => app.close());
+
+test('Setup: a signed-out page with --expect-text exits 2 with the redirect named', async () => {
+  const r = await run([`${app.url}/orders`, '--expect-text', 'Signed in as']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login/);
+});
+
+test('signed-in: the admin cookie and the right text audit the page', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--expect-text', 'Signed in as Lan · Admin', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.ok(page.result);
+});
+
+test('Setup: the viewer is not the admin text', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('minh'), '--expect-text', 'Lan · Admin']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: "Lan · Admin" not found/);
+});
+
+test('signed-in: the cookie reaches the --checks tabs (no setup error)', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--expect-text', 'Signed in as Lan', '--checks', '--disposable', '--require', 'search', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.ok(page.checks, r.output);
+  assert.ok(!JSON.stringify(page.checks).includes('Setup:'), JSON.stringify(page.checks));
 });

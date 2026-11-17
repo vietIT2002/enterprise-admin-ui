@@ -23,6 +23,7 @@ import {
   judgeSearch,
   notApplicable,
   parseCli,
+  samePath,
   stateUrl,
   sweepStaleProfiles,
   toUrl,
@@ -37,9 +38,9 @@ test('PAGE_TYPES lists the 11 page types in order', () => {
 });
 
 test('parseCli: targets and flags', () => {
-  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, require: [], notApplicable: [], disposable: false, timeout: 90, browser: null, help: false });
+  assert.deepEqual(parseCli(['a.html', '--type', 'list']), { targets: ['a.html'], pageType: 'list', json: false, strict: false, states: false, checks: false, require: [], notApplicable: [], disposable: false, cookies: [], expectText: [], timeout: 90, browser: null, help: false });
   const all = parseCli(['--json', '--strict', '--states', '--checks', '--disposable', '--timeout', '120', '--browser', '/x/chrome', 'a', 'b']);
-  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, require: [], notApplicable: [], disposable: true, timeout: 120, browser: '/x/chrome', help: false });
+  assert.deepEqual(all, { targets: ['a', 'b'], pageType: null, json: true, strict: true, states: true, checks: true, require: [], notApplicable: [], disposable: true, cookies: [], expectText: [], timeout: 120, browser: '/x/chrome', help: false });
 });
 
 test('parseCli: --require and --not-applicable take check names', () => {
@@ -491,4 +492,27 @@ test('evidence: [method, basis] of every judge output and path', () => {
     ['live-region', judgeLive(1), ['dom', 'direct']],
   ];
   for (const [name, r, expected] of table) assert.deepEqual([r.evidence.method, r.evidence.basis], expected, name);
+});
+
+test('parseCli: --cookie and --expect-text repeat, and are empty by default', () => {
+  const none = parseCli(['http://x/']);
+  assert.deepEqual([none.cookies, none.expectText], [[], []]);
+  const o = parseCli(['http://x/', '--cookie', 'sid=a', '--cookie', 'b=c=d', '--expect-text', 'Signed in', '--expect-text', 'Lan · Admin']);
+  assert.deepEqual(o.cookies, ['sid=a', 'b=c=d']);
+  assert.deepEqual(o.expectText, ['Signed in', 'Lan · Admin']);
+});
+
+test('parseCli: a cookie needs a name and an =; --cookie needs an http(s) target', () => {
+  for (const bad of ['nope', '=v', ' =v']) assert.throws(() => parseCli(['http://x/', '--cookie', bad]), UsageError, bad);
+  assert.throws(() => parseCli(['page.html', '--cookie', 'sid=1']), UsageError);
+  assert.throws(() => parseCli(['file:///tmp/p.html', '--cookie', 'sid=1']), UsageError);
+  assert.throws(() => parseCli(['http://x/', '--expect-text', '']), UsageError);
+  assert.doesNotThrow(() => parseCli(['page.html', '--expect-text', 'x']));
+});
+
+test('samePath compares pathnames, ignoring one trailing slash, the query and the hash', () => {
+  assert.equal(samePath('/orders', '/orders/'), true);
+  assert.equal(samePath('/orders', '/orders?x=1'), true);
+  assert.equal(samePath('http://h/orders#a', 'http://h/orders'), true);
+  assert.equal(samePath('/orders', '/login'), false);
 });
