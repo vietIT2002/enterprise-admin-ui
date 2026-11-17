@@ -333,3 +333,40 @@ test('workflows: the order of the checks does not change the results', async () 
   const w2 = await onVariant('no-permission-check', permissionBoundary);
   assert.deepEqual([w3.status, w1.status, w2.status], ['fail', 'fail', 'fail']);
 });
+
+// Fix round 1: a broken UI or a lost session is a fail with a reason, never a crash or a false pass.
+test('workflows: a page without the controls fails with a reason (no crash)', async () => {
+  const { createServer } = await import('node:http');
+  const stub = createServer((req, res) => {
+    res.setHeader('content-type', req.url.startsWith('/__test/') ? 'application/json' : 'text/html');
+    if (req.url === '/__test/session') res.end('{"cookie":"sid=x"}');
+    else if (req.url === '/__test/orders') res.end('[]');
+    else if (req.url.startsWith('/__test/')) res.end('{}');
+    else res.end('<!doctype html><title>x</title><p>Signed in as Lan · Admin</p>');
+  });
+  await new Promise((r) => stub.listen(0, '127.0.0.1', r));
+  try {
+    const url = `http://127.0.0.1:${stub.address().port}`;
+    for (const check of [inputKept, selectAllMatching]) {
+      const r = await check({ url, browser });
+      assert.equal(r.status, 'fail', r.workflow);
+      assert.ok(r.problems.length && r.problems[0].length > 0, r.workflow);
+    }
+  } finally {
+    stub.close();
+  }
+});
+
+test('workflows: a lost session fails naming /login, for every check', async () => {
+  for (const check of WORKFLOWS) {
+    const r = await check({ url: app.url, browser, cookie: 'sid=bogus' });
+    assert.equal(r.status, 'fail', r.workflow);
+    assert.match(r.problems.join(' | '), /\/login/, r.workflow);
+  }
+});
+
+test('workflows: the wrong signed-in user fails naming who', async () => {
+  const r = await inputKept({ url: app.url, browser, cookie: minh });
+  assert.equal(r.status, 'fail');
+  assert.match(r.problems.join(' | '), /Minh · Viewer.*Lan · Admin/);
+});

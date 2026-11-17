@@ -11,27 +11,51 @@ const postJson = (url, path, body, cookie) =>
   });
 const serverOrders = async (url) => (await fetch(url + '/__test/orders')).json();
 
-async function start(ctx, user) {
+const WHO = { lan: 'Lan · Admin', minh: 'Minh · Viewer' };
+
+// ctx.cookie (optional, for tests): use this cookie instead of a fresh /__test/session, e.g. an invalid one.
+async function start(ctx, user, s) {
   await postJson(ctx.url, '/__test/reset', {});
-  const res = await postJson(ctx.url, '/__test/session', { user });
-  const { cookie } = await res.json();
-  const context = await ctx.browser.newContext();
-  await context.addCookies([{ name: 'sid', value: cookie.slice(cookie.indexOf('=') + 1), url: ctx.url }]);
-  const page = await context.newPage();
-  page.setDefaultTimeout(TIMEOUT);
-  return { context, page, cookie };
+  let cookie = ctx.cookie;
+  if (!cookie) {
+    const res = await postJson(ctx.url, '/__test/session', { user });
+    const body = res.ok ? await res.json().catch(() => null) : null;
+    if (!body || typeof body.cookie !== 'string' || !body.cookie.includes('=')) throw new Error(`/__test/session answered ${res.status} without a cookie`);
+    cookie = body.cookie;
+  }
+  s.cookie = cookie;
+  s.context = await ctx.browser.newContext();
+  await s.context.addCookies([{ name: 'sid', value: cookie.slice(cookie.indexOf('=') + 1), url: ctx.url }]);
+  s.page = await s.context.newPage();
+  s.page.setDefaultTimeout(TIMEOUT);
 }
 
-// Runs the body, turns a thrown error (a missing element, a timeout) into a failed result, always closes the context.
+// Opens a page and verifies where we landed and who is signed in; a mismatch throws a problem naming it.
+async function open(page, ctx, path, user) {
+  await page.goto(ctx.url + path);
+  const landed = new URL(page.url()).pathname;
+  if (landed.replace(new RegExp('/$'), '') !== path) {
+    throw new Error(landed.startsWith('/login') ? `redirected to ${landed} (not signed in), expected ${path}` : `landed on ${landed}, expected ${path}`);
+  }
+  const want = 'Signed in as ' + WHO[user];
+  const text = await page.locator('body').innerText();
+  if (!text.includes(want)) {
+    const m = new RegExp("Signed in as .*").exec(text);
+    throw new Error(`signed in as "${m ? m[0].replace('Signed in as ', '') : 'nobody'}", expected "${WHO[user]}"`);
+  }
+}
+
+// Runs the body, turns a thrown error (a missing element, a timeout, a lost session) into a failed result, always closes the context.
 async function run(workflow, ctx, user, body) {
   const result = { workflow, status: 'pass', problems: [], evidence: [] };
-  const s = await start(ctx, user);
+  const s = {};
   try {
+    await start(ctx, user, s);
     await body(s, result);
   } catch (err) {
-    result.problems.push(`${workflow} could not complete: ${String(err && err.message).split('\n')[0]}`);
+    result.problems.push(`${workflow} could not complete: ${String(err && err.message).split(String.fromCharCode(10))[0]}`);
   } finally {
-    await s.context.close();
+    if (s.context) await s.context.close().catch(() => {});
   }
   if (result.problems.length) result.status = 'fail';
   return result;
@@ -45,13 +69,14 @@ export async function inputKept(ctx) {
     const before = (await serverOrders(ctx.url)).find((o) => o.id === 'SO-1005');
     const customer = 'Kept Customer Ltd';
     const note = 'Kept note after a failed save';
-    await page.goto(ctx.url + '/orders/SO-1005/edit');
+    await open(page, ctx, '/orders/SO-1005/edit', 'lan');
     await page.getByLabel('Customer').fill(customer);
     await page.getByLabel('Note').fill(note);
     await postJson(ctx.url, '/__test/fail', { method: 'PUT', path: '/api/orders/SO-1005', times: 1 });
-    const failed = page.waitForResponse((x) => x.request().method() === 'PUT' && x.url().endsWith('/api/orders/SO-1005'));
-    await page.getByRole('button', { name: 'Save order' }).click();
-    const res = await failed;
+    const [res] = await Promise.all([
+      page.waitForResponse((x) => x.request().method() === 'PUT' && x.url().endsWith('/api/orders/SO-1005')),
+      page.getByRole('button', { name: 'Save order' }).click(),
+    ]);
     await page.getByRole('alert').first().waitFor();
     const alertText = ((await page.getByRole('alert').first().textContent()) || '').trim();
     if (res.status() < 400) r.problems.push(`the injected failure was not returned (status ${res.status()})`);
@@ -79,14 +104,21 @@ export async function inputKept(ctx) {
 export async function permissionBoundary(ctx) {
   return run('permission-boundary', ctx, 'minh', async ({ page, cookie }, r) => {
     const before = await serverOrders(ctx.url);
-    await page.goto(ctx.url + '/orders');
+    await open(page, ctx, '/orders', 'minh');
     await page.locator('#count').getByText('60 orders', { exact: true }).waitFor();
     // The bulk button is disabled until a row is selected, so select one row first.
     await page.getByRole('checkbox', { name: 'Select SO-1001' }).check();
+    // Wait for the UI to react to the selection ("1 selected" in the bulk region), then watch for a late button.
+    await page.getByText('1 selected', { exact: true }).waitFor({ timeout: 2000 }).catch(() => {});
     const buttons = page.getByRole('button', { name: /Cancel orders/i });
-    const n = await buttons.count();
+    let n = 0;
     let enabled = 0;
-    for (let i = 0; i < n; i++) if (await buttons.nth(i).isEnabled()) enabled++;
+    const deadline = Date.now() + 1000;
+    do {
+      n = await buttons.count();
+      enabled = 0;
+      for (let i = 0; i < n; i++) if (await buttons.nth(i).isEnabled()) enabled++;
+    } while (enabled === 0 && Date.now() < deadline);
     if (enabled > 0) r.problems.push(`the viewer sees an enabled "Cancel orders" button after selecting a row (${enabled} found)`);
     r.evidence.push(`UI: ${n} "Cancel orders" button(s), ${enabled} enabled, after selecting one row`);
 
@@ -109,7 +141,7 @@ export async function selectAllMatching(ctx) {
   return run('select-all-matching', ctx, 'lan', async ({ page }, r) => {
     const before = await serverOrders(ctx.url);
     const pending = before.filter((o) => o.status === 'Pending').map((o) => o.id);
-    await page.goto(ctx.url + '/orders');
+    await open(page, ctx, '/orders', 'lan');
     await page.locator('#count').getByText('60 orders', { exact: true }).waitFor();
     await page.getByLabel('Status').selectOption('Pending');
     await page.locator('#count').getByText(`${pending.length} orders`, { exact: true }).waitFor();
@@ -121,9 +153,10 @@ export async function selectAllMatching(ctx) {
     if (n !== pending.length) r.problems.push(`the button says "${label}", but the server has ${pending.length} Pending orders`);
     await all.click();
     await page.getByRole('button', { name: 'Cancel orders' }).click();
-    const done = page.waitForResponse((x) => x.request().method() === 'POST' && x.url().endsWith('/api/orders/bulk-cancel'));
-    await page.getByRole('alertdialog').getByRole('button', { name: new RegExp('^Cancel [0-9]+ orders$') }).click();
-    await done;
+    await Promise.all([
+      page.waitForResponse((x) => x.request().method() === 'POST' && x.url().endsWith('/api/orders/bulk-cancel')),
+      page.getByRole('alertdialog').getByRole('button', { name: new RegExp('^Cancel [0-9]+ orders$') }).click(),
+    ]);
     await page.getByRole('status').filter({ hasText: 'cancelled' }).first().waitFor();
     const afterRows = await serverOrders(ctx.url);
     const cancelled = afterRows.filter((o) => pending.includes(o.id) && o.status === 'Cancelled').length;

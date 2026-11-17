@@ -26,3 +26,8 @@ Page `/orders`.
 
 ## Result shape
 `{ workflow, status: 'pass' | 'fail', problems: string[], evidence: string[] }`. An element that cannot be found or a wait that times out is a failed check with a problem, not a thrown error.
+
+## Identity and selection signals (all checks)
+- After opening a page, the check requires the final path to equal the requested one (a redirect to `/login` fails with "redirected to /login (not signed in)") and the page text to contain "Signed in as Lan · Admin" (W1, W3) or "Signed in as Minh · Viewer" (W2). A mismatch fails with a problem naming the actual user.
+- W2 selection signal: after checking the row, the check waits up to 2 s for the exact text "1 selected" (the bulk region's selection count), then polls for 1 s that no enabled /Cancel orders/i button appears; a button that shows up late still fails.
+- Test seam: `ctx.cookie` (optional) replaces the cookie from `/__test/session`, for proving the lost-session path.
