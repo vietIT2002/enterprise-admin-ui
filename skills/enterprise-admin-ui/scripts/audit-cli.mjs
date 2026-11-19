@@ -1054,7 +1054,7 @@ async function withPage(browser, url, { waitForPlaceholders = true, cookies = []
 
       for (const cookie of cookies) {
         const at = cookie.indexOf('=');
-        const set = await send('Network.setCookie', { name: cookie.slice(0, at), value: cookie.slice(at + 1), url });
+        const set = await send('Network.setCookie', { name: cookie.slice(0, at), value: cookie.slice(at + 1), url, path: '/' });
         if (!set.success) throw new Error(`Could not set the cookie "${cookie.slice(0, at)}" for ${url}`);
       }
 

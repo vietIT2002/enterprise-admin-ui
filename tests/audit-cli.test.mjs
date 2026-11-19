@@ -164,6 +164,8 @@ const PAGES = {
   // Removing a form line or a filter chip is undone in place and needs no confirmation.
   '/checks-remove-line': () =>
     html('<h1>New order</h1><button type="button" aria-label="Remove line 1" onclick="this.remove()">×</button><button type="button" onclick="this.remove()">Remove filter: Online</button><div role="status"></div>'),
+  // A deep route whose script fetches /api/echo-cookie: the page shows the cookie the server received.
+  '/deep/a/b': () => html('<h1>Deep</h1><p id="echo">pending</p><script>fetch("/api/echo-cookie").then(function (r) { return r.text(); }).then(function (t) { document.getElementById("echo").textContent = t; });</script>'),
   '/clean': () => readFileSync(CLEAN, 'utf8'),
   '/new': () => readFileSync(CLEAN, 'utf8'),
   '/login-page': () => readFileSync(CLEAN, 'utf8'),
@@ -224,6 +226,10 @@ before(async () => {
   server = createServer((req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname; // ?state= and other parameters are for the page's script
     if (path === '/hang') return; // never answers, so a page with <img src="/hang"> never fires its load event
+    if (path === '/api/echo-cookie') {
+      const m = /(?:^|;s*)a=([^;]*)/.exec(req.headers.cookie || '');
+      return res.writeHead(200, { 'content-type': 'text/plain' }).end(m ? 'echo:' + m[1] : 'echo:none');
+    }
     if (path.startsWith('/api/')) {
       if (path === '/api/beacon') beacons.push(`${path}${new URL(req.url, 'http://localhost').search}`);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) mutations.push(`${req.method} ${path}`);
@@ -741,6 +747,12 @@ test('signed-in: the cookie reaches the --checks tabs (no setup error)', async (
   assert.equal(page.error, null, r.output);
   assert.ok(page.checks, r.output);
   assert.ok(!JSON.stringify(page.checks).includes('Setup:'), JSON.stringify(page.checks));
+});
+
+test('signed-in: the cookie is sent to /api fetches on a deep route (path /)', async () => {
+  const r = await run([`${base}/deep/a/b`, '--cookie', 'a=b', '--expect-text', 'echo:b', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
 });
 
 test('Setup: a client-side redirect after load is a setup failure with --cookie', async () => {

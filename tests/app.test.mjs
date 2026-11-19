@@ -1,4 +1,4 @@
-// Backend tests for the fixture app (tests/app/). fetch only, no browser.
+// Tests for the fixture app (tests/app/) and the workflow checks: backend by fetch, UI and checks in Chromium.
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
@@ -152,7 +152,7 @@ test('bulk-cancel by ids changes only those ids', async () => {
   await post('/__test/reset', {});
   const r = await fetch(app.url + '/api/orders/bulk-cancel', json(lan, { ids: ['SO-1001', 'SO-1002'] }));
   const { changed } = await r.json();
-  assert.ok(changed >= 1 && changed <= 2);
+  assert.equal(changed, 2);
   const seed = seedOrders();
   for (const o of await raw()) {
     if (o.id === 'SO-1001' || o.id === 'SO-1002') assert.equal(o.status, 'Cancelled');
@@ -303,13 +303,15 @@ test('workflows: selectAllMatching evidences 23 cancelled, 37 unchanged', async 
 test('workflows: inputKept fails on loses-input', async () => {
   const r = await onVariant('loses-input', inputKept);
   assert.equal(r.status, 'fail');
-  assert.ok(r.problems.some((p) => /Customer .* cleared|kept/i.test(p)), r.problems.join(' | '));
+  assert.ok(r.problems.some((p) => /Customer was cleared/.test(p)), r.problems.join(' | '));
 });
 
 test('workflows: permissionBoundary fails on no-permission-check', async () => {
   const r = await onVariant('no-permission-check', permissionBoundary);
   assert.equal(r.status, 'fail');
-  assert.ok(r.problems.some((p) => /Cancel orders|403/.test(p)), r.problems.join(' | '));
+  const text = r.problems.join(' | ');
+  assert.match(text, /enabled cancel control "Cancel orders"/);
+  assert.match(text, /answered 200, expected 403/);
 });
 
 test('workflows: selectAllMatching fails on page-only-select-all', async () => {
@@ -317,7 +319,7 @@ test('workflows: selectAllMatching fails on page-only-select-all', async () => {
   assert.equal(r.status, 'fail');
   const text = r.problems.join(' | ');
   assert.match(text, /23/);
-  assert.match(text, /20/);
+  assert.match(text, /but 20 were/);
 });
 
 test('workflows: the order of the checks does not change the results', async () => {
@@ -342,7 +344,7 @@ test('workflows: a page without the controls fails with a reason (no crash)', as
     if (req.url === '/__test/session') res.end('{"cookie":"sid=x"}');
     else if (req.url === '/__test/orders') res.end('[]');
     else if (req.url.startsWith('/__test/')) res.end('{}');
-    else res.end('<!doctype html><title>x</title><p>Signed in as Lan · Admin</p>');
+    else res.end('<!doctype html><meta charset="utf-8"><title>x</title><p>Signed in as Lan · Admin</p>');
   });
   await new Promise((r) => stub.listen(0, '127.0.0.1', r));
   try {
@@ -351,8 +353,11 @@ test('workflows: a page without the controls fails with a reason (no crash)', as
       const r = await check({ url, browser });
       assert.equal(r.status, 'fail', r.workflow);
       assert.ok(r.problems.length && r.problems[0].length > 0, r.workflow);
+      const named = r.workflow === 'input-kept' ? /Customer|Save order|Status/ : /60 orders|Select all|Cancel orders|Status/;
+      assert.match(r.problems.join(' | '), named, r.workflow);
     }
   } finally {
+    stub.closeAllConnections();
     stub.close();
   }
 });
@@ -369,4 +374,74 @@ test('workflows: the wrong signed-in user fails naming who', async () => {
   const r = await inputKept({ url: app.url, browser, cookie: minh });
   assert.equal(r.status, 'fail');
   assert.match(r.problems.join(' | '), /Minh · Viewer.*Lan · Admin/);
+});
+
+// Stub servers: static pages answering the /__test routes, to prove how the checks judge UIs other than the reference app.
+async function withStub(pages, fn, { api = 403 } = {}) {
+  const { createServer } = await import('node:http');
+  const stub = createServer((req, res) => {
+    const path = req.url.split('?')[0];
+    res.setHeader('content-type', path.startsWith('/__test/') || path.startsWith('/api/') ? 'application/json' : 'text/html');
+    if (path === '/__test/session') res.end('{"cookie":"sid=x"}');
+    else if (path === '/__test/orders') res.end('[{"id":"SO-1001","status":"Pending","version":1,"customer":"A","note":""}]');
+    else if (path.startsWith('/__test/')) res.end('{}');
+    else if (path.startsWith('/api/')) res.writeHead(api).end('{}');
+    else if (pages[path]) res.end('<!doctype html><meta charset="utf-8"><title>x</title>' + pages[path]);
+    else res.writeHead(404).end('no');
+  });
+  await new Promise((r) => stub.listen(0, '127.0.0.1', r));
+  try {
+    return await fn(`http://127.0.0.1:${stub.address().port}`);
+  } finally {
+    stub.closeAllConnections();
+    stub.close();
+  }
+}
+const VIEWER = '<p>Signed in as Minh · Viewer</p><p>60 orders</p>';
+
+test('workflows: a viewer list with no row selection and no cancel control passes the UI half', async () => {
+  for (const extra of ['', '<input type="checkbox" aria-label="Select SO-1001" disabled><button disabled>Cancel orders</button>']) {
+    const r = await withStub({ '/orders': VIEWER + extra }, (url) => permissionBoundary({ url, browser }));
+    assert.equal(r.status, 'pass', r.problems.join(' | '));
+    assert.ok(r.evidence.some((e) => /no row selection/.test(e)), r.evidence.join(' | '));
+  }
+});
+
+test('workflows: an enabled cancel control the viewer can see fails, whatever it is called', async () => {
+  for (const [html, name] of [
+    ['<button>Cancel 1 order</button>', /Cancel 1 order/],
+    ['<button>Cancel selected</button>', /Cancel selected/],
+    ['<div role="menuitem">Cancel selected orders</div>', /Cancel selected orders/],
+  ]) {
+    const r = await withStub({ '/orders': VIEWER + html }, (url) => permissionBoundary({ url, browser }));
+    assert.equal(r.status, 'fail', html);
+    assert.match(r.problems.join(' | '), name, html);
+  }
+});
+
+test('workflows: an always-rendered empty alert before the real one does not fail input-kept', async () => {
+  const { createServer } = await import('node:http');
+  const proxy = createServer(async (req, res) => {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const up = await fetch(app.url + req.url, {
+      method: req.method, redirect: 'manual',
+      headers: { 'content-type': req.headers['content-type'] || 'text/plain', cookie: req.headers.cookie || '' },
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : Buffer.concat(chunks),
+    });
+    let body = Buffer.from(await up.arrayBuffer());
+    const headers = {};
+    up.headers.forEach((v, k) => { if (!['content-encoding', 'content-length', 'transfer-encoding', 'set-cookie'].includes(k)) headers[k] = v; });
+    if (up.headers.get('set-cookie')) headers['set-cookie'] = up.headers.getSetCookie();
+    if (/text\/html/.test(headers['content-type'] || '')) body = Buffer.from(body.toString('utf8').replace('<body>', '<body><div role="alert"></div>'));
+    res.writeHead(up.status, headers).end(body);
+  });
+  await new Promise((r) => proxy.listen(0, '127.0.0.1', r));
+  try {
+    const r = await inputKept({ url: `http://127.0.0.1:${proxy.address().port}`, browser });
+    assert.equal(r.status, 'pass', r.problems.join(' | '));
+  } finally {
+    proxy.closeAllConnections();
+    proxy.close();
+  }
 });
