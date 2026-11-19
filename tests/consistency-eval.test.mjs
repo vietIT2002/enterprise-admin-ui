@@ -5,10 +5,12 @@
 // Uses Playwright's Chromium (`npx playwright install chromium`), or an installed Google Chrome when that is missing.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { PAGES as GRADER_PAGES, consistency, functionKept, signatures } from './agent-eval/consistency/grade.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'tests', 'agent-eval', 'consistency', 'fixture');
@@ -412,4 +414,218 @@ test('shared navigation: the same sidebar on every page, linking all five', asyn
     for (const target of Object.keys(PAGES)) assert.ok(m[0].includes(`href="${target}.html"`), `${name} links ${target}`);
   }
   assert.equal(new Set(Object.values(html)).size, 1, 'sidebar markup is identical apart from aria-current');
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Grader part: signatures, consistency, function kept. Expected values are literal, from FIXTURE.md.
+// ---------------------------------------------------------------------------------------------------------------
+const FILES = Object.keys(GRADER_PAGES);
+
+async function sigOfFile(file) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.goto(pathToFileURL(file).href);
+    return await signatures(page);
+  } finally {
+    await page.close();
+  }
+}
+
+async function sigOfHtml(html) {
+  const dir = mkdtempSync(join(tmpdir(), 'grade-variant-'));
+  try {
+    const file = join(dir, 'v.html');
+    writeFileSync(file, html);
+    return await sigOfFile(file);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const fixtureSigs = {};
+async function fixtureSignatures() {
+  if (!Object.keys(fixtureSigs).length) for (const f of FILES) fixtureSigs[f] = await sigOfFile(join(FIXTURE, f));
+  return fixtureSigs;
+}
+
+test('grader: PAGES has the five page types', () => {
+  assert.deepEqual(GRADER_PAGES, {
+    'employees.html': 'list',
+    'timesheets.html': 'list',
+    'leave-requests.html': 'list',
+    'reports.html': 'report',
+    'settings.html': 'settings',
+  });
+});
+
+test('grader: signatures of the fixture match the planned variants', async () => {
+  const s = await fixtureSignatures();
+  const e = s['employees.html'];
+  assert.deepEqual(e.pagination, { kinds: ['numbered', 'range-text'], position: 'below' });
+  assert.deepEqual(e.filterBar, { search: 'left', control: 'select' });
+  assert.deepEqual(e.pageHeader, { tag: 'h1', fontSize: 28, action: 'header-right', breadcrumb: false });
+  assert.deepEqual(e.dateFormat, { formats: ['dd/mm/yyyy'] });
+  assert.equal(e.tableRow.height, 72);
+  assert.equal(e.tableRow.fontSize, 14);
+  assert.equal(e.statusBadge['Đang làm'], '#dcfce7');
+  assert.equal(e.statusBadge['Thử việc'], '#dbeafe');
+  assert.equal(e.statusBadge['Nghỉ phép'], '#f3e8ff');
+
+  const t = s['timesheets.html'];
+  assert.deepEqual(t.pagination, { kinds: ['page-size-select', 'prev-next'], position: 'below' });
+  assert.deepEqual(t.filterBar, { search: 'right', control: 'panel-button' });
+  assert.deepEqual(t.pageHeader, { tag: 'h1', fontSize: 24, action: 'below-title', breadcrumb: false });
+  assert.deepEqual(t.dateFormat, { formats: ['iso'] });
+  assert.equal(t.tableRow.height, 32);
+  assert.equal(t.tableRow.fontSize, 12);
+  assert.equal(t.statusBadge['Nghỉ phép'], '#bfdbfe');
+  assert.equal(t.statusBadge['Chờ duyệt'], '#fef08a');
+  assert.equal(t.statusBadge['Đã duyệt'], '#99f6e4');
+
+  const l = s['leave-requests.html'];
+  assert.deepEqual(l.pagination, { kinds: ['load-more'], position: 'below' });
+  assert.deepEqual(l.filterBar, { search: 'left', control: 'chips' });
+  assert.deepEqual(l.pageHeader, { tag: 'h1', fontSize: 32, action: 'header-right', breadcrumb: true });
+  assert.deepEqual(l.dateFormat, { formats: ['month-name'] });
+  assert.equal(l.tableRow.height, 60);
+  assert.equal(l.tableRow.fontSize, 15);
+  assert.equal(l.statusBadge['Chờ duyệt'], '#fed7aa');
+  assert.equal(l.statusBadge['Đã duyệt'], '#bbf7d0');
+
+  const r = s['reports.html'];
+  assert.equal(r.pagination, null);
+  assert.deepEqual(r.filterBar, { search: 'none', control: 'select' });
+  assert.deepEqual(r.pageHeader, { tag: 'h1', fontSize: 26, action: 'none', breadcrumb: true });
+  assert.equal(r.dateFormat, null);
+  assert.equal(r.statusBadge, null);
+  assert.equal(r.tableRow.height, 48);
+  assert.equal(r.tableRow.fontSize, 13);
+
+  const g = s['settings.html'];
+  assert.deepEqual(g.pageHeader, { tag: 'h1', fontSize: 22, action: 'none', breadcrumb: false });
+  for (const k of ['pagination', 'filterBar', 'statusBadge', 'dateFormat', 'tableRow']) assert.equal(g[k], null, `settings ${k}`);
+});
+
+test('grader: the fixture scores 0 of 6 and lists the variant per page', async () => {
+  const c = consistency(await fixtureSignatures());
+  assert.deepEqual(c.score, { consistent: 0, of: 6 });
+  assert.deepEqual(Object.keys(c.patterns), ['pagination', 'filterBar', 'pageHeader', 'statusBadge', 'dateFormat', 'tableRow']);
+  assert.deepEqual(c.patterns.pagination.present, ['employees.html', 'timesheets.html', 'leave-requests.html']);
+  assert.deepEqual(c.patterns.filterBar.present, ['employees.html', 'timesheets.html', 'leave-requests.html', 'reports.html']);
+  assert.equal(c.patterns.pageHeader.present.length, 5);
+  assert.deepEqual(c.patterns.statusBadge.present, ['employees.html', 'timesheets.html', 'leave-requests.html']);
+  assert.deepEqual(c.patterns.dateFormat.present, ['employees.html', 'timesheets.html', 'leave-requests.html']);
+  assert.deepEqual(c.patterns.tableRow.present, ['employees.html', 'timesheets.html', 'leave-requests.html', 'reports.html']);
+  for (const p of Object.values(c.patterns)) assert.equal(p.consistent, false);
+});
+
+test('grader: consistency counts agreement (synthetic signatures)', () => {
+  const pag = { kinds: ['numbered'], position: 'below' };
+  const sig = (over) => ({ pagination: null, filterBar: null, pageHeader: null, statusBadge: null, dateFormat: null, tableRow: null, ...over });
+  const c = consistency({
+    'a.html': sig({ pagination: pag, statusBadge: { 'Chờ duyệt': '#fef08a', Vắng: '#fecaca' }, tableRow: { height: 48, rawHeight: 47, fontSize: 14 } }),
+    'b.html': sig({ pagination: pag, statusBadge: { 'chờ duyệt': '#fef08b' }, tableRow: { height: 48, rawHeight: 48, fontSize: 14 } }),
+    'c.html': sig({ pagination: { kinds: ['load-more'], position: 'below' }, statusBadge: { 'Đã duyệt': '#000000' } }),
+    'd.html': sig({ dateFormat: { formats: ['iso'] } }),
+  });
+  assert.equal(c.patterns.pagination.consistent, false);
+  assert.equal(c.patterns.statusBadge.consistent, true, 'shared statuses agree within tolerance; c shares none');
+  assert.equal(c.patterns.tableRow.consistent, true);
+  assert.equal(c.patterns.dateFormat.counted, false, 'present on one page only: not scored');
+  assert.deepEqual(c.score, { consistent: 2, of: 3 });
+});
+
+// ---- equivalent markup gives equal signatures (Decisions item 1) ------------------------------------------------
+const rowsHtml = '<tr><td>Nguyễn Văn An</td><td>2026-11-02</td></tr><tr><td>Trần Bình</td><td>2026-11-03</td></tr><tr><td>Lê Cường</td><td>2026-11-04</td></tr>';
+const shell = (filters, after) =>
+  `<!doctype html><meta charset="utf-8"><title>x</title><body style="margin:0"><main><h1>Danh sách</h1><section class="card">${filters}<table style="width:100%"><thead><tr><th>Tên</th><th>Ngày</th></tr></thead><tbody>${rowsHtml}</tbody></table>${after}</section></main></body>`;
+
+test('grader: icon-only Prev/Next by accessible name equals text Prev/Next', async () => {
+  const text = await sigOfHtml(shell('', '<div><button>Trước</button><button>Sau</button></div>'));
+  const english = await sigOfHtml(shell('', '<div><button>Previous</button><button>Next</button></div>'));
+  const icons = await sigOfHtml(shell('', '<nav><button aria-label="Previous page"><svg width="12" height="12"><path d="M8 1L2 6l6 5"/></svg></button><button aria-label="Next page"><svg width="12" height="12"><path d="M4 1l6 5-6 5"/></svg></button></nav>'));
+  const chevrons = await sigOfHtml(shell('', '<div><button>‹</button><button>›</button></div>'));
+  assert.deepEqual(text.pagination, { kinds: ['prev-next'], position: 'below' });
+  assert.deepEqual(english.pagination, text.pagination);
+  assert.deepEqual(icons.pagination, text.pagination);
+  assert.deepEqual(chevrons.pagination, text.pagination);
+});
+
+test('grader: chips as buttons, links and role=tab give the same filter bar', async () => {
+  const search = '<input type="search" aria-label="Tìm" style="width:200px">';
+  const buttons = await sigOfHtml(shell(`<div>${search}<div role="group"><button aria-pressed="true">All</button><button aria-pressed="false">Pending</button><button aria-pressed="false">Done</button></div></div>`, ''));
+  const links = await sigOfHtml(shell(`<div>${search}<div><a href="#all" class="chip active">All</a><a href="#p" class="chip">Pending</a><a href="#d" class="chip">Done</a></div></div>`, ''));
+  const tabs = await sigOfHtml(shell(`<div>${search}<div role="tablist"><button role="tab" aria-selected="true">All</button><button role="tab" aria-selected="false">Pending</button><button role="tab" aria-selected="false">Done</button></div></div>`, ''));
+  assert.deepEqual(buttons.filterBar, { search: 'left', control: 'chips' });
+  assert.deepEqual(links.filterBar, buttons.filterBar);
+  assert.deepEqual(tabs.filterBar, buttons.filterBar);
+});
+
+test('grader: range text anywhere in the table container, English or Vietnamese', async () => {
+  const vi = await sigOfHtml(shell('', '<div><span>Hiển thị 1–10 trên 48 nhân viên</span><button>1</button><button>2</button></div>'));
+  const en = await sigOfHtml(shell('<p class="meta">Showing 1-10 of 48 results</p>', '<div><button>1</button><button>2</button></div>'));
+  const slash = await sigOfHtml(shell('', '<div><button>1</button><button>2</button><em>1 - 10 / 48</em></div>'));
+  assert.deepEqual(vi.pagination.kinds, ['numbered', 'range-text']);
+  assert.deepEqual(en.pagination.kinds, ['numbered', 'range-text']);
+  assert.deepEqual(slash.pagination.kinds, ['numbered', 'range-text']);
+});
+
+test('grader: a page without a table, and a blank or closed page, give nulls and never throw', async () => {
+  const none = await sigOfHtml('<!doctype html><title>x</title><body><p>hi</p></body>');
+  assert.deepEqual(none, { pagination: null, filterBar: null, pageHeader: null, statusBadge: null, dateFormat: null, tableRow: null });
+  const page = await browser.newPage();
+  await page.goto('about:blank');
+  assert.deepEqual(Object.values(await signatures(page)), [null, null, null, null, null, null]);
+  await page.close();
+  assert.deepEqual(Object.values(await signatures(page)), [null, null, null, null, null, null], 'a closed page does not throw');
+});
+
+// ---- function kept -----------------------------------------------------------------------------------------------
+test('functionKept: passes every fixture page', async () => {
+  const had = { 'employees.html': [true, true], 'timesheets.html': [true, true], 'leave-requests.html': [true, true], 'reports.html': [false, false], 'settings.html': [false, false] };
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    for (const f of FILES) {
+      const r = await functionKept(page, join(FIXTURE, f), { hadSearch: had[f][0], hadPagination: had[f][1] });
+      assert.deepEqual(r, { ok: true, problems: [] }, f);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+test('functionKept: rows removed, search box removed, pagination removed, file missing, fields removed', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'grade-broken-'));
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    cpSync(FIXTURE, dir, { recursive: true });
+    const emp = join(dir, 'employees.html');
+    writeFileSync(emp, readFileSync(emp, 'utf8').replace(/const DATA = \[.*\];/, 'const DATA = [];'));
+    let r = await functionKept(page, emp, { hadSearch: true, hadPagination: false });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('no data rows'), r.problems.join('|'));
+
+    const ts = join(dir, 'timesheets.html');
+    writeFileSync(ts, readFileSync(ts, 'utf8').replace(/<input type="search"[^>]*>/, ''));
+    r = await functionKept(page, ts, { hadSearch: true, hadPagination: true });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('pattern lost: search'), r.problems.join('|'));
+
+    const lv = join(dir, 'leave-requests.html');
+    writeFileSync(lv, readFileSync(lv, 'utf8').replace(/<div class="more">.*<\/div>/, ''));
+    r = await functionKept(page, lv, { hadSearch: true, hadPagination: true });
+    assert.ok(r.problems.includes('pattern lost: pagination'), r.problems.join('|'));
+
+    r = await functionKept(page, join(dir, 'nope.html'), { hadSearch: true, hadPagination: true });
+    assert.deepEqual(r, { ok: false, problems: ['page missing'] });
+
+    const st = join(dir, 'settings.html');
+    writeFileSync(st, readFileSync(st, 'utf8').replace(/<form[\s\S]*<\/form>/, ''));
+    r = await functionKept(page, st, { hadSearch: false, hadPagination: false });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.some((p) => /fewer than 3 labelled fields/.test(p)), r.problems.join('|'));
+  } finally {
+    await page.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
