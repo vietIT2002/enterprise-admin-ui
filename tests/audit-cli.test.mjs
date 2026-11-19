@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { ROOT } from '../tools/build-adapters.mjs';
 import { FIXTURES, loadFixtures } from './fixture-pages.mjs';
+import { startApp } from './app/server.mjs';
 
 const CLI = join(ROOT, 'skills/enterprise-admin-ui/scripts/audit-cli.mjs');
 const CLEAN = join(FIXTURES, 'list-clean.html');
@@ -163,8 +164,12 @@ const PAGES = {
   // Removing a form line or a filter chip is undone in place and needs no confirmation.
   '/checks-remove-line': () =>
     html('<h1>New order</h1><button type="button" aria-label="Remove line 1" onclick="this.remove()">×</button><button type="button" onclick="this.remove()">Remove filter: Online</button><div role="status"></div>'),
+  // A deep route whose script fetches /api/echo-cookie: the page shows the cookie the server received.
+  '/deep/a/b': () => html('<h1>Deep</h1><p id="echo">pending</p><script>fetch("/api/echo-cookie").then(function (r) { return r.text(); }).then(function (t) { document.getElementById("echo").textContent = t; });</script>'),
   '/clean': () => readFileSync(CLEAN, 'utf8'),
   '/new': () => readFileSync(CLEAN, 'utf8'),
+  '/login-page': () => readFileSync(CLEAN, 'utf8'),
+  '/js-redirect': () => readFileSync(CLEAN, 'utf8').replace('</body>', "<script>addEventListener('load', () => setTimeout(() => location.replace('/login-page'), 50))</script></body>"),
   // The only issue: one ALL-CAPS label, a warning.
   '/caps': () => html('<h1>Tổng quan</h1><p><span style="text-transform:uppercase">Trạng thái</span> của kho Hà Nội hôm nay.</p>'),
   // Mock data: a skeleton for 300 ms, then a table whose amounts are left-aligned (an error the audit must see).
@@ -221,6 +226,10 @@ before(async () => {
   server = createServer((req, res) => {
     const path = new URL(req.url, 'http://localhost').pathname; // ?state= and other parameters are for the page's script
     if (path === '/hang') return; // never answers, so a page with <img src="/hang"> never fires its load event
+    if (path === '/api/echo-cookie') {
+      const m = /(?:^|;s*)a=([^;]*)/.exec(req.headers.cookie || '');
+      return res.writeHead(200, { 'content-type': 'text/plain' }).end(m ? 'echo:' + m[1] : 'echo:none');
+    }
     if (path.startsWith('/api/')) {
       if (path === '/api/beacon') beacons.push(`${path}${new URL(req.url, 'http://localhost').search}`);
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) mutations.push(`${req.method} ${path}`);
@@ -700,4 +709,92 @@ test('--not-applicable print: print is not run, and the other checks still pass'
 test('status: an unverified confirm has dom/heuristic evidence', async () => {
   const c = await checksOf('/checks', 'list', []);
   assert.deepEqual([c.confirm.evidence.method, c.confirm.evidence.basis], ['dom', 'heuristic']);
+});
+
+// Signed-in mode, against the fixture app.
+let app;
+const sessionCookie = async (user) => {
+  const res = await fetch(`${app.url}/__test/session`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user }) });
+  return (await res.json()).cookie;
+};
+before(async () => {
+  app = await startApp();
+});
+after(() => app.close());
+
+test('Setup: a signed-out page with --expect-text exits 2 with the redirect named', async () => {
+  const r = await run([`${app.url}/orders`, '--expect-text', 'Signed in as']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login/);
+});
+
+test('signed-in: the admin cookie and the right text audit the page', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--expect-text', 'Signed in as Lan · Admin', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.ok(page.result);
+});
+
+test('Setup: the viewer is not the admin text', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('minh'), '--expect-text', 'Lan · Admin']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: "Lan · Admin" not found/);
+});
+
+test('signed-in: the cookie reaches the --checks tabs (no setup error)', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--expect-text', 'Signed in as Lan', '--checks', '--disposable', '--require', 'search', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.ok(page.checks, r.output);
+  assert.ok(!JSON.stringify(page.checks).includes('Setup:'), JSON.stringify(page.checks));
+});
+
+test('signed-in: the cookie is sent to /api fetches on a deep route (path /)', async () => {
+  const r = await run([`${base}/deep/a/b`, '--cookie', 'a=b', '--expect-text', 'echo:b', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+});
+
+test('Setup: a client-side redirect after load is a setup failure with --cookie', async () => {
+  const r = await run([`${base}/js-redirect`, '--cookie', 'a=b']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login-page/);
+});
+
+test('a client-side redirect without the new flags is audited as before', async () => {
+  const r = await run([`${base}/js-redirect`, '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.ok(!String(page.error).startsWith('Setup:'), r.output);
+});
+
+test('signed-in: --cookie alone reaches the --states and --checks tabs', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--states', '--checks', '--disposable', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.equal(page.states.length, 3, r.output);
+  assert.ok(!JSON.stringify([page.states, page.checks]).includes('Setup:'), r.output);
+});
+
+test('Setup: without the cookie the --states and --checks run is a setup failure', async () => {
+  const r = await run([`${app.url}/orders`, '--expect-text', 'Signed in as', '--states', '--checks', '--disposable']);
+  assert.equal(r.code, 2, r.output);
+  assert.match(r.output, /Setup: redirected to \/login/);
+});
+
+test('reference UI: /orders and the edit form audit with no error', async () => {
+  const cookie = await sessionCookie('lan');
+  for (const [path, type] of [['/orders', 'list'], ['/orders/SO-1005/edit', 'form']]) {
+    const r = await run([`${app.url}${path}`, '--cookie', cookie, '--type', type, '--expect-text', 'Signed in as Lan', '--json']);
+    const [page] = JSON.parse(r.stdout);
+    assert.equal(page.error, null, r.output);
+    const errors = page.result.violations.filter((v) => v.severity === 'error');
+    assert.deepEqual(errors, [], path);
+  }
+});
+
+test('reference UI: the search check passes on /orders', async () => {
+  const r = await run([`${app.url}/orders`, '--cookie', await sessionCookie('lan'), '--checks', '--disposable', '--require', 'search', '--json']);
+  const [page] = JSON.parse(r.stdout);
+  assert.equal(page.error, null, r.output);
+  assert.equal(page.checks.find((c) => c.check === 'search').status, 'pass', r.output);
 });

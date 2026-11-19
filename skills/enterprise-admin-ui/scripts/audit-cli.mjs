@@ -4,7 +4,8 @@
  * Runs scripts/audit.js on pages in an installed headless Chrome, Edge or Chromium. No dependencies; Node 22 or later.
  *
  *   node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable]
-                     [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
+                     [--require <checks>] [--not-applicable <checks>]] [--cookie <name=value>] [--expect-text <text>]
+                     [--json] [--strict] [--browser <path>]
  *
  * --states also opens ?state=empty, error and loading; --checks also searches, exports and prints the way a person
  * would, to check the behaviour SKILL.md asks for. Neither needs special markup in the page. --checks clicks Delete
@@ -20,6 +21,10 @@
  * Each check ends with a status: pass, fail, not_verified (no matching control, or Delete not clicked without
  * --disposable: an absent control is never a pass), not_applicable (declared with --not-applicable; the check is not
  * run) or error. --require makes a check that finds no control fail, and one that is not_verified exit 1.
+ *
+ * --cookie <name=value> sets a cookie before each page, state and check tab opens (http(s) targets; for test sessions
+ * only, as command lines are visible to other local processes). With --cookie or --expect-text (the page must show that
+ * text), a page that redirects away from the requested path, or lacks the text, is a setup failure: exit 2, not graded.
  *
  * Exit code: 0 nothing failed; 1 an ✗ error (or any violation with --strict), a failed state, a check with status
  * fail, or a required check that is not_verified; 2 a usage error, or a page, state or check that could not run.
@@ -76,6 +81,8 @@ export function parseCli(argv) {
         require: { type: 'string', multiple: true },
         'not-applicable': { type: 'string', multiple: true },
         disposable: { type: 'boolean' },
+        cookie: { type: 'string', multiple: true },
+        'expect-text': { type: 'string', multiple: true },
         timeout: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
@@ -95,6 +102,8 @@ export function parseCli(argv) {
     require: checkList(values.require, '--require'),
     notApplicable: checkList(values['not-applicable'], '--not-applicable'),
     disposable: Boolean(values.disposable),
+    cookies: values.cookie ?? [],
+    expectText: values['expect-text'] ?? [],
     timeout: values.timeout === undefined ? DEFAULT_PAGE_TIMEOUT_S : Number(values.timeout),
     browser: values.browser ?? null,
     help: Boolean(values.help),
@@ -107,6 +116,13 @@ export function parseCli(argv) {
   if (!opts.targets.length) throw new UsageError('Give a URL or an HTML file to audit.');
   for (const [flag, list] of [['--require', opts.require], ['--not-applicable', opts.notApplicable]]) {
     if (list.length && !opts.checks) throw new UsageError(`${flag} needs --checks.`);
+  }
+  for (const cookie of opts.cookies) {
+    if (!/^[^=\s][^=]*=/.test(cookie)) throw new UsageError('--cookie takes name=value, such as --cookie sid=abc123.');
+  }
+  if (opts.expectText.some((text) => !text)) throw new UsageError('--expect-text takes the text the page must show.');
+  if (opts.cookies.length && !opts.targets.every((t) => /^https?:\/\//i.test(t))) {
+    throw new UsageError('--cookie needs http(s) URLs: a cookie cannot be set for a file.');
   }
   const both = opts.require.filter((c) => opts.notApplicable.includes(c));
   if (both.length) throw new UsageError(`A check cannot be in both --require and --not-applicable: ${both.join(', ')}.`);
@@ -985,11 +1001,22 @@ const MEDIA_FEATURES = Object.freeze([
   { name: 'prefers-reduced-motion', value: 'no-preference' },
 ]);
 
+// Whether two URLs (or paths) have the same pathname, ignoring one trailing slash, the query and the hash.
+export function samePath(requested, final) {
+  const path = (u) => {
+    const p = new URL(u, 'http://x').pathname;
+    return p.length > 1 && p.endsWith('/') ? p.slice(0, -1) : p;
+  };
+  return path(requested) === path(final);
+}
+
 // Opens url in a new tab of its own browser context (no storage or cookies from other targets), waits for it to load
 // and settle, and returns work(send, { loadingPlaceholders, dialogs, on }); dialogs() counts the alert(), confirm() and
 // prompt() dialogs the page has opened (each is dismissed); on(fn) calls fn(method, params) for each later event of the
-// tab. The tab and its context close afterwards.
-async function withPage(browser, url, { waitForPlaceholders = true } = {}, work) {
+// tab. The tab and its context close afterwards. With cookies (name=value), each is set for url before navigating. With
+// cookies or expectText, the page must stay on url's path (else a Setup error: it redirected, e.g. to a login page) and
+// show every expectText once settled (else a Setup error: wrong user, role or page); nothing is graded then.
+async function withPage(browser, url, { waitForPlaceholders = true, cookies = [], expectText = [] } = {}, work) {
   const { browserContextId } = await browser.send('Target.createBrowserContext');
   try {
     const { targetId } = await browser.send('Target.createTarget', { url: 'about:blank', browserContextId });
@@ -1025,6 +1052,12 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
       await send('Emulation.setEmulatedMedia', { media: '', features: MEDIA_FEATURES });
       await send('Emulation.setFocusEmulationEnabled', { enabled: true });
 
+      for (const cookie of cookies) {
+        const at = cookie.indexOf('=');
+        const set = await send('Network.setCookie', { name: cookie.slice(0, at), value: cookie.slice(at + 1), url, path: '/' });
+        if (!set.success) throw new Error(`Could not set the cookie "${cookie.slice(0, at)}" for ${url}`);
+      }
+
       navigating = true;
       let nav;
       try {
@@ -1038,11 +1071,30 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
         throw new Error(`Could not load ${url}: no load event after 30 s`);
       }
       if (response && response.status >= 400) throw new Error(`HTTP ${response.status} from ${response.url}`);
+      const identity = cookies.length > 0 || expectText.length > 0;
+      // The final URL is the main frame's last Document response (a redirect gives no response of its own).
+      const finalUrl = identity ? (response ? response.url : await evaluate(send, 'location.href')) : url;
+      if (identity && !samePath(url, finalUrl)) {
+        throw new Error(`Setup: redirected to ${new URL(finalUrl).pathname} — sign in first (--cookie), or audit the page it redirected to`);
+      }
       // Like the benchmark's goto(networkidle): no request in flight for 500 ms, or go on after 15 s.
       await waitForQuiet(() => inflight.size > 0, NETWORK_IDLE.quietMs, NETWORK_IDLE.timeoutMs);
 
       const settle = { ...SETTLE, waitForPlaceholders };
       const loadingPlaceholders = await evaluate(send, `(${settleInPage})(${JSON.stringify(settle)})`, true, SETTLE_TIMEOUT_MS);
+      let landedUrl = finalUrl;
+      if (identity) {
+        // A script may have navigated after load (location.replace): the page it is on now is the one that counts.
+        landedUrl = await evaluate(send, 'location.href');
+        if (!samePath(url, landedUrl)) {
+          throw new Error(`Setup: redirected to ${new URL(landedUrl).pathname} — sign in first (--cookie), or audit the page it redirected to`);
+        }
+      }
+      if (expectText.length) {
+        const shown = await evaluate(send, 'document.body ? document.body.innerText : ""');
+        const missing = expectText.find((text) => !shown.includes(text));
+        if (missing !== undefined) throw new Error(`Setup: "${missing}" not found on ${new URL(landedUrl).pathname} — wrong user, role or page`);
+      }
       return await work(send, { loadingPlaceholders, dialogs: () => dialogs, on: (fn) => listeners.add(fn) });
     } finally {
       loaded.cancel();
@@ -1055,8 +1107,8 @@ async function withPage(browser, url, { waitForPlaceholders = true } = {}, work)
 }
 
 // The page's audit; with snapshot, also the page's own snapshot that checkState compares each state with.
-function auditPage(browser, url, pageType, auditSource, { snapshot = false } = {}) {
-  return withPage(browser, url, {}, async (send, { loadingPlaceholders }) => {
+function auditPage(browser, url, pageType, auditSource, { snapshot = false, ...who } = {}) {
+  return withPage(browser, url, who, async (send, { loadingPlaceholders }) => {
     const tailwind = await evaluate(send, `(${tailwindInPage})()`);
     if (tailwind.uses && !tailwind.loaded) {
       throw new Error('Tailwind CDN did not load, so the page has none of its styles. Check the network and run the audit again');
@@ -1070,8 +1122,8 @@ function auditPage(browser, url, pageType, auditSource, { snapshot = false } = {
 
 // One ?state= variant (its URL from stateUrl), checked against the page's own snapshot. ?state=loading holds its
 // skeleton, so its settle does not wait for placeholders to go.
-async function auditState(browser, target, state, base) {
-  const snap = await withPage(browser, target, { waitForPlaceholders: state !== 'loading' }, (send) => evaluate(send, `(${snapshotInPage})()`));
+async function auditState(browser, target, state, base, who = {}) {
+  const snap = await withPage(browser, target, { ...who, waitForPlaceholders: state !== 'loading' }, (send) => evaluate(send, `(${snapshotInPage})()`));
   const { ok, problems, details } = checkState(state, base, snap);
   return { state, url: target, ok, problems, details, error: null, status: ok ? 'pass' : 'fail' };
 }
@@ -1086,8 +1138,8 @@ async function settleAfterAction(send, ms) {
 const controlsOf = (send) => evaluate(send, `(${controlsInPage})(${JSON.stringify(PATTERNS)})`);
 
 // The read-only checks, from one tab: the controls, then what prints (print media last, as it changes the page). With print false (declared not applicable), print media is never emulated.
-function readControls(browser, url, { print = true } = {}) {
-  return withPage(browser, url, {}, async (send) => {
+function readControls(browser, url, { print = true, ...who } = {}) {
+  return withPage(browser, url, who, async (send) => {
     const controls = await controlsOf(send);
     controls.printed = null;
     if (print && controls.print) {
@@ -1099,8 +1151,8 @@ function readControls(browser, url, { print = true } = {}) {
 }
 
 // Types a search that matches nothing into the first search box, as a person would, and compares the page before and after.
-function searchCheck(browser, url, pageType) {
-  return withPage(browser, url, {}, async (send) => {
+function searchCheck(browser, url, pageType, who = {}) {
+  return withPage(browser, url, who, async (send) => {
     const read = async () => ({
       ...(await evaluate(send, `(${countsInPage})(${JSON.stringify(PATTERNS)})`)),
       rows: (await evaluate(send, `(${snapshotInPage})()`)).rows,
@@ -1119,8 +1171,8 @@ const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // before the click, each request the tab sends with a method other than GET, HEAD or OPTIONS is failed before it leaves
 // the browser, and listed. That is a safeguard, not isolation: a GET, a WebSocket, a service worker or a frame of its
 // own can still change data, which is why the click needs --disposable.
-function confirmCheck(browser, url) {
-  return withPage(browser, url, {}, async (send, { dialogs, on }) => {
+function confirmCheck(browser, url, who = {}) {
+  return withPage(browser, url, who, async (send, { dialogs, on }) => {
     const { destructive } = await controlsOf(send);
     const point = destructive ? await evaluate(send, `(${confirmTargetInPage})()`) : null;
     if (!point) return judgeConfirm({ label: null });
@@ -1149,14 +1201,15 @@ function confirmCheck(browser, url) {
 // The five checks of CHECKS, in order, each tab under the same per-page time limit. A check that fails to run gets an error.
 // Only with disposable is the destructive action clicked; without it, confirm is unverified. A check declared not
 // applicable is not run at all (no tab, no click); every other result gets its status from withRequirement.
-async function behaviourChecks(limited, url, pageType, disposable, { require = [], notApplicable: declared = [] } = {}) {
+async function behaviourChecks(limited, url, pageType, disposable, { require = [], notApplicable: declared = [], cookies = [], expectText = [] } = {}) {
+  const who = { cookies, expectText };
   const failed = failedCheck;
   const wrap = (check, result) => withRequirement(result, { required: require.includes(check) });
   const todo = CHECKS.filter((check) => !declared.includes(check));
   let controls;
   if (todo.length) {
     try {
-      controls = await limited((b) => readControls(b, url, { print: !declared.includes('print') }));
+      controls = await limited((b) => readControls(b, url, { print: !declared.includes('print'), ...who }));
     } catch (err) {
       return CHECKS.map((check) => (declared.includes(check) ? notApplicable(check) : wrap(check, failed(check, err))));
     }
@@ -1169,14 +1222,14 @@ async function behaviourChecks(limited, url, pageType, disposable, { require = [
     }
   };
   const run = {
-    search: () => (controls.search ? attempt('search', (b) => searchCheck(b, url, pageType)) : judgeSearch({ found: false })),
+    search: () => (controls.search ? attempt('search', (b) => searchCheck(b, url, pageType, who)) : judgeSearch({ found: false })),
     export: () => judgeExport(controls.exports),
     print: () => judgePrint(controls.printed),
     confirm: () =>
       !controls.destructive
         ? judgeConfirm({ label: null })
         : disposable
-          ? attempt('confirm', (b) => confirmCheck(b, url))
+          ? attempt('confirm', (b) => confirmCheck(b, url, who))
           : judgeConfirm({ label: controls.destructive, clicked: false }),
     'live-region': () => judgeLive(controls.live),
   };
@@ -1189,7 +1242,7 @@ async function behaviourChecks(limited, url, pageType, disposable, { require = [
 // With states, each page that was audited is also opened with ?state=empty, error and loading; with checks, it gets the
 // behaviour checks. Each page, state and check tab gets at most timeoutS; one that takes longer may have hung the
 // browser, so it is stopped and a new one started.
-export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, require = [], notApplicable = [], disposable = false, timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
+export async function auditTargets(targets, { pageType = null, browser: executable, states = false, checks = false, require = [], notApplicable = [], disposable = false, cookies = [], expectText = [], timeoutS = DEFAULT_PAGE_TIMEOUT_S }) {
   const pages = targets.map((target) => {
     try {
       return { target, url: toUrl(target), error: null, loadingPlaceholders: 0, result: null, states: null, checks: null };
@@ -1232,7 +1285,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
     for (const page of todo) {
       let base;
       try {
-        const audited = await limited((b) => auditPage(b, page.url, pageType, auditSource, { snapshot: states }));
+        const audited = await limited((b) => auditPage(b, page.url, pageType, auditSource, { snapshot: states, cookies, expectText }));
         base = audited.base;
         delete audited.base;
         Object.assign(page, audited);
@@ -1245,13 +1298,13 @@ export async function auditTargets(targets, { pageType = null, browser: executab
         for (const state of STATES) {
           const url = stateUrl(page.url, state);
           try {
-            page.states.push(await limited((b) => auditState(b, url, state, base)));
+            page.states.push(await limited((b) => auditState(b, url, state, base, { cookies, expectText })));
           } catch (err) {
             page.states.push({ state, url, ok: false, problems: [], details: {}, error: err.message, status: 'error' });
           }
         }
       }
-      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable, { require, notApplicable });
+      if (checks) page.checks = await behaviourChecks(limited, page.url, pageType, disposable, { require, notApplicable, cookies, expectText });
     }
   } finally {
     if (browser) await browser.close();
@@ -1261,7 +1314,7 @@ export async function auditTargets(targets, { pageType = null, browser: executab
 
 // ------------------------------------------------------------------ command line
 
-const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable] [--require <checks>] [--not-applicable <checks>]] [--json] [--strict] [--browser <path>]
+const HELP = `Usage: node audit-cli.mjs <url | file.html>... [--type <type>] [--states] [--checks [--disposable] [--require <checks>] [--not-applicable <checks>]] [--cookie <name=value>] [--expect-text <text>] [--json] [--strict] [--browser <path>]
 
 Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge or Chromium at 1440×900.
 
@@ -1288,6 +1341,12 @@ Audits each page with enterprise-admin-ui's audit.js in a headless Chrome, Edge 
                      then, requests that click sends with a method other than GET, HEAD or OPTIONS are blocked, but a
                      GET, a WebSocket or a service worker can still change data: never use it on real data. Without
                      it, "? confirm" means Delete was not checked. Every run loads each page and runs its scripts
+  --cookie <name=value>
+                     set this cookie before each page, state and check tab opens (repeatable; http(s) URLs only).
+                     For test sessions only: command lines are visible to other local processes
+  --expect-text <text>
+                     the page must show this text once loaded (repeatable). With --cookie or --expect-text, a
+                     page that redirects (to a login page) or lacks the text is a setup failure, exit 2, not graded
   --timeout <s>      give up on a page (or a state) after this many seconds and restart the browser; default ${DEFAULT_PAGE_TIMEOUT_S}
   --browser <path>   the browser to use; default CHROME_PATH, then an installed Chrome, Chromium or Edge
 
@@ -1328,7 +1387,7 @@ export async function main(argv = process.argv.slice(2)) {
   process.once('SIGTERM', onSignal);
   let pages;
   try {
-    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, require: opts.require, notApplicable: opts.notApplicable, disposable: opts.disposable, timeoutS: opts.timeout });
+    pages = await auditTargets(opts.targets, { pageType: opts.pageType, browser: executable, states: opts.states, checks: opts.checks, require: opts.require, notApplicable: opts.notApplicable, disposable: opts.disposable, cookies: opts.cookies, expectText: opts.expectText, timeoutS: opts.timeout });
   } catch (err) {
     process.stderr.write(err.message + '\n');
     return 2;
