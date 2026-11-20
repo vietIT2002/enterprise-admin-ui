@@ -6,9 +6,11 @@
 // text anywhere in the table's container, English and Vietnamese labels, rows as table rows, role=row or list items.
 // Nothing here throws on unusual markup. An absent pattern is `null`; a pattern whose extractor failed is
 // `{ error }`, which consistency() reports as unreadable and never counts as consistent.
-import { existsSync } from 'node:fs';
-import { basename, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { chromium } from 'playwright';
 
 export const PAGES = {
   'employees.html': 'list',
@@ -618,3 +620,463 @@ export async function functionKept(page, file, before = {}) {
   }
   return { ok: problems.length === 0, problems, evidence };
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// Change metrics: grade(beforeDir, afterDir) pairs pages by file name and reports, per page, the audit score, the counted
+// tells, the first-screen pixel difference and whether the function was kept; plus the cross-page consistency.
+// ---------------------------------------------------------------------------------------------------------------
+const HERE = dirname(fileURLToPath(import.meta.url));
+const AUDIT_CLI = join(HERE, '..', '..', '..', 'skills', 'enterprise-admin-ui', 'scripts', 'audit-cli.mjs');
+const AUDIT_TIMEOUT_MS = 180000;
+const VIEWPORT = { width: 1440, height: 900 };
+// A pixel is changed when its RGB Euclidean distance is above this.
+export const PIXEL_THRESHOLD = 32;
+
+// The audit rules that count as tells (a rule counts when any violation of it exists, at any severity).
+const AUDIT_TELLS = ['no-gradient', 'no-backdrop-blur', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold'];
+const round2 = (n) => Math.round(n * 100) / 100;
+const firstLine = (e) => String((e && e.message) || e).split('\n')[0];
+
+// ---- audit: one audit-cli child per side and page type, run one after the other -----------------------------------------
+function chromiumPath() {
+  try {
+    const p = chromium.executablePath();
+    return p && existsSync(p) ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+function runAuditCli(type, files, browser) {
+  const args = [AUDIT_CLI, '--json', '--type', type, ...(browser ? ['--browser', browser] : []), ...files];
+  return new Promise((done) => {
+    execFile(process.execPath, args, { timeout: AUDIT_TIMEOUT_MS, maxBuffer: 128 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+      let parsed = null;
+      try {
+        parsed = JSON.parse(stdout);
+      } catch {
+        parsed = null;
+      }
+      if (Array.isArray(parsed)) return done({ pages: parsed });
+      if (err && err.killed) return done({ error: `audit timed out after ${AUDIT_TIMEOUT_MS / 1000} s` });
+      done({ error: 'audit failed: ' + (firstLine(stderr) || (err ? `exit ${err.code}` : 'output is not JSON')) });
+    });
+  });
+}
+
+// files: { file name: path } of the pages that exist on this side. Returns { file name: { score, errors, warnings, error?, rules } }.
+async function auditSide(files, browser) {
+  const out = {};
+  const byType = {};
+  for (const [name, path] of Object.entries(files)) (byType[PAGES[name]] ||= []).push([name, path]);
+  for (const [type, list] of Object.entries(byType)) {
+    const res = await runAuditCli(type, list.map(([, p]) => p), browser);
+    list.forEach(([name], i) => {
+      const entry = res.pages && (res.pages[i] || null);
+      const fail = (error) => (out[name] = { score: null, errors: null, warnings: null, error, rules: [] });
+      if (!entry) return fail(res.error || 'audit gave no result');
+      if (entry.error || !entry.result) return fail(entry.error || 'audit gave no result');
+      const v = entry.result.violations || [];
+      out[name] = {
+        score: entry.result.score,
+        errors: v.filter((x) => x.severity === 'error').length, // violated rules, not occurrences
+        warnings: v.filter((x) => x.severity !== 'error').length,
+        rules: v.map((x) => x.rule),
+      };
+    });
+  }
+  return out;
+}
+
+// ---- detectors. Run in the browser; self-contained. -----------------------------------------------------------------------
+//   greeting-header: a visible h1/h2 that starts with a greeting (Welcome, Good morning/afternoon/evening, Hello, Chao, Xin chao).
+//   rainbow-status: 5 or more distinct hues among the badge-like elements (short labels with a coloured background, in data
+//     rows or with a "badge" class). Hue buckets are 30 degrees wide: bucket = floor(hue / 30), 12 buckets, no wrap-around
+//     merge. Backgrounds with a chroma (max-min of RGB over 255) under 0.06 are greys and ignored.
+//   initials-avatar-non-person: a 1-2 letter circular element (16-64px, radius at least 40% of the side) in a data row whose
+//     first cell is not a person. A first cell is a person when it holds an email (an "@" or a mailto link) or reads like a
+//     name: 2 to 5 words, each starting with an uppercase letter. Initials and avatar text are left out of that reading.
+function detect() {
+  const all = (root, sel) => Array.from(root.querySelectorAll(sel));
+  const vis = (el) => {
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return false;
+    const cs = getComputedStyle(el);
+    return cs.visibility !== 'hidden' && cs.display !== 'none';
+  };
+  const text = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const stripMarks = (s) => s.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').trim();
+  const out = { greeting: false, hueBuckets: 0, avatarNonPerson: false };
+
+  const GREET = /^(?:welcome\b|good\s+(?:morning|afternoon|evening)\b|hello\b|xin\s+chào(?![\p{L}])|chào(?![\p{L}]))/iu;
+  out.greeting = all(document, 'h1, h2').some((h) => vis(h) && !h.closest('aside, nav') && GREET.test(stripMarks(text(h))));
+
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 1;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  const rgbOf = (c) => {
+    if (!c) return null;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#123456';
+    ctx.fillStyle = c;
+    if (ctx.fillStyle === '#123456') return null;
+    ctx.fillRect(0, 0, 1, 1);
+    if (!ctx.getImageData(0, 0, 1, 1).data[3]) return null;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 1, 1);
+    ctx.fillStyle = c;
+    ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2]];
+  };
+  const ROWS = 'tbody tr, [role="row"]';
+  const rows = all(document, ROWS).filter((r) => vis(r) && !r.querySelector('[role="columnheader"]'));
+  const isAvatar = (e) => {
+    const t = text(e);
+    if (!/^\p{L}{1,2}$/u.test(t) || !vis(e)) return false;
+    const r = e.getBoundingClientRect();
+    if (r.width < 16 || r.width > 64 || r.height < 16 || r.height > 64 || Math.abs(r.width - r.height) > 4) return false;
+    return (parseFloat(getComputedStyle(e).borderTopLeftRadius) || 0) >= Math.min(r.width, r.height) * 0.4;
+  };
+
+  // rainbow-status
+  const cands = new Set();
+  for (const r of rows) for (const e of all(r, '*')) cands.add(e);
+  for (const e of all(document, '[class*="badge" i]')) cands.add(e);
+  const buckets = new Set();
+  for (const e of cands) {
+    if (e.matches('button, a, input, select, textarea, svg, svg *, [role="button"]') || e.closest('button, a, [role="button"]') || !vis(e)) continue;
+    const label = stripMarks(text(e));
+    if (!label || label.length > 32 || isAvatar(e)) continue;
+    const rgb = rgbOf(getComputedStyle(e).backgroundColor);
+    if (!rgb) continue;
+    const r = e.getBoundingClientRect();
+    if (r.width > 220 || r.height > 56) continue;
+    const [R, G, B] = rgb.map((v) => v / 255);
+    const mx = Math.max(R, G, B);
+    const mn = Math.min(R, G, B);
+    const chroma = mx - mn;
+    if (chroma < 0.06) continue;
+    let h;
+    if (mx === R) h = ((G - B) / chroma + 6) % 6;
+    else if (mx === G) h = (B - R) / chroma + 2;
+    else h = (R - G) / chroma + 4;
+    buckets.add(Math.floor(((h * 60) % 360) / 30));
+  }
+  out.hueBuckets = buckets.size;
+
+  // initials-avatar-non-person
+  const isPerson = (cell, avatars) => {
+    if (cell.querySelector('a[href^="mailto:" i]')) return true;
+    let t = '';
+    const w = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      if (avatars.some((a) => a.contains(n))) continue;
+      t += ' ' + n.textContent;
+    }
+    t = t.replace(/\s+/g, ' ').trim();
+    if (t.includes('@')) return true;
+    const words = t.split(' ').filter(Boolean);
+    return words.length >= 2 && words.length <= 5 && words.every((x) => /^\p{Lu}[\p{L}'.-]*$/u.test(x));
+  };
+  for (const r of rows) {
+    const avatars = all(r, '*').filter(isAvatar);
+    if (!avatars.length) continue;
+    const first = r.querySelector('td, th, [role="cell"], [role="gridcell"]') || r;
+    if (!isPerson(first, avatars)) {
+      out.avatarNonPerson = true;
+      break;
+    }
+  }
+  return out;
+}
+
+// ---- pixel difference, in a blank page ------------------------------------------------------------------------------------
+async function pixelDiff(page, a, b) {
+  await page.setContent('<!doctype html><body></body>');
+  const r = await page.evaluate(
+    async ([x, y, threshold]) => {
+      const load = (b64) =>
+        new Promise((res, rej) => {
+          const im = new Image();
+          im.onload = () => res(im);
+          im.onerror = () => rej(new Error('image did not decode'));
+          im.src = 'data:image/png;base64,' + b64;
+        });
+      const [ia, ib] = await Promise.all([load(x), load(y)]);
+      const W = Math.max(ia.width, ib.width);
+      const H = Math.max(ia.height, ib.height);
+      const data = (im) => {
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const g = c.getContext('2d', { willReadFrequently: true });
+        g.drawImage(im, 0, 0);
+        return g.getImageData(0, 0, W, H).data;
+      };
+      const da = data(ia);
+      const db = data(ib);
+      const ow = Math.min(ia.width, ib.width);
+      const oh = Math.min(ia.height, ib.height);
+      let changed = 0;
+      for (let py = 0; py < H; py++) {
+        for (let px = 0; px < W; px++) {
+          if (px >= ow || py >= oh) {
+            changed++;
+            continue;
+          }
+          const i = (py * W + px) * 4;
+          const dr = da[i] - db[i];
+          const dg = da[i + 1] - db[i + 1];
+          const dbl = da[i + 2] - db[i + 2];
+          if (Math.sqrt(dr * dr + dg * dg + dbl * dbl) > threshold) changed++;
+        }
+      }
+      return { changed, total: W * H };
+    },
+    [a.toString('base64'), b.toString('base64'), PIXEL_THRESHOLD]
+  );
+  return round2((r.changed / r.total) * 100);
+}
+
+async function launch() {
+  try {
+    return await chromium.launch();
+  } catch (err) {
+    if (!/Executable doesn't exist|browserType\.launch/i.test(String(err && err.message))) throw err;
+    return await chromium.launch({ channel: 'chrome' });
+  }
+}
+
+// One page on one side: signatures, detectors and both screenshots. Never throws.
+async function captureSide(browser, file, name, outDir, side) {
+  const res = { sigs: null, detectors: null, shot: null, error: null };
+  let page;
+  try {
+    page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+    await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
+    await page.waitForTimeout(150);
+    res.sigs = await signatures(page);
+    res.detectors = await page.evaluate(detect).catch(() => null);
+    const dir = join(outDir, 'screens', side);
+    mkdirSync(dir, { recursive: true });
+    const stem = name.replace(/\.html?$/i, '');
+    res.shot = await page.screenshot({ animations: 'disabled', caret: 'hide' });
+    writeFileSync(join(dir, stem + '.png'), res.shot);
+    writeFileSync(join(dir, stem + '.full.png'), await page.screenshot({ fullPage: true, animations: 'disabled', caret: 'hide' }));
+  } catch (e) {
+    res.error = firstLine(e);
+  } finally {
+    if (page) await page.close().catch(() => {});
+  }
+  return res;
+}
+
+function tellsOf(audit, detectors, type) {
+  const tells = new Set();
+  if (audit && audit.rules) {
+    for (const r of AUDIT_TELLS) if (audit.rules.includes(r) && (r !== 'table-above-fold' || type === 'list')) tells.add(r);
+  }
+  if (detectors) {
+    if (detectors.greeting) tells.add('greeting-header');
+    if (detectors.hueBuckets >= 5) tells.add('rainbow-status');
+    if (detectors.avatarNonPerson) tells.add('initials-avatar-non-person');
+  }
+  return [...tells].sort();
+}
+
+const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return round2(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+};
+const mean = (xs) => (xs.length ? round2(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+
+export async function grade(beforeDir, afterDir, { outDir } = {}) {
+  const dirs = { before: resolve(String(beforeDir)), after: resolve(String(afterDir)) };
+  outDir = resolve(outDir || join(dirname(dirs.after), 'grade'));
+  mkdirSync(outDir, { recursive: true });
+  const names = Object.keys(PAGES);
+  const paths = { before: {}, after: {} };
+  for (const side of ['before', 'after']) for (const n of names) if (existsSync(join(dirs[side], n))) paths[side][n] = join(dirs[side], n);
+
+  // all audits first, one child at a time, before any other browser starts
+  const browserPath = chromiumPath();
+  const audits = { before: await auditSide(paths.before, browserPath), after: await auditSide(paths.after, browserPath) };
+
+  const cap = { before: {}, after: {} };
+  const fk = {};
+  const diffs = {};
+  let browser = null;
+  let launchError = null;
+  try {
+    browser = await launch();
+  } catch (e) {
+    launchError = firstLine(e);
+  }
+  if (browser) {
+    try {
+      for (const side of ['before', 'after']) for (const n of names) if (paths[side][n]) cap[side][n] = await captureSide(browser, paths[side][n], n, outDir, side);
+      for (const n of names) {
+        if (!paths.after[n]) continue;
+        const b = cap.before[n] && cap.before[n].sigs;
+        const before = { hadSearch: !!(b && b.filterBar && !b.filterBar.error && b.filterBar.search !== 'none'), hadPagination: !!(b && b.pagination && !b.pagination.error) };
+        let page;
+        try {
+          page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+          fk[n] = await functionKept(page, paths.after[n], before);
+        } catch (e) {
+          fk[n] = { ok: false, problems: ['check failed: ' + firstLine(e)], evidence: [] };
+        } finally {
+          if (page) await page.close().catch(() => {});
+        }
+      }
+      let blank;
+      try {
+        blank = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+        for (const n of names) {
+          const a = cap.before[n] && cap.before[n].shot;
+          const b = cap.after[n] && cap.after[n].shot;
+          if (!a || !b) continue;
+          try {
+            diffs[n] = await pixelDiff(blank, a, b);
+          } catch {
+            diffs[n] = null;
+          }
+        }
+      } finally {
+        if (blank) await blank.close().catch(() => {});
+      }
+    } finally {
+      await browser.close().catch(() => {});
+    }
+  }
+
+  const pages = {};
+  const missing = [];
+  const sigsBySide = { before: {}, after: {} };
+  for (const n of names) {
+    // a page that exists on neither side is not part of the report
+    if (!paths.before[n] && !paths.after[n]) continue;
+    for (const side of ['before', 'after']) {
+      const c = cap[side][n];
+      if (c && c.sigs) sigsBySide[side][n] = c.sigs;
+      else if (paths[side][n]) sigsBySide[side][n] = errorSignatures((c && c.error) || launchError || 'page could not be read');
+    }
+    const auditOf = (side) => {
+      const a = audits[side][n];
+      if (!a) return null;
+      const { rules, ...rest } = a;
+      return rest;
+    };
+    let kept;
+    if (!paths.after[n]) {
+      missing.push(n);
+      kept = { ok: false, problems: ['page missing'], evidence: [] };
+    } else {
+      const base = fk[n] || { ok: false, problems: ['check failed: ' + (launchError || 'no browser')], evidence: [] };
+      const problems = [...base.problems];
+      const aa = audits.after[n];
+      if (aa && aa.error) problems.push('audit error: ' + aa.error);
+      if (problems.length) for (const e of base.evidence) if (e.startsWith('script error: ')) problems.push('page error: ' + e.slice('script error: '.length));
+      kept = { ok: problems.length === 0, problems, evidence: base.evidence };
+    }
+    pages[n] = {
+      type: PAGES[n],
+      audit: { before: auditOf('before'), after: auditOf('after') },
+      tells: {
+        before: tellsOf(audits.before[n], cap.before[n] && cap.before[n].detectors, PAGES[n]),
+        after: tellsOf(audits.after[n], cap.after[n] && cap.after[n].detectors, PAGES[n]),
+      },
+      pixelDiffPct: n in diffs ? diffs[n] : null,
+      functionKept: kept,
+    };
+  }
+
+  const cons = { before: consistency(sigsBySide.before), after: consistency(sigsBySide.after) };
+  const keys = Object.keys(pages);
+  const scores = (side) => keys.map((k) => pages[k].audit[side] && pages[k].audit[side].score).filter((s) => typeof s === 'number');
+  const diffVals = keys.map((k) => pages[k].pixelDiffPct).filter((d) => typeof d === 'number');
+  const report = {
+    consistency: cons,
+    pages,
+    summary: {
+      consistency: { before: cons.before.score, after: cons.after.score },
+      auditScoreMean: { before: mean(scores('before')), after: mean(scores('after')) },
+      tellsTotal: { before: keys.reduce((s, k) => s + pages[k].tells.before.length, 0), after: keys.reduce((s, k) => s + pages[k].tells.after.length, 0) },
+      pixelDiffPct: { median: median(diffVals), min: diffVals.length ? Math.min(...diffVals) : null, max: diffVals.length ? Math.max(...diffVals) : null },
+      functionKept: { ok: keys.filter((k) => pages[k].functionKept.ok).length, of: keys.length },
+      pagesMissing: missing,
+    },
+    generatedAt: new Date().toISOString(),
+  };
+  writeFileSync(join(outDir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+  return report;
+}
+
+// ---- CLI -------------------------------------------------------------------------------------------------------------------
+const USAGE = 'Usage: node tests/agent-eval/consistency/grade.mjs <before-dir> <after-dir> [--out <dir>]';
+
+export function formatReport(report) {
+  const pad = (s, n) => String(s).padEnd(n);
+  const lines = [pad('page', 22) + pad('type', 10) + pad('audit', 11) + pad('tells', 8) + pad('diff %', 9) + 'function kept'];
+  for (const [file, p] of Object.entries(report.pages)) {
+    const sc = (s) => (p.audit[s] && typeof p.audit[s].score === 'number' ? p.audit[s].score : '-');
+    lines.push(
+      pad(file, 22) +
+        pad(p.type, 10) +
+        pad(`${sc('before')}->${sc('after')}`, 11) +
+        pad(`${p.tells.before.length}->${p.tells.after.length}`, 8) +
+        pad(p.pixelDiffPct == null ? '-' : p.pixelDiffPct, 9) +
+        (p.functionKept.ok ? 'yes' : 'NO: ' + p.functionKept.problems.join('; '))
+    );
+  }
+  lines.push('', 'Consistency (before -> after)');
+  for (const pat of PATTERNS) {
+    const f = (c) => (!c.counted ? 'not scored' : c.consistent ? 'consistent' : c.unreadable ? 'unreadable' : 'inconsistent');
+    lines.push('  ' + pad(pat, 12) + f(report.consistency.before.patterns[pat]) + ' -> ' + f(report.consistency.after.patterns[pat]));
+  }
+  const s = report.summary;
+  lines.push(
+    `  total: ${s.consistency.before.consistent}/${s.consistency.before.of} -> ${s.consistency.after.consistent}/${s.consistency.after.of}`,
+    `Mean audit score ${s.auditScoreMean.before} -> ${s.auditScoreMean.after}; tells ${s.tellsTotal.before} -> ${s.tellsTotal.after}; function kept ${s.functionKept.ok}/${s.functionKept.of}`
+  );
+  if (s.pagesMissing.length) lines.push('Pages missing: ' + s.pagesMissing.join(', '));
+  return lines.join('\n');
+}
+
+export async function main(argv = process.argv.slice(2)) {
+  const args = [];
+  let out = null;
+  let bad = false;
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--out') {
+      out = argv[++i];
+      if (!out) bad = true;
+    } else args.push(argv[i]);
+  }
+  const isDir = (d) => {
+    try {
+      return statSync(d).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+  if (bad || args.length !== 2 || !args.every(isDir)) {
+    process.stderr.write(USAGE + '\n');
+    return 2;
+  }
+  const report = await grade(args[0], args[1], { outDir: out || undefined });
+  process.stdout.write(formatReport(report) + '\n');
+  return 0;
+}
+
+const isMain = (() => {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+})();
+if (isMain) main().then((code) => process.exit(code));

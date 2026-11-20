@@ -5,12 +5,12 @@
 // Uses Playwright's Chromium (`npx playwright install chromium`), or an installed Google Chrome when that is missing.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
-import { PAGES as GRADER_PAGES, consistency, functionKept, signatures } from './agent-eval/consistency/grade.mjs';
+import { PAGES as GRADER_PAGES, consistency, functionKept, grade, signatures } from './agent-eval/consistency/grade.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'tests', 'agent-eval', 'consistency', 'fixture');
@@ -936,4 +936,128 @@ test('fix D: a pattern that cannot be read is not "kept"', async () => {
       await page.close();
     }
   });
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Task 3: grade(before, after) — change metrics, report JSON
+// ---------------------------------------------------------------------------------------------------------------
+const GRADE_TIMEOUT = 600000;
+const tmpDirs = [];
+const tmp = (prefix) => {
+  const d = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(d);
+  return d;
+};
+after(() => {
+  for (const d of tmpDirs) rmSync(d, { recursive: true, force: true });
+});
+
+// FIXTURE.md "Counted tells" column, one literal list per page.
+const PLANNED_TELLS = {
+  'employees.html': ['no-gradient', 'no-backdrop-blur', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold', 'greeting-header', 'rainbow-status'],
+  'timesheets.html': ['no-gradient', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold', 'rainbow-status'],
+  'leave-requests.html': ['no-gradient', 'no-backdrop-blur', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold', 'greeting-header', 'initials-avatar-non-person'],
+  'reports.html': ['no-gradient', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'initials-avatar-non-person'],
+  'settings.html': ['no-gradient', 'surface-shadow', 'uppercase-text', 'emoji-icon'],
+};
+const sortedTells = (list) => [...list].sort();
+const withoutTime = (report) => JSON.stringify({ ...report, generatedAt: null });
+
+let selfRun;
+const gradeSelf = () =>
+  (selfRun ||= (async () => {
+    const outDir = tmp('eval-self-');
+    return { outDir, report: await grade(FIXTURE, FIXTURE, { outDir }) };
+  })());
+
+test('grade: the fixture against itself is 0 of 6, 0% diff, the planned tells, function kept', { timeout: GRADE_TIMEOUT }, async () => {
+  const { outDir, report } = await gradeSelf();
+  assert.deepEqual(report.consistency.before.score, { consistent: 0, of: 6 });
+  assert.deepEqual(report.consistency.after.score, { consistent: 0, of: 6 });
+  assert.deepEqual(Object.keys(report.pages).sort(), Object.keys(GRADER_PAGES).sort());
+  for (const [file, type] of Object.entries(GRADER_PAGES)) {
+    const p = report.pages[file];
+    assert.equal(p.type, type, file);
+    assert.equal(p.pixelDiffPct, 0, `${file}: pixel diff`);
+    assert.deepEqual(p.audit.before, p.audit.after, `${file}: audit`);
+    assert.equal(typeof p.audit.before.score, 'number', `${file}: audit score`);
+    assert.deepEqual(p.tells.before, p.tells.after, `${file}: tells`);
+    assert.deepEqual(sortedTells(p.tells.before), sortedTells(PLANNED_TELLS[file]), `${file}: counted tells vs FIXTURE.md`);
+    assert.equal(p.functionKept.ok, true, `${file}: function kept ${JSON.stringify(p.functionKept.problems)}`);
+    const name = file.replace(/\.html$/, '');
+    for (const side of ['before', 'after']) {
+      for (const f of [`${name}.png`, `${name}.full.png`]) assert.ok(existsSync(join(outDir, 'screens', side, f)), `${side}/${f}`);
+    }
+  }
+  assert.equal(report.summary.functionKept.ok, 5);
+  assert.equal(report.summary.functionKept.of, 5);
+  assert.deepEqual(report.summary.pagesMissing, []);
+  assert.equal(report.summary.pixelDiffPct.max, 0);
+  assert.deepEqual(JSON.parse(readFileSync(join(outDir, 'report.json'), 'utf8')), JSON.parse(JSON.stringify(report)));
+});
+
+test('grade: grading twice gives identical JSON apart from generatedAt', { timeout: GRADE_TIMEOUT }, async () => {
+  const first = (await gradeSelf()).report;
+  const second = await grade(FIXTURE, FIXTURE, { outDir: tmp('eval-self2-') });
+  assert.equal(typeof first.generatedAt, 'string');
+  assert.equal(withoutTime(second), withoutTime(first));
+});
+
+const stripGradients = (html) => html.replace(/linear-gradient\((?:[^()]|\([^()]*\))*\)/g, '#4f46e5');
+const SHARED_PAGER = (total) =>
+  `<div class="pg2" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:14px"><span>Hiển thị 1–10 trên ${total} mục</span><span><button type="button">Trước</button> <button type="button">Sau</button></span></div>`;
+
+test('grade: a hand-fixed copy (shared pagination on 3 pages, no gradient on 2) is seen as better', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-fixed-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  const edit = (file, fn) => writeFileSync(join(copy, file), fn(readFileSync(join(copy, file), 'utf8')));
+  const hide = '<style>.pager,.more{display:none !important}</style>';
+  edit('employees.html', (h) => stripGradients(h).replace('<div class="pager">', SHARED_PAGER(48) + hide + '<div class="pager">'));
+  edit('timesheets.html', (h) => stripGradients(h).replace('<div class="pager">', SHARED_PAGER(120) + hide + '<div class="pager">'));
+  // the pager is below the first screen on this page, so a header button colour change makes the page visibly change too
+  edit('leave-requests.html', (h) => h.replace('<div class="more">', SHARED_PAGER(36) + hide + '<style>.page-action{background:#4f46e5}</style><div class="more">'));
+  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-fixed-out-') });
+  const pag = (side) => report.consistency[side].patterns.pagination;
+  assert.equal(pag('before').consistent, false);
+  assert.equal(pag('after').consistent, true, JSON.stringify(pag('after').byPage));
+  assert.ok(report.consistency.after.score.consistent > report.consistency.before.score.consistent);
+  for (const file of ['employees.html', 'timesheets.html']) {
+    const p = report.pages[file];
+    assert.ok(p.tells.before.includes('no-gradient'), `${file}: before`);
+    assert.ok(!p.tells.after.includes('no-gradient'), `${file}: after still has no-gradient`);
+  }
+  for (const file of ['employees.html', 'timesheets.html', 'leave-requests.html']) assert.ok(report.pages[file].pixelDiffPct > 0, `${file}: pixel diff`);
+  for (const file of ['reports.html', 'settings.html']) assert.equal(report.pages[file].pixelDiffPct, 0, `${file}: untouched`);
+  assert.ok(report.summary.tellsTotal.after < report.summary.tellsTotal.before);
+});
+
+test('grade: a page that throws on load fails function-kept with the error, and the rest is graded', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-throw-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  const file = join(copy, 'leave-requests.html');
+  writeFileSync(file, readFileSync(file, 'utf8').replace('<script>', '<script>throw new Error("boom: eval fixture");'));
+  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-throw-out-') });
+  const fk = report.pages['leave-requests.html'].functionKept;
+  assert.equal(fk.ok, false);
+  assert.ok(fk.problems.some((p) => p.includes('no data rows')), JSON.stringify(fk.problems));
+  assert.ok(fk.problems.some((p) => p.includes('boom: eval fixture')), JSON.stringify(fk.problems));
+  for (const f of ['employees.html', 'timesheets.html', 'reports.html', 'settings.html']) {
+    assert.equal(report.pages[f].functionKept.ok, true, f);
+    assert.equal(report.pages[f].pixelDiffPct, 0, f);
+  }
+});
+
+test('grade: a page missing from the after folder is reported, not thrown', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-missing-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  rmSync(join(copy, 'settings.html'));
+  writeFileSync(join(copy, 'extra.html'), '<!doctype html><title>x</title>');
+  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-missing-out-') });
+  const p = report.pages['settings.html'];
+  assert.deepEqual(p.functionKept.problems, ['page missing']);
+  assert.equal(p.functionKept.ok, false);
+  assert.equal(p.audit.after, null);
+  assert.equal(p.pixelDiffPct, null);
+  assert.deepEqual(report.summary.pagesMissing, ['settings.html']);
+  assert.equal(report.pages['extra.html'], undefined);
 });
