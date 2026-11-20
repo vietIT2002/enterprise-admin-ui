@@ -6,7 +6,7 @@
 // text anywhere in the table's container, English and Vietnamese labels, rows as table rows, role=row or list items.
 // Nothing here throws on unusual markup. An absent pattern is `null`; a pattern whose extractor failed is
 // `{ error }`, which consistency() reports as unreadable and never counts as consistent.
-import { execFile } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -543,6 +543,71 @@ export function consistency(byPage) {
 // ---------------------------------------------------------------------------------------------------------------
 // Function kept
 // ---------------------------------------------------------------------------------------------------------------
+// Runs in the page. Copied from settleInPage in skills/enterprise-admin-ui/scripts/audit-cli.mjs (not exported, and the skill is
+// not changed here): wait for a DOM-mutation quiet period, then for loading placeholders (aria-busy, .animate-pulse blocks) to go,
+// both within capMs, then finish animations and scroll to the top. Resolves with the number of placeholders still present.
+async function settleInPage({ quietMs, capMs }) {
+  const started = Date.now();
+  await new Promise((resolve) => {
+    let quiet = null;
+    let cap = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(quiet);
+      quiet = setTimeout(done, quietMs);
+    });
+    function done() {
+      observer.disconnect();
+      clearTimeout(quiet);
+      clearTimeout(cap);
+      resolve();
+    }
+    observer.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+    quiet = setTimeout(done, quietMs);
+    cap = setTimeout(done, capMs);
+  });
+  const remaining = Math.max(0, capMs - (Date.now() - started));
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && s.opacity !== '0';
+  };
+  const placeholder = (el) => {
+    const r = el.getBoundingClientRect();
+    return visible(el) && !el.textContent.trim() && r.width >= 12 && r.height >= 12;
+  };
+  const count = () =>
+    [...document.querySelectorAll('[aria-busy="true"]')].filter(visible).length +
+    [...document.querySelectorAll('.animate-pulse')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
+  const left = await new Promise((resolve) => {
+    const end = Date.now() + remaining;
+    const tick = () => {
+      const n = count();
+      if (n === 0 || Date.now() >= end) resolve(n);
+      else setTimeout(tick, 100);
+    };
+    tick();
+  });
+  await document.fonts.ready;
+  for (const animation of document.getAnimations()) {
+    try {
+      animation.finish();
+    } catch {
+      // infinite animations cannot finish
+    }
+  }
+  window.scrollTo(0, 0);
+  await new Promise((resolve) => {
+    setTimeout(resolve, 1000);
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+  return left;
+}
+
+// A page is read after it has settled: about 300 ms without DOM changes and no loading placeholder, at most 5 s.
+export async function settle(page) {
+  await page.evaluate(settleInPage, { quietMs: 300, capMs: 5000 }).catch(() => {});
+}
+
 const pageFacts = (page) => page.evaluate(extract, [SEARCH_SELECTOR, 'facts', ...pageInfo(page.url())]);
 
 // Poll for the number of data rows to differ from `from`, up to `ms`; returns the facts once they settle.
@@ -570,7 +635,7 @@ export async function functionKept(page, file, before = {}) {
     page.on('pageerror', onError);
     try {
       await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
-      await page.waitForTimeout(150);
+      await settle(page);
     } catch (e) {
       return { ok: false, problems: ['load failed: ' + String(e.message || e).split('\n')[0]], evidence };
     } finally {
@@ -611,6 +676,7 @@ export async function functionKept(page, file, before = {}) {
 
     if (before.hadPagination) {
       await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' }).catch(() => {});
+      await settle(page);
       const sig = await signatures(page);
       if (sig.pagination && sig.pagination.error) problems.push('could not read pagination: ' + sig.pagination.error);
       else if (!sig.pagination) problems.push('pattern lost: pagination');
@@ -624,11 +690,20 @@ export async function functionKept(page, file, before = {}) {
 // ---------------------------------------------------------------------------------------------------------------
 // Change metrics: grade(beforeDir, afterDir) pairs pages by file name and reports, per page, the audit score, the counted
 // tells, the first-screen pixel difference and whether the function was kept; plus the cross-page consistency.
+// A page that cannot be compared (missing, failed to load, failed to audit, on either side) is listed in summary.excluded and
+// left out of the tell totals and the mean audit score.
 // ---------------------------------------------------------------------------------------------------------------
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AUDIT_CLI = join(HERE, '..', '..', '..', 'skills', 'enterprise-admin-ui', 'scripts', 'audit-cli.mjs');
-const AUDIT_TIMEOUT_MS = 180000;
 const VIEWPORT = { width: 1440, height: 900 };
+const AUDIT_MAX_BYTES = 64 * 1024 * 1024;
+// Defaults of the grade() options of the same name (ms).
+const DEFAULTS = {
+  auditTimeoutMs: 90000, // one audit-cli child, one page; the child itself is given --timeout 45
+  pageGuardMs: 60000, // all the work on one page of one side
+  netTimeoutMs: 5000, // an http(s) request that has not answered by then is aborted, so a hanging font or CDN link cannot stall a page
+  callTimeoutMs: 15000, // Playwright's default for each call on a page
+};
 // A pixel is changed when its RGB Euclidean distance is above this.
 export const PIXEL_THRESHOLD = 32;
 
@@ -636,8 +711,9 @@ export const PIXEL_THRESHOLD = 32;
 const AUDIT_TELLS = ['no-gradient', 'no-backdrop-blur', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold'];
 const round2 = (n) => Math.round(n * 100) / 100;
 const firstLine = (e) => String((e && e.message) || e).split('\n')[0];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---- audit: one audit-cli child per side and page type, run one after the other -----------------------------------------
+// ---- audit: one audit-cli child per page, one at a time ---------------------------------------------------------------------
 function chromiumPath() {
   try {
     const p = chromium.executablePath();
@@ -647,35 +723,82 @@ function chromiumPath() {
   }
 }
 
-function runAuditCli(type, files, browser) {
-  const args = [AUDIT_CLI, '--json', '--type', type, ...(browser ? ['--browser', browser] : []), ...files];
+// Stops the child and everything it started (its browser): taskkill /T on Windows, SIGKILL to the process group elsewhere.
+function killTree(child) {
+  try {
+    if (process.platform === 'win32') spawnSync('taskkill', ['/T', '/F', '/PID', String(child.pid)], { windowsHide: true, stdio: 'ignore' });
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+}
+
+function runAuditCli(cli, type, file, browser, timeoutMs) {
+  const args = [cli, '--json', '--type', type, '--timeout', '45', ...(browser ? ['--browser', browser] : []), file];
   return new Promise((done) => {
-    execFile(process.execPath, args, { timeout: AUDIT_TIMEOUT_MS, maxBuffer: 128 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+    let out = '';
+    let bytes = 0;
+    let err = '';
+    let settled = false;
+    let child;
+    const finish = (r) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      done(r);
+    };
+    const timer = setTimeout(() => {
+      if (child) killTree(child);
+      finish({ error: `audit timed out after ${timeoutMs / 1000} s` });
+    }, timeoutMs);
+    try {
+      child = spawn(process.execPath, args, { detached: process.platform !== 'win32', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      return finish({ error: 'audit could not start: ' + firstLine(e) });
+    }
+    child.stdout.on('data', (d) => {
+      bytes += d.length;
+      if (bytes > AUDIT_MAX_BYTES) {
+        killTree(child);
+        finish({ error: `audit output is larger than ${AUDIT_MAX_BYTES / 1024 / 1024} MB` });
+      } else out += d;
+    });
+    child.stderr.on('data', (d) => {
+      if (err.length < 4000) err += d;
+    });
+    child.on('error', (e) => finish({ error: 'audit could not start: ' + firstLine(e) }));
+    child.on('close', (code) => {
       let parsed = null;
       try {
-        parsed = JSON.parse(stdout);
+        parsed = JSON.parse(out);
       } catch {
         parsed = null;
       }
-      if (Array.isArray(parsed)) return done({ pages: parsed });
-      if (err && err.killed) return done({ error: `audit timed out after ${AUDIT_TIMEOUT_MS / 1000} s` });
-      done({ error: 'audit failed: ' + (firstLine(stderr) || (err ? `exit ${err.code}` : 'output is not JSON')) });
+      if (Array.isArray(parsed)) return finish({ pages: parsed });
+      finish({ error: firstLine(err) ? 'audit failed: ' + firstLine(err) : code ? `audit failed: exit ${code}` : 'audit output is not JSON' });
     });
   });
 }
 
 // files: { file name: path } of the pages that exist on this side. Returns { file name: { score, errors, warnings, error?, rules } }.
-async function auditSide(files, browser) {
+async function auditSide(files, { cli, browser, timeoutMs }) {
   const out = {};
-  const byType = {};
-  for (const [name, path] of Object.entries(files)) (byType[PAGES[name]] ||= []).push([name, path]);
-  for (const [type, list] of Object.entries(byType)) {
-    const res = await runAuditCli(type, list.map(([, p]) => p), browser);
-    list.forEach(([name], i) => {
-      const entry = res.pages && (res.pages[i] || null);
-      const fail = (error) => (out[name] = { score: null, errors: null, warnings: null, error, rules: [] });
-      if (!entry) return fail(res.error || 'audit gave no result');
-      if (entry.error || !entry.result) return fail(entry.error || 'audit gave no result');
+  for (const [name, path] of Object.entries(files)) {
+    const fail = (error) => (out[name] = { score: null, errors: null, warnings: null, error, rules: [] });
+    const res = await runAuditCli(cli, PAGES[name], path, browser, timeoutMs);
+    if (!res.pages) {
+      fail(res.error);
+      continue;
+    }
+    // results are matched by target, not by position
+    const entry = res.pages.find((e) => e && e.target === path) || (res.pages.length === 1 ? res.pages[0] : null);
+    if (!entry) fail('audit gave no result for this page');
+    else if (entry.error || !entry.result) fail(entry.error || 'audit gave no result');
+    else {
       const v = entry.result.violations || [];
       out[name] = {
         score: entry.result.score,
@@ -683,19 +806,23 @@ async function auditSide(files, browser) {
         warnings: v.filter((x) => x.severity !== 'error').length,
         rules: v.map((x) => x.rule),
       };
-    });
+    }
   }
   return out;
 }
 
 // ---- detectors. Run in the browser; self-contained. -----------------------------------------------------------------------
 //   greeting-header: a visible h1/h2 that starts with a greeting (Welcome, Good morning/afternoon/evening, Hello, Chao, Xin chao).
-//   rainbow-status: 5 or more distinct hues among the badge-like elements (short labels with a coloured background, in data
-//     rows or with a "badge" class). Hue buckets are 30 degrees wide: bucket = floor(hue / 30), 12 buckets, no wrap-around
-//     merge. Backgrounds with a chroma (max-min of RGB over 255) under 0.06 are greys and ignored.
-//   initials-avatar-non-person: a 1-2 letter circular element (16-64px, radius at least 40% of the side) in a data row whose
-//     first cell is not a person. A first cell is a person when it holds an email (an "@" or a mailto link) or reads like a
-//     name: 2 to 5 words, each starting with an uppercase letter. Initials and avatar text are left out of that reading.
+//   rainbow-status: 5 or more distinct hues among badge-like elements. An element is badge-like when it has a short label
+//     (at most 24 characters, more than 2 letters, so initials and avatars of any shape are out), a coloured background and a
+//     class that names a badge (badge, pill, chip, tag, status, label), or when the same label sits in 2 or more rows. A dot
+//     badge counts too: an empty coloured element of at most 14px whose parent holds the label. Hue buckets are 30 degrees
+//     wide with red centred on 0: bucket = floor(((hue + 15) mod 360) / 30), so 345-15 is one bucket. Backgrounds with a
+//     chroma (max-min of RGB over 255) under 0.03 are greys and ignored.
+//   initials-avatar-non-person: a 1-2 letter circular element (16-64px, radius at least 40% of the side) in a data row that is
+//     not a person row. A row is a person row when any cell holds an email, or when the avatar's own cell, else the nearest cell
+//     with text, starts with a name-like line (the avatar's own letters left out): 2 to 5 words that start with an uppercase
+//     letter, apart from lowercase name particles (thi, van, de, ...). A row with no text next to the avatar is not flagged.
 function detect() {
   const all = (root, sel) => Array.from(root.querySelectorAll(sel));
   const vis = (el) => {
@@ -715,7 +842,7 @@ function detect() {
   cv.width = cv.height = 1;
   const ctx = cv.getContext('2d', { willReadFrequently: true });
   const rgbOf = (c) => {
-    if (!c) return null;
+    if (!c || c === 'transparent' || /^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(c)) return null;
     ctx.clearRect(0, 0, 1, 1);
     ctx.fillStyle = '#123456';
     ctx.fillStyle = c;
@@ -730,66 +857,112 @@ function detect() {
     return [d[0], d[1], d[2]];
   };
   const ROWS = 'tbody tr, [role="row"]';
+  const CELLS = 'td, th, [role="cell"], [role="gridcell"]';
   const rows = all(document, ROWS).filter((r) => vis(r) && !r.querySelector('[role="columnheader"]'));
   const isAvatar = (e) => {
-    const t = text(e);
-    if (!/^\p{L}{1,2}$/u.test(t) || !vis(e)) return false;
+    if (!/^\p{L}{1,2}$/u.test(text(e)) || !vis(e)) return false;
     const r = e.getBoundingClientRect();
     if (r.width < 16 || r.width > 64 || r.height < 16 || r.height > 64 || Math.abs(r.width - r.height) > 4) return false;
     return (parseFloat(getComputedStyle(e).borderTopLeftRadius) || 0) >= Math.min(r.width, r.height) * 0.4;
   };
 
-  // rainbow-status
-  const cands = new Set();
-  for (const r of rows) for (const e of all(r, '*')) cands.add(e);
-  for (const e of all(document, '[class*="badge" i]')) cands.add(e);
-  const buckets = new Set();
-  for (const e of cands) {
-    if (e.matches('button, a, input, select, textarea, svg, svg *, [role="button"]') || e.closest('button, a, [role="button"]') || !vis(e)) continue;
-    const label = stripMarks(text(e));
-    if (!label || label.length > 32 || isAvatar(e)) continue;
-    const rgb = rgbOf(getComputedStyle(e).backgroundColor);
+  // ---- rainbow-status ----
+  const BADGE_CLASS = /badge|pill|chip|(^|[\s_-])(tag|status|label)([\s_-]|$)/i;
+  const entries = [];
+  for (const e of all(document, '*')) {
+    if (e.matches('button, a, input, select, textarea, svg, svg *, script, style, [role="button"]') || e.closest('button, a, [role="button"], svg')) continue;
+    const own = text(e);
+    let label;
+    let colourEl = e;
+    let labelEl = e;
+    if (own) {
+      label = stripMarks(own);
+      if (all(e, '*').some((k) => text(k) === own && rgbOf(getComputedStyle(k).backgroundColor))) continue; // not the inner-most
+    } else {
+      const r = e.getBoundingClientRect();
+      const p = e.parentElement;
+      if (!p || e.children.length || r.width < 4 || r.height < 4 || r.width > 14 || r.height > 14) continue;
+      labelEl = p;
+      label = stripMarks(text(p));
+    }
+    if (!label || label.length > 24 || /^\p{L}{1,2}$/u.test(label) || !vis(colourEl)) continue;
+    const rgb = rgbOf(getComputedStyle(colourEl).backgroundColor);
     if (!rgb) continue;
-    const r = e.getBoundingClientRect();
-    if (r.width > 220 || r.height > 56) continue;
-    const [R, G, B] = rgb.map((v) => v / 255);
+    const box = labelEl.getBoundingClientRect();
+    if (box.width > 220 || box.height > 56) continue;
+    entries.push({
+      label: label.toLowerCase(),
+      rgb,
+      classy: BADGE_CLASS.test(labelEl.getAttribute('class') || '') || BADGE_CLASS.test(colourEl.getAttribute('class') || ''),
+      row: colourEl.closest(ROWS),
+    });
+  }
+  const rowsOfLabel = new Map();
+  for (const en of entries) if (en.row) (rowsOfLabel.get(en.label) || rowsOfLabel.set(en.label, new Set()).get(en.label)).add(en.row);
+  const buckets = new Set();
+  for (const en of entries) {
+    if (!en.classy && !(rowsOfLabel.get(en.label) && rowsOfLabel.get(en.label).size >= 2)) continue;
+    const [R, G, B] = en.rgb.map((v) => v / 255);
     const mx = Math.max(R, G, B);
-    const mn = Math.min(R, G, B);
-    const chroma = mx - mn;
-    if (chroma < 0.06) continue;
+    const chroma = mx - Math.min(R, G, B);
+    if (chroma < 0.03) continue;
     let h;
     if (mx === R) h = ((G - B) / chroma + 6) % 6;
     else if (mx === G) h = (B - R) / chroma + 2;
     else h = (R - G) / chroma + 4;
-    buckets.add(Math.floor(((h * 60) % 360) / 30));
+    buckets.add(Math.floor((((h * 60) % 360) + 15) % 360 / 30));
   }
   out.hueBuckets = buckets.size;
 
-  // initials-avatar-non-person
-  const isPerson = (cell, avatars) => {
-    if (cell.querySelector('a[href^="mailto:" i]')) return true;
-    let t = '';
-    const w = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) {
-      if (avatars.some((a) => a.contains(n))) continue;
-      t += ' ' + n.textContent;
-    }
-    t = t.replace(/\s+/g, ' ').trim();
-    if (t.includes('@')) return true;
-    const words = t.split(' ').filter(Boolean);
-    return words.length >= 2 && words.length <= 5 && words.every((x) => /^\p{Lu}[\p{L}'.-]*$/u.test(x));
+  // ---- initials-avatar-non-person ----
+  const WORD = /^\p{Lu}[\p{L}'.-]*$/u;
+  const PARTICLES = new Set(['thị', 'thi', 'văn', 'van', 'de', 'der', 'den', 'von', 'la', 'le', 'da', 'di', 'du', 'bin', 'ibn', 'al', 'el']);
+  const looksLikeName = (line) => {
+    const words = line.split(/\s+/).filter(Boolean);
+    if (words.length < 2 || words.length > 5 || !WORD.test(words[0])) return false;
+    return words.every((w) => WORD.test(w) || PARTICLES.has(w.toLowerCase()));
   };
-  for (const r of rows) {
-    const avatars = all(r, '*').filter(isAvatar);
+  const firstTextLine = (cell, avatars) => {
+    const saved = avatars.map((a) => a.style.display);
+    avatars.forEach((a) => (a.style.display = 'none'));
+    let t = '';
+    try {
+      t = cell.innerText || '';
+    } finally {
+      avatars.forEach((a, i) => (a.style.display = saved[i]));
+    }
+    return t.split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).find(Boolean) || '';
+  };
+  const cellOf = (row, el) => {
+    for (let n = el; n && n !== row; n = n.parentElement) if (n.matches(CELLS)) return n;
+    return null;
+  };
+  for (const row of rows) {
+    const avatars = all(row, '*').filter(isAvatar);
     if (!avatars.length) continue;
-    const first = r.querySelector('td, th, [role="cell"], [role="gridcell"]') || r;
-    if (!isPerson(first, avatars)) {
+    if (row.querySelector('a[href^="mailto:" i]') || /[^\s@]+@[^\s@]+\.[^\s@]+/.test(row.textContent || '')) continue;
+    const cells = all(row, CELLS).filter((c) => c.closest(ROWS) === row);
+    const flagged = avatars.some((a) => {
+      const own = cellOf(row, a);
+      const i = own ? cells.indexOf(own) : -1;
+      const order = i < 0 ? (cells.length ? cells : [row]) : [own];
+      if (i >= 0) for (let d = 1; d < cells.length; d++) order.push(...[cells[i + d], cells[i - d]].filter(Boolean));
+      for (const c of order) {
+        const line = firstTextLine(c, avatars);
+        if (line) return !looksLikeName(line);
+      }
+      return false;
+    });
+    if (flagged) {
       out.avatarNonPerson = true;
       break;
     }
   }
   return out;
 }
+
+// The three detectors of one loaded page: { greeting, hueBuckets, avatarNonPerson }.
+export const detectorsOf = (page) => page.evaluate(detect);
 
 // ---- pixel difference, in a blank page ------------------------------------------------------------------------------------
 async function pixelDiff(page, a, b) {
@@ -848,27 +1021,81 @@ async function launch() {
   }
 }
 
+// Races the work against a timer. A late result or error of the work is dropped.
+function guarded(ms, label, work) {
+  let timer;
+  const p = Promise.resolve().then(work);
+  p.catch(() => {});
+  return Promise.race([p, new Promise((_, rej) => (timer = setTimeout(() => rej(new Error(`${label} timed out after ${ms / 1000} s`)), ms)))]).finally(() => clearTimeout(timer));
+}
+
+// Pages come from one browser context. A page that wedges its renderer costs the context: reset() closes it and the next page
+// opens a new one. Requests to http(s) hosts are answered by Node with a time limit, so a hanging link cannot stall a page.
+function browserEnv(browser, { netTimeoutMs, callTimeoutMs }) {
+  let ctx = null;
+  return {
+    async page() {
+      if (!ctx) {
+        ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+        await ctx.route(/^https?:\/\//, async (route) => {
+          try {
+            await route.fulfill({ response: await route.fetch({ timeout: netTimeoutMs }) });
+          } catch {
+            await route.abort().catch(() => {});
+          }
+        });
+      }
+      const p = await ctx.newPage();
+      p.setDefaultTimeout(callTimeoutMs);
+      p.setDefaultNavigationTimeout(callTimeoutMs);
+      return p;
+    },
+    async release(page, wedged) {
+      if (wedged) return this.reset();
+      await Promise.race([page.close().catch(() => {}), sleep(3000)]);
+    },
+    async reset() {
+      const c = ctx;
+      ctx = null;
+      if (c) await Promise.race([c.close().catch(() => {}), sleep(5000)]);
+    },
+    async close() {
+      await this.reset();
+      await Promise.race([browser.close().catch(() => {}), sleep(10000)]);
+    },
+  };
+}
+const isWedge = (message) => /timeout|timed out/i.test(String(message));
+
 // One page on one side: signatures, detectors and both screenshots. Never throws.
-async function captureSide(browser, file, name, outDir, side) {
+async function captureSide(env, file, name, outDir, side, guardMs) {
   const res = { sigs: null, detectors: null, shot: null, error: null };
-  let page;
+  let page = null;
+  let wedged = false;
   try {
-    page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-    await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' });
-    await page.waitForTimeout(150);
-    res.sigs = await signatures(page);
-    res.detectors = await page.evaluate(detect).catch(() => null);
-    const dir = join(outDir, 'screens', side);
-    mkdirSync(dir, { recursive: true });
-    const stem = name.replace(/\.html?$/i, '');
-    res.shot = await page.screenshot({ animations: 'disabled', caret: 'hide' });
-    writeFileSync(join(dir, stem + '.png'), res.shot);
-    writeFileSync(join(dir, stem + '.full.png'), await page.screenshot({ fullPage: true, animations: 'disabled', caret: 'hide' }));
+    await guarded(guardMs, 'page', async () => {
+      page = await env.page();
+      try {
+        await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'domcontentloaded' });
+      } catch (e) {
+        if (!isWedge(e && e.message)) throw e; // a navigation timeout: go on with what has loaded
+      }
+      await settle(page);
+      res.sigs = await signatures(page);
+      res.detectors = await detectorsOf(page);
+      const dir = join(outDir, 'screens', side);
+      mkdirSync(dir, { recursive: true });
+      const stem = name.replace(/\.html?$/i, '');
+      res.shot = await page.screenshot({ animations: 'disabled', caret: 'hide' });
+      writeFileSync(join(dir, stem + '.png'), res.shot);
+      writeFileSync(join(dir, stem + '.full.png'), await page.screenshot({ fullPage: true, animations: 'disabled', caret: 'hide' }));
+    });
   } catch (e) {
     res.error = firstLine(e);
-  } finally {
-    if (page) await page.close().catch(() => {});
+    wedged = isWedge(res.error);
+    res.shot = null;
   }
+  if (page || wedged) await env.release(page, wedged);
   return res;
 }
 
@@ -893,76 +1120,89 @@ const median = (xs) => {
 };
 const mean = (xs) => (xs.length ? round2(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
 
-export async function grade(beforeDir, afterDir, { outDir } = {}) {
+// options: outDir, and for tests auditCli (path of the audit CLI), auditTimeoutMs, pageGuardMs, netTimeoutMs, callTimeoutMs.
+export async function grade(beforeDir, afterDir, options = {}) {
+  const o = { ...DEFAULTS, auditCli: AUDIT_CLI, ...options };
   const dirs = { before: resolve(String(beforeDir)), after: resolve(String(afterDir)) };
-  outDir = resolve(outDir || join(dirname(dirs.after), 'grade'));
+  const outDir = resolve(o.outDir || join(dirname(dirs.after), 'grade'));
   mkdirSync(outDir, { recursive: true });
   const names = Object.keys(PAGES);
   const paths = { before: {}, after: {} };
   for (const side of ['before', 'after']) for (const n of names) if (existsSync(join(dirs[side], n))) paths[side][n] = join(dirs[side], n);
 
   // all audits first, one child at a time, before any other browser starts
-  const browserPath = chromiumPath();
-  const audits = { before: await auditSide(paths.before, browserPath), after: await auditSide(paths.after, browserPath) };
+  const auditOpts = { cli: o.auditCli, browser: chromiumPath(), timeoutMs: o.auditTimeoutMs };
+  const audits = { before: await auditSide(paths.before, auditOpts), after: await auditSide(paths.after, auditOpts) };
 
   const cap = { before: {}, after: {} };
   const fk = {};
   const diffs = {};
-  let browser = null;
+  let env = null;
   let launchError = null;
   try {
-    browser = await launch();
+    env = browserEnv(await launch(), o);
   } catch (e) {
     launchError = firstLine(e);
   }
-  if (browser) {
+  if (env) {
     try {
-      for (const side of ['before', 'after']) for (const n of names) if (paths[side][n]) cap[side][n] = await captureSide(browser, paths[side][n], n, outDir, side);
+      for (const side of ['before', 'after']) for (const n of names) if (paths[side][n]) cap[side][n] = await captureSide(env, paths[side][n], n, outDir, side, o.pageGuardMs);
       for (const n of names) {
         if (!paths.after[n]) continue;
         const b = cap.before[n] && cap.before[n].sigs;
         const before = { hadSearch: !!(b && b.filterBar && !b.filterBar.error && b.filterBar.search !== 'none'), hadPagination: !!(b && b.pagination && !b.pagination.error) };
-        let page;
+        let page = null;
+        let wedged = false;
         try {
-          page = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-          fk[n] = await functionKept(page, paths.after[n], before);
+          fk[n] = await guarded(o.pageGuardMs, 'page', async () => {
+            page = await env.page();
+            return functionKept(page, paths.after[n], before);
+          });
         } catch (e) {
           fk[n] = { ok: false, problems: ['check failed: ' + firstLine(e)], evidence: [] };
-        } finally {
-          if (page) await page.close().catch(() => {});
+          wedged = isWedge(firstLine(e));
         }
+        if (page || wedged) await env.release(page, wedged);
       }
-      let blank;
+      let blank = null;
       try {
-        blank = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 1 });
+        blank = await env.page();
         for (const n of names) {
           const a = cap.before[n] && cap.before[n].shot;
           const b = cap.after[n] && cap.after[n].shot;
           if (!a || !b) continue;
           try {
-            diffs[n] = await pixelDiff(blank, a, b);
+            diffs[n] = await guarded(o.pageGuardMs, 'pixel diff', () => pixelDiff(blank, a, b));
           } catch {
             diffs[n] = null;
           }
         }
+      } catch {
+        // no pixel differences without a page
       } finally {
-        if (blank) await blank.close().catch(() => {});
+        if (blank) await env.release(blank, false);
       }
     } finally {
-      await browser.close().catch(() => {});
+      await env.close();
     }
   }
 
   const pages = {};
   const missing = [];
+  const excluded = [];
   const sigsBySide = { before: {}, after: {} };
   for (const n of names) {
     // a page that exists on neither side is not part of the report
     if (!paths.before[n] && !paths.after[n]) continue;
+    let reason = null;
     for (const side of ['before', 'after']) {
       const c = cap[side][n];
       if (c && c.sigs) sigsBySide[side][n] = c.sigs;
       else if (paths[side][n]) sigsBySide[side][n] = errorSignatures((c && c.error) || launchError || 'page could not be read');
+      if (reason) continue;
+      if (!paths[side][n]) reason = `page missing ${side}`;
+      else if (!c || c.error || !c.sigs || !c.detectors) reason = `${side} side failed to load: ${(c && c.error) || launchError || 'page could not be read'}`;
+      else if (audits[side][n] && audits[side][n].error) reason = `${side} audit error: ${audits[side][n].error}`;
     }
     const auditOf = (side) => {
       const a = audits[side][n];
@@ -982,12 +1222,13 @@ export async function grade(beforeDir, afterDir, { outDir } = {}) {
       if (problems.length) for (const e of base.evidence) if (e.startsWith('script error: ')) problems.push('page error: ' + e.slice('script error: '.length));
       kept = { ok: problems.length === 0, problems, evidence: base.evidence };
     }
+    if (reason) excluded.push({ page: n, reason });
     pages[n] = {
       type: PAGES[n],
       audit: { before: auditOf('before'), after: auditOf('after') },
       tells: {
         before: tellsOf(audits.before[n], cap.before[n] && cap.before[n].detectors, PAGES[n]),
-        after: tellsOf(audits.after[n], cap.after[n] && cap.after[n].detectors, PAGES[n]),
+        after: reason ? null : tellsOf(audits.after[n], cap.after[n] && cap.after[n].detectors, PAGES[n]),
       },
       pixelDiffPct: n in diffs ? diffs[n] : null,
       functionKept: kept,
@@ -996,7 +1237,8 @@ export async function grade(beforeDir, afterDir, { outDir } = {}) {
 
   const cons = { before: consistency(sigsBySide.before), after: consistency(sigsBySide.after) };
   const keys = Object.keys(pages);
-  const scores = (side) => keys.map((k) => pages[k].audit[side] && pages[k].audit[side].score).filter((s) => typeof s === 'number');
+  const comparable = keys.filter((k) => !excluded.some((x) => x.page === k));
+  const scores = (side) => comparable.map((k) => pages[k].audit[side] && pages[k].audit[side].score).filter((s) => typeof s === 'number');
   const diffVals = keys.map((k) => pages[k].pixelDiffPct).filter((d) => typeof d === 'number');
   const report = {
     consistency: cons,
@@ -1004,10 +1246,11 @@ export async function grade(beforeDir, afterDir, { outDir } = {}) {
     summary: {
       consistency: { before: cons.before.score, after: cons.after.score },
       auditScoreMean: { before: mean(scores('before')), after: mean(scores('after')) },
-      tellsTotal: { before: keys.reduce((s, k) => s + pages[k].tells.before.length, 0), after: keys.reduce((s, k) => s + pages[k].tells.after.length, 0) },
+      tellsTotal: { before: comparable.reduce((s, k) => s + pages[k].tells.before.length, 0), after: comparable.reduce((s, k) => s + pages[k].tells.after.length, 0) },
       pixelDiffPct: { median: median(diffVals), min: diffVals.length ? Math.min(...diffVals) : null, max: diffVals.length ? Math.max(...diffVals) : null },
       functionKept: { ok: keys.filter((k) => pages[k].functionKept.ok).length, of: keys.length },
       pagesMissing: missing,
+      excluded,
     },
     generatedAt: new Date().toISOString(),
   };
@@ -1023,11 +1266,12 @@ export function formatReport(report) {
   const lines = [pad('page', 22) + pad('type', 10) + pad('audit', 11) + pad('tells', 8) + pad('diff %', 9) + 'function kept'];
   for (const [file, p] of Object.entries(report.pages)) {
     const sc = (s) => (p.audit[s] && typeof p.audit[s].score === 'number' ? p.audit[s].score : '-');
+    const tl = (t) => (t ? t.length : '-');
     lines.push(
       pad(file, 22) +
         pad(p.type, 10) +
         pad(`${sc('before')}->${sc('after')}`, 11) +
-        pad(`${p.tells.before.length}->${p.tells.after.length}`, 8) +
+        pad(`${tl(p.tells.before)}->${tl(p.tells.after)}`, 8) +
         pad(p.pixelDiffPct == null ? '-' : p.pixelDiffPct, 9) +
         (p.functionKept.ok ? 'yes' : 'NO: ' + p.functionKept.problems.join('; '))
     );
@@ -1043,6 +1287,7 @@ export function formatReport(report) {
     `Mean audit score ${s.auditScoreMean.before} -> ${s.auditScoreMean.after}; tells ${s.tellsTotal.before} -> ${s.tellsTotal.after}; function kept ${s.functionKept.ok}/${s.functionKept.of}`
   );
   if (s.pagesMissing.length) lines.push('Pages missing: ' + s.pagesMissing.join(', '));
+  for (const x of s.excluded) lines.push(`Not compared (left out of the totals): ${x.page}: ${x.reason}`);
   return lines.join('\n');
 }
 
@@ -1067,9 +1312,14 @@ export async function main(argv = process.argv.slice(2)) {
     process.stderr.write(USAGE + '\n');
     return 2;
   }
-  const report = await grade(args[0], args[1], { outDir: out || undefined });
-  process.stdout.write(formatReport(report) + '\n');
-  return 0;
+  try {
+    const report = await grade(args[0], args[1], { outDir: out || undefined });
+    process.stdout.write(formatReport(report) + '\n');
+    return 0;
+  } catch (e) {
+    process.stderr.write('grade failed: ' + firstLine(e) + '\n');
+    return 1;
+  }
 }
 
 const isMain = (() => {
@@ -1079,4 +1329,8 @@ const isMain = (() => {
     return false;
   }
 })();
-if (isMain) main().then((code) => process.exit(code));
+if (isMain) {
+  main().then((code) => {
+    process.exitCode = code;
+  });
+}

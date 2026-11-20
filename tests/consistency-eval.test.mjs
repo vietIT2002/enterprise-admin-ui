@@ -6,11 +6,12 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
-import { PAGES as GRADER_PAGES, consistency, functionKept, grade, signatures } from './agent-eval/consistency/grade.mjs';
+import { PAGES as GRADER_PAGES, consistency, detectorsOf, functionKept, grade, signatures } from './agent-eval/consistency/grade.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURE = join(ROOT, 'tests', 'agent-eval', 'consistency', 'fixture');
@@ -1007,15 +1008,18 @@ const stripGradients = (html) => html.replace(/linear-gradient\((?:[^()]|\([^()]
 const SHARED_PAGER = (total) =>
   `<div class="pg2" style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-size:14px"><span>Hiển thị 1–10 trên ${total} mục</span><span><button type="button">Trước</button> <button type="button">Sau</button></span></div>`;
 
-test('grade: a hand-fixed copy (shared pagination on 3 pages, no gradient on 2) is seen as better', { timeout: GRADE_TIMEOUT }, async () => {
+test('grade: a hand-fixed copy is seen as better, and a page that throws fails function-kept with the error', { timeout: GRADE_TIMEOUT }, async () => {
   const copy = tmp('eval-fixed-');
   cpSync(FIXTURE, copy, { recursive: true });
   const edit = (file, fn) => writeFileSync(join(copy, file), fn(readFileSync(join(copy, file), 'utf8')));
   const hide = '<style>.pager,.more{display:none !important}</style>';
+  // shared pagination on the 3 pages that have one; no gradient at all on 2 of them
   edit('employees.html', (h) => stripGradients(h).replace('<div class="pager">', SHARED_PAGER(48) + hide + '<div class="pager">'));
   edit('timesheets.html', (h) => stripGradients(h).replace('<div class="pager">', SHARED_PAGER(120) + hide + '<div class="pager">'));
   // the pager is below the first screen on this page, so a header button colour change makes the page visibly change too
   edit('leave-requests.html', (h) => h.replace('<div class="more">', SHARED_PAGER(36) + hide + '<style>.page-action{background:#4f46e5}</style><div class="more">'));
+  // reports throws before it renders its rows
+  edit('reports.html', (h) => h.replace('<script>', '<script>throw new Error("boom: eval fixture");'));
   const report = await grade(FIXTURE, copy, { outDir: tmp('eval-fixed-out-') });
   const pag = (side) => report.consistency[side].patterns.pagination;
   assert.equal(pag('before').consistent, false);
@@ -1027,37 +1031,173 @@ test('grade: a hand-fixed copy (shared pagination on 3 pages, no gradient on 2) 
     assert.ok(!p.tells.after.includes('no-gradient'), `${file}: after still has no-gradient`);
   }
   for (const file of ['employees.html', 'timesheets.html', 'leave-requests.html']) assert.ok(report.pages[file].pixelDiffPct > 0, `${file}: pixel diff`);
-  for (const file of ['reports.html', 'settings.html']) assert.equal(report.pages[file].pixelDiffPct, 0, `${file}: untouched`);
-  assert.ok(report.summary.tellsTotal.after < report.summary.tellsTotal.before);
-});
-
-test('grade: a page that throws on load fails function-kept with the error, and the rest is graded', { timeout: GRADE_TIMEOUT }, async () => {
-  const copy = tmp('eval-throw-');
-  cpSync(FIXTURE, copy, { recursive: true });
-  const file = join(copy, 'leave-requests.html');
-  writeFileSync(file, readFileSync(file, 'utf8').replace('<script>', '<script>throw new Error("boom: eval fixture");'));
-  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-throw-out-') });
-  const fk = report.pages['leave-requests.html'].functionKept;
+  assert.equal(report.pages['settings.html'].pixelDiffPct, 0, 'settings: untouched');
+  const fk = report.pages['reports.html'].functionKept;
   assert.equal(fk.ok, false);
   assert.ok(fk.problems.some((p) => p.includes('no data rows')), JSON.stringify(fk.problems));
   assert.ok(fk.problems.some((p) => p.includes('boom: eval fixture')), JSON.stringify(fk.problems));
-  for (const f of ['employees.html', 'timesheets.html', 'reports.html', 'settings.html']) {
-    assert.equal(report.pages[f].functionKept.ok, true, f);
-    assert.equal(report.pages[f].pixelDiffPct, 0, f);
-  }
+  for (const f of ['employees.html', 'timesheets.html', 'settings.html']) assert.equal(report.pages[f].functionKept.ok, true, f);
+  assert.deepEqual(report.summary.excluded, [], 'every page loaded and audited on both sides');
 });
 
-test('grade: a page missing from the after folder is reported, not thrown', { timeout: GRADE_TIMEOUT }, async () => {
-  const copy = tmp('eval-missing-');
+// A tiny stand-in for audit-cli: no browser. Behaviour by the page's file name, and by whether it is on the after side.
+const FAKE_AUDIT = `
+const a = process.argv.slice(2);
+const file = a[a.length - 1];
+const base = file.split(/[\\\\/]/).pop();
+const after = /eval-audit-/.test(file);
+if (after && base === 'reports.html') { console.log('this is not json'); process.exit(0); }
+if (after && base === 'timesheets.html') { setInterval(() => {}, 1000); }
+else {
+  const score = { 'employees.html': 80, 'leave-requests.html': 60 }[base] || 90;
+  console.log(JSON.stringify([{ target: file, error: null, result: { score, violations: [{ rule: 'no-gradient', severity: 'error', count: 1 }, { rule: 'surface-shadow', severity: 'warn', count: 2 }] } }]));
+}
+`;
+const fakeAuditCli = () => {
+  const dir = tmp('eval-fake-cli-');
+  const file = join(dir, 'audit-cli.mjs');
+  writeFileSync(file, FAKE_AUDIT);
+  return file;
+};
+
+test('grade: pages that are missing, fail to audit (not JSON, timeout) or fail to load are left out of the totals', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-audit-');
   cpSync(FIXTURE, copy, { recursive: true });
   rmSync(join(copy, 'settings.html'));
   writeFileSync(join(copy, 'extra.html'), '<!doctype html><title>x</title>');
-  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-missing-out-') });
-  const p = report.pages['settings.html'];
-  assert.deepEqual(p.functionKept.problems, ['page missing']);
-  assert.equal(p.functionKept.ok, false);
-  assert.equal(p.audit.after, null);
-  assert.equal(p.pixelDiffPct, null);
+  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-audit-out-'), auditCli: fakeAuditCli(), auditTimeoutMs: 4000 });
+  const p = report.pages;
+  assert.deepEqual(p['settings.html'].functionKept.problems, ['page missing']);
+  assert.equal(p['settings.html'].audit.after, null);
+  assert.equal(p['settings.html'].pixelDiffPct, null);
   assert.deepEqual(report.summary.pagesMissing, ['settings.html']);
-  assert.equal(report.pages['extra.html'], undefined);
+  assert.equal(p['extra.html'], undefined);
+  assert.ok(p['reports.html'].functionKept.problems.includes('audit error: audit output is not JSON'), JSON.stringify(p['reports.html'].functionKept.problems));
+  assert.ok(p['timesheets.html'].functionKept.problems.some((x) => /^audit error: audit timed out/.test(x)), JSON.stringify(p['timesheets.html'].functionKept.problems));
+  assert.equal(p['timesheets.html'].audit.after.score, null);
+  // the excluded pages have no after tells; the before tells stay
+  for (const f of ['settings.html', 'reports.html', 'timesheets.html']) assert.equal(p[f].tells.after, null, f);
+  assert.ok(Array.isArray(p['reports.html'].tells.before));
+  assert.deepEqual(report.summary.excluded.map((x) => x.page), ['timesheets.html', 'reports.html', 'settings.html']);
+  assert.match(report.summary.excluded[0].reason, /after audit error: audit timed out/);
+  assert.match(report.summary.excluded[1].reason, /after audit error: audit output is not JSON/);
+  assert.equal(report.summary.excluded[2].reason, 'page missing after');
+  // totals cover employees and leave-requests only: each has 2 audit tells and 2 detector tells
+  assert.deepEqual(report.summary.tellsTotal, { before: 8, after: 8 });
+  assert.deepEqual(report.summary.auditScoreMean, { before: 70, after: 70 });
+  assert.equal(p['employees.html'].functionKept.ok, true);
+});
+
+test('grade: a hanging stylesheet is bounded, and a page stuck in a loop is an error while the rest is graded', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-guard-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  const edit = (file, fn) => writeFileSync(join(copy, file), fn(readFileSync(join(copy, file), 'utf8')));
+  edit('leave-requests.html', (h) => h.replace('<head>', '<head><link rel="stylesheet" href="http://10.255.255.1/x.css">'));
+  edit('timesheets.html', (h) => h.replace('<script>', '<script>setTimeout(function () { while (true) {} }, 50);'));
+  const started = Date.now();
+  const report = await grade(FIXTURE, copy, { outDir: tmp('eval-guard-out-'), auditCli: fakeAuditCli(), pageGuardMs: 8000, netTimeoutMs: 2000 });
+  const p = report.pages;
+  assert.ok(Date.now() - started < 180000, 'bounded');
+  assert.equal(p['leave-requests.html'].functionKept.ok, true, JSON.stringify(p['leave-requests.html'].functionKept.problems));
+  assert.equal(typeof p['leave-requests.html'].pixelDiffPct, 'number');
+  assert.ok(Array.isArray(p['leave-requests.html'].tells.after));
+  assert.equal(p['timesheets.html'].functionKept.ok, false);
+  assert.ok(p['timesheets.html'].functionKept.problems.some((x) => /timed out|timeout/i.test(x)), JSON.stringify(p['timesheets.html'].functionKept.problems));
+  assert.equal(p['timesheets.html'].pixelDiffPct, null);
+  assert.equal(p['timesheets.html'].tells.after, null);
+  assert.deepEqual(report.summary.excluded.map((x) => x.page), ['timesheets.html']);
+  assert.match(report.summary.excluded[0].reason, /^after side failed to load:/);
+  for (const f of ['employees.html', 'reports.html', 'settings.html']) {
+    assert.equal(p[f].functionKept.ok, true, f);
+    assert.equal(p[f].pixelDiffPct, 0, f);
+  }
+});
+
+test('grade CLI: no arguments exits 2 and prints the usage', () => {
+  const r = spawnSync(process.execPath, [join(ROOT, 'tests', 'agent-eval', 'consistency', 'grade.mjs')], { encoding: 'utf8' });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /Usage: node tests\/agent-eval\/consistency\/grade\.mjs <before-dir> <after-dir>/);
+});
+
+// ---- detectors, on synthetic markup --------------------------------------------------------------------------------------
+async function detectorsFor(html) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.setContent(`<!doctype html><meta charset="utf-8"><body style="font:14px sans-serif"><main>${html}</main></body>`);
+    return await detectorsOf(page);
+  } finally {
+    await page.close();
+  }
+}
+const AV = (letters, extra = '') =>
+  `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#e0e7ff;margin-right:8px;${extra}">${letters}</span>`;
+const tableOf = (...cells) => `<table><tbody>${cells.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+
+test('detectors: initials-avatar-non-person is not fooled by checkbox columns, titles, particles, or an email elsewhere', { timeout: 60000 }, async () => {
+  const flagged = async (html) => (await detectorsFor(html)).avatarNonPerson;
+  assert.equal(await flagged(tableOf(['<input type="checkbox">', AV('LM') + 'Lê Minh Hoa', 'x'])), false, 'checkbox column, avatar and name');
+  assert.equal(await flagged(tableOf([AV('NA') + '<div>Nguyễn Văn An<br><small>Kế toán trưởng</small></div>', 'x'])), false, 'name then job title');
+  assert.equal(await flagged(tableOf([AV('TH') + 'Trần thị Hoa', 'x'])), false, 'lowercase particle');
+  assert.equal(await flagged(tableOf([AV('KT') + 'Phòng Kế toán', 'x'])), true, 'a department');
+  assert.equal(await flagged(tableOf([AV('KT') + 'Phòng Kế toán', 'lead@example.com'])), false, 'an email in the row');
+  assert.equal(await flagged(tableOf([AV('LV') + 'LV-001', 'Nguyễn Văn An'])), true, 'a code, the name is in another column');
+});
+
+test('detectors: rainbow-status counts badge-like hues, merges red and rose, and ignores avatars', { timeout: 60000 }, async () => {
+  const badge = (bg, text) => `<span class="badge" style="display:inline-block;padding:2px 10px;border-radius:999px;background:${bg}">${text}</span> `;
+  const hues = async (html) => (await detectorsFor(html)).hueBuckets;
+  const pastels = ['#fef2f2', '#fff7ed', '#f0fdf4', '#eff6ff', '#faf5ff'].map((c, i) => badge(c, 'Status ' + 'ABCDE'[i])).join('');
+  assert.equal(await hues(pastels), 5, 'five Tailwind-50 pastels');
+  const red = ['#ef4444', '#f43f5e', '#f97316', '#22c55e', '#3b82f6'].map((c, i) => badge(c, 'State ' + 'ABCDE'[i])).join('');
+  assert.equal(await hues(red), 4, 'red and rose are one hue');
+  const squares = ['#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#eab308'].map((c, i) => AV('AB'[i % 2] + 'CDEFG'[i], `background:${c};border-radius:6px`));
+  assert.equal(await hues(tableOf(...squares.map((s) => [s + 'Someone ' + 'X']))), 0, 'per-person coloured square avatars');
+  const plain = (bg, text) => `<span style="display:inline-block;padding:2px 10px;background:${bg}">${text}</span>`;
+  const colours = ['#fecaca', '#fed7aa', '#bbf7d0', '#bfdbfe', '#e9d5ff'];
+  const labels = ['Open', 'Hold', 'Done', 'Review', 'Late'];
+  const repeated = tableOf(...[0, 1].map(() => colours.map((c, i) => plain(c, labels[i]))));
+  assert.equal(await hues(repeated), 5, 'the same labels in 2 rows without a badge class');
+  assert.equal(await hues(tableOf(colours.map((c, i) => plain(c, labels[i])))), 0, 'once, without a class: not a badge');
+  const dot = (c, t) => `<span class="status"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${c}"></i> ${t}</span> `;
+  assert.equal(await hues(['#ef4444', '#f97316', '#22c55e', '#3b82f6', '#a855f7'].map((c, i) => dot(c, 'Item ' + 'ABCDE'[i])).join('')), 5, 'dot and text badges');
+});
+
+// A rewrite that shows a skeleton first and renders its rows 400 ms later is read after the rows are there.
+const LATE_REPORT = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo</title>
+<style>body{margin:0;font:14px sans-serif}main{padding:24px}td,th{padding:20px;text-align:left}.skel-block{position:absolute;left:300px;top:200px;width:200px;height:100px;background:#f00}</style></head>
+<body><main><h1>Báo cáo</h1><table><thead><tr><th>Phòng ban</th><th>Nhân sự</th></tr></thead><tbody id="b"></tbody></table></main>
+<script>
+const b = document.getElementById('b');
+b.innerHTML = '<tr class="skel"><td aria-busy="true"><div class="skel-block animate-pulse"></div></td><td></td></tr>';
+setTimeout(() => { b.innerHTML = ['Kế toán', 'Nhân sự', 'Kinh doanh'].map((d, i) => '<tr><td>' + d + '</td><td>' + (4 + i) + '</td></tr>').join(''); }, 400);
+</script></body></html>`;
+
+test('grade: a page that renders a skeleton first is read after its rows arrive', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-skel-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  writeFileSync(join(copy, 'reports.html'), LATE_REPORT);
+  const outDir = tmp('eval-skel-out-');
+  const report = await grade(FIXTURE, copy, { outDir, auditCli: fakeAuditCli() });
+  const row = report.consistency.after.patterns.tableRow.byPage['reports.html'];
+  assert.ok(row && row.rawHeight >= 55 && row.rawHeight <= 70, `real rows, not the skeleton: ${JSON.stringify(row)}`);
+  assert.equal(report.pages['reports.html'].functionKept.ok, true, JSON.stringify(report.pages['reports.html'].functionKept.problems));
+  const png = readFileSync(join(outDir, 'screens', 'after', 'reports.png')).toString('base64');
+  const page = await browser.newPage();
+  try {
+    await page.setContent('<canvas id="c"></canvas>');
+    const px = await page.evaluate(async (b64) => {
+      const im = new Image();
+      im.src = 'data:image/png;base64,' + b64;
+      await im.decode();
+      const c = document.getElementById('c');
+      c.width = im.width;
+      c.height = im.height;
+      const g = c.getContext('2d');
+      g.drawImage(im, 0, 0);
+      return Array.from(g.getImageData(400, 250, 1, 1).data);
+    }, png);
+    assert.notDeepEqual(px.slice(0, 3), [255, 0, 0], 'the skeleton block is not in the screenshot');
+  } finally {
+    await page.close();
+  }
 });
