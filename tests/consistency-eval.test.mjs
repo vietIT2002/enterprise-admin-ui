@@ -476,7 +476,7 @@ test('grader: signatures of the fixture match the planned variants', async () =>
   assert.deepEqual(t.filterBar, { search: 'right', control: 'panel-button' });
   assert.deepEqual(t.pageHeader, { tag: 'h1', fontSize: 24, action: 'below-title', breadcrumb: false });
   assert.deepEqual(t.dateFormat, { formats: ['iso'] });
-  assert.equal(t.tableRow.height, 32);
+  assert.ok(t.tableRow.rawHeight >= 28 && t.tableRow.rawHeight <= 32, 'timesheets row height ' + t.tableRow.rawHeight);
   assert.equal(t.tableRow.fontSize, 12);
   assert.equal(t.statusBadge['Nghỉ phép'], '#bfdbfe');
   assert.equal(t.statusBadge['Chờ duyệt'], '#fef08a');
@@ -577,7 +577,7 @@ test('grader: a page without a table, and a blank or closed page, give nulls and
   await page.goto('about:blank');
   assert.deepEqual(Object.values(await signatures(page)), [null, null, null, null, null, null]);
   await page.close();
-  assert.deepEqual(Object.values(await signatures(page)), [null, null, null, null, null, null], 'a closed page does not throw');
+  assert.ok(Object.values(await signatures(page)).every((v) => v && typeof v.error === 'string'), 'a closed page does not throw; every pattern is an error, not null');
 });
 
 // ---- function kept -----------------------------------------------------------------------------------------------
@@ -587,7 +587,7 @@ test('functionKept: passes every fixture page', async () => {
   try {
     for (const f of FILES) {
       const r = await functionKept(page, join(FIXTURE, f), { hadSearch: had[f][0], hadPagination: had[f][1] });
-      assert.deepEqual(r, { ok: true, problems: [] }, f);
+      assert.deepEqual(r, { ok: true, problems: [], evidence: [] }, f);
     }
   } finally {
     await page.close();
@@ -617,7 +617,7 @@ test('functionKept: rows removed, search box removed, pagination removed, file m
     assert.ok(r.problems.includes('pattern lost: pagination'), r.problems.join('|'));
 
     r = await functionKept(page, join(dir, 'nope.html'), { hadSearch: true, hadPagination: true });
-    assert.deepEqual(r, { ok: false, problems: ['page missing'] });
+    assert.deepEqual(r, { ok: false, problems: ['page missing'], evidence: [] });
 
     const st = join(dir, 'settings.html');
     writeFileSync(st, readFileSync(st, 'utf8').replace(/<form[\s\S]*<\/form>/, ''));
@@ -628,4 +628,224 @@ test('functionKept: rows removed, search box removed, pagination removed, file m
     await page.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Grader fix round 1: pages rewritten by agents.
+// ---------------------------------------------------------------------------------------------------------------
+const hexOf = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+async function withTempDir(fn) {
+  const dir = mkdtempSync(join(tmpdir(), 'grade-fix-'));
+  try {
+    return await fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// A list page named employees.html with a search box whose behaviour is given by `script`.
+const searchPage = (script) =>
+  `<!doctype html><meta charset="utf-8"><title>x</title><body><main><h1>Nhân viên</h1><section class="card"><input type="search" id="q" aria-label="Tìm nhân viên"><table style="width:100%"><thead><tr><th>Tên</th></tr></thead><tbody id="b"><tr><td>Nguyễn Văn An</td></tr><tr><td>Trần Bình</td></tr><tr><td>Lê Cường</td></tr><tr><td>Phạm Dung</td></tr></tbody></table></section></main><script>
+const q = document.getElementById('q');
+const apply = () => { for (const tr of document.querySelectorAll('#b tr')) tr.style.display = !q.value || tr.textContent.includes(q.value) ? '' : 'none'; };
+${script}
+</script></body>`;
+
+test('fix 1: search that is debounced, needs Enter, or does nothing', async () => {
+  await withTempDir(async (dir) => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      const run = async (script) => {
+        const f = join(dir, 'employees.html');
+        writeFileSync(f, searchPage(script));
+        return functionKept(page, f, { hadSearch: true, hadPagination: false });
+      };
+      let r = await run("let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(apply, 300); });");
+      assert.deepEqual(r.problems, [], 'debounced 300 ms');
+      r = await run("q.addEventListener('keydown', (e) => { if (e.key === 'Enter') apply(); });");
+      assert.deepEqual(r.problems, [], 'filters on Enter only');
+      r = await run("q.addEventListener('input', () => setTimeout(apply, 900));");
+      assert.deepEqual(r.problems, [], 'async 900 ms');
+      r = await run('/* search box that does nothing */');
+      assert.ok(r.problems.some((p) => /search does not narrow/.test(p)), r.problems.join('|'));
+      // the box is cleared afterwards
+      const f = join(dir, 'employees.html');
+      writeFileSync(f, searchPage("q.addEventListener('input', apply);"));
+      await functionKept(page, f, {});
+      assert.equal(await page.inputValue('#q'), '', 'search box cleared afterwards');
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+test('fix 2: a pattern that throws is an error, the other five survive, and it is never counted consistent', async () => {
+  const html = shell('', '<div><button>Previous</button><button>Next</button></div>').replace(
+    '<main>',
+    "<script>const g = window.getComputedStyle; window.getComputedStyle = (e, p) => { if (e && e.tagName === 'H1') throw new Error('boom'); return g.call(window, e, p); };</script><main>"
+  );
+  const sig = await sigOfHtml(html);
+  assert.equal(typeof sig.pageHeader.error, 'string');
+  assert.match(sig.pageHeader.error, /boom/);
+  assert.deepEqual(sig.pagination, { kinds: ['prev-next'], position: 'below' });
+  assert.equal(sig.tableRow.error, undefined);
+  assert.deepEqual(sig.dateFormat, { formats: ['iso'] });
+
+  const ok = { tag: 'h1', fontSize: 24, action: 'none', breadcrumb: false };
+  const none = { pagination: null, filterBar: null, statusBadge: null, dateFormat: null, tableRow: null };
+  const c = consistency({ 'a.html': { ...none, pageHeader: ok }, 'b.html': { ...none, pageHeader: ok }, 'c.html': { ...none, pageHeader: { error: 'boom' } } });
+  assert.equal(c.patterns.pageHeader.consistent, false);
+  assert.deepEqual(c.patterns.pageHeader.unreadable, ['c.html']);
+  assert.deepEqual(c.score, { consistent: 0, of: 1 });
+});
+
+test('fix 3: badge colours in oklch() and color-mix() are read', async () => {
+  const badge = (name, bg) => `<tr><td>x</td><td><span style="display:inline-block;padding:2px 8px;border-radius:9px;background:${bg}">${name}</span></td></tr>`;
+  const html = shell('', '').replace(
+    '<tbody>',
+    '<tbody>' + badge('Black', 'oklch(0 0 0)') + badge('Mixed', 'color-mix(in srgb, #dcfce7 100%, #ffffff 0%)') + badge('Lime', 'oklch(0.9 0.1 150)') + badge('Alpha', 'rgb(0 0 0 / 0.5)')
+  );
+  const sig = await sigOfHtml(html);
+  assert.equal(sig.statusBadge.Black, '#000000');
+  assert.equal(sig.statusBadge.Mixed, '#dcfce7');
+  const [r, g, b] = hexOf(sig.statusBadge.Lime);
+  assert.ok(g > r && g > b, 'oklch(0.9 0.1 150) is green: ' + sig.statusBadge.Lime);
+  assert.ok(hexOf(sig.statusBadge.Alpha).every((v) => Math.abs(v - 128) <= 2), '50% black over white: ' + sig.statusBadge.Alpha);
+});
+
+test('fix 4: a header above <main> is found', async () => {
+  const html =
+    '<!doctype html><meta charset="utf-8"><title>x</title><body style="margin:0"><header style="display:flex;justify-content:space-between"><h1 style="font-size:30px">Danh sách</h1><button>Thêm</button></header><main><section class="card"><table style="width:100%"><thead><tr><th>Tên</th></tr></thead><tbody><tr><td>a</td></tr></tbody></table></section></main></body>';
+  const sig = await sigOfHtml(html);
+  assert.deepEqual(sig.pageHeader, { tag: 'h1', fontSize: 30, action: 'header-right', breadcrumb: false });
+});
+
+test('fix 5: a sidebar of links is not filter chips, nor is a menu', async () => {
+  const links = '<a href="#a" aria-current="page" class="active">Nhân viên</a><a href="#b">Chấm công</a><a href="#c">Nghỉ phép</a><a href="#d">Báo cáo</a>';
+  const html = `<!doctype html><meta charset="utf-8"><title>x</title><body style="margin:0;display:flex"><div class="sidebar" style="width:200px">${links}</div><main style="flex:1"><h1>Danh sách</h1><section class="card"><input type="search" aria-label="Tìm" style="width:200px"><table style="width:100%"><thead><tr><th>Tên</th></tr></thead><tbody><tr><td>a</td></tr></tbody></table></section></main></body>`;
+  const sig = await sigOfHtml(html);
+  assert.deepEqual(sig.filterBar, { search: 'left', control: null });
+  const topbar = await sigOfHtml(html.replace('class="sidebar" style="width:200px"', 'class="topnav-menu" style="width:200px"'));
+  assert.equal(topbar.filterBar.control, null);
+  // while chips right above the table still read as chips
+  const real = await sigOfHtml(shell('<div><button class="active">All</button><button>Open</button><button>Done</button></div>', ''));
+  assert.equal(real.filterBar.control, 'chips');
+});
+
+// A redesign where every page shares one header, filter bar, pager, badge, date and row style.
+function perfectPage({ title, action, search, pager, badges, dates, select }) {
+  const rows = [0, 1, 2, 3].map(
+    (i) =>
+      `<tr><td>Nguyễn ${i}</td>${dates ? '<td>2026-11-0' + (i + 1) + '</td>' : ''}${badges ? '<td><span style="display:inline-block;vertical-align:top;padding:0 8px;line-height:20px;border-radius:9px;background:' + ['#dcfce7', '#fef08a', '#fecaca', '#dbeafe'][i] + '">' + ['Đang làm', 'Chờ duyệt', 'Vắng', 'Thử việc'][i] + '</span></td>' : ''}</tr>`
+  ).join('');
+  return `<!doctype html><meta charset="utf-8"><title>x</title><style>body{margin:0;font:14px system-ui}h1{font-size:24px;margin:0}header{display:flex;justify-content:space-between;padding:16px}td,th{padding:8px;font-size:14px;line-height:20px;text-align:left}tr{height:36px}</style><body><main><header><h1>${title}</h1>${action ? '<button>Thêm</button>' : ''}</header><section class="card"><div style="display:flex;gap:8px">${search ? '<input type="search" aria-label="Tìm" style="width:240px">' : ''}${select ? '<select aria-label="Phòng ban"><option>Tất cả</option><option>Kế toán</option></select>' : ''}</div><table style="width:100%"><thead><tr><th>Tên</th>${dates ? '<th>Ngày</th>' : ''}${badges ? '<th>Trạng thái</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>${pager ? '<div><span>Showing 1–4 of 40</span> <button>1</button><button>2</button></div>' : ''}</section></main></body>`;
+}
+
+test('fix 6: a perfectly consistent redesign scores N of N despite content-driven absences', async () => {
+  await withTempDir(async (dir) => {
+    const list = { search: true, select: true, pager: true, badges: true, dates: true, action: true };
+    const files = {
+      'employees.html': perfectPage({ title: 'Nhân viên', ...list }),
+      'timesheets.html': perfectPage({ title: 'Chấm công', ...list }),
+      'leave-requests.html': perfectPage({ title: 'Nghỉ phép', ...list }),
+      'reports.html': perfectPage({ title: 'Báo cáo', select: true }),
+      'settings.html': perfectPage({ title: 'Cài đặt' }).replace(/<section[\s\S]*<\/section>/, '<section><form><label>Tên<input></label></form></section>'),
+    };
+    const by = {};
+    for (const [f, html] of Object.entries(files)) {
+      writeFileSync(join(dir, f), html);
+      by[f] = await sigOfFile(join(dir, f));
+    }
+    const c = consistency(by);
+    assert.deepEqual(
+      Object.fromEntries(Object.entries(c.patterns).map(([k, v]) => [k, v.consistent])),
+      { pagination: true, filterBar: true, pageHeader: true, statusBadge: true, dateFormat: true, tableRow: true },
+      JSON.stringify(by)
+    );
+    assert.deepEqual(c.score, { consistent: 6, of: 6 });
+  });
+});
+
+test('fix 6: a real inconsistency on a shared sub-feature still counts', () => {
+  const h = (action, size = 24) => ({ tag: 'h1', fontSize: size, action, breadcrumb: false });
+  const n = { pagination: null, statusBadge: null, dateFormat: null, tableRow: null, filterBar: null };
+  let c = consistency({ 'a.html': { ...n, pageHeader: h('header-right') }, 'b.html': { ...n, pageHeader: h('none') }, 'c.html': { ...n, pageHeader: h('header-right') } });
+  assert.equal(c.patterns.pageHeader.consistent, true);
+  c = consistency({ 'a.html': { ...n, pageHeader: h('header-right') }, 'b.html': { ...n, pageHeader: h('below-title') } });
+  assert.equal(c.patterns.pageHeader.consistent, false);
+  c = consistency({ 'a.html': { ...n, pageHeader: h('none', 24) }, 'b.html': { ...n, pageHeader: h('none', 28) } });
+  assert.equal(c.patterns.pageHeader.consistent, false);
+  const f = (search, control) => ({ ...n, filterBar: { search, control } });
+  c = consistency({ 'a.html': f('left', 'select'), 'b.html': f('none', 'select'), 'c.html': f('left', null) });
+  assert.equal(c.patterns.filterBar.consistent, true);
+  c = consistency({ 'a.html': f('left', 'select'), 'b.html': f('right', 'select') });
+  assert.equal(c.patterns.filterBar.consistent, false);
+  c = consistency({ 'a.html': f('left', 'select'), 'b.html': f('left', 'chips') });
+  assert.equal(c.patterns.filterBar.consistent, false);
+  // status badge: not counted when no two pages share a status
+  c = consistency({ 'a.html': { ...n, statusBadge: { A: '#ffffff' } }, 'b.html': { ...n, statusBadge: { B: '#000000' } } });
+  assert.equal(c.patterns.statusBadge.counted, false);
+  assert.deepEqual(c.score, { consistent: 0, of: 0 });
+});
+
+test('fix 7: row height is the median of single-line rows', async () => {
+  const wrapped = '<td style="width:60px">Một đoạn văn bản dài sẽ xuống nhiều dòng trong ô hẹp này nhé</td>';
+  const tall = `<tr><td>a</td>${wrapped}</tr>`;
+  const flat = '<tr><td>a</td><td style="width:60px">b</td></tr>';
+  const html = `<!doctype html><meta charset="utf-8"><title>x</title><style>td{padding:8px;font-size:14px;line-height:20px}</style><body style="margin:0"><main><h1>x</h1><section class="card"><table style="width:300px"><thead><tr><th>A</th><th>B</th></tr></thead><tbody>${tall}${tall}${tall}${tall}${flat}${flat}${flat}</tbody></table></section></main></body>`;
+  const sig = await sigOfHtml(html);
+  assert.equal(sig.tableRow.rawHeight, 36, 'three single-line rows of 36px (8+20+8), not the wrapped ones');
+  assert.equal(sig.tableRow.height, 36);
+  // all rows wrapped: falls back to all rows
+  const all = await sigOfHtml(html.replace(new RegExp(flat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), tall));
+  assert.ok(all.tableRow.rawHeight > 50, 'fallback to all rows: ' + all.tableRow.rawHeight);
+});
+
+test('fix 8: a script error during load is evidence, not a failure', async () => {
+  await withTempDir(async (dir) => {
+    const f = join(dir, 'employees.html');
+    writeFileSync(f, searchPage("q.addEventListener('input', apply);").replace('</script>', "</script><script>throw new Error('late failure');</script>"));
+    const page = await browser.newPage();
+    try {
+      const r = await functionKept(page, f, { hadSearch: true, hadPagination: false });
+      assert.equal(r.ok, true, r.problems.join('|'));
+      assert.deepEqual(r.problems, []);
+      assert.equal(r.evidence.length, 1);
+      assert.match(r.evidence[0], /script error: .*late failure/);
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+test('fix 9: div/role=row lists and ul/li lists read rows and pagination', async () => {
+  await withTempDir(async (dir) => {
+    const pager = '<div><button>Previous</button><button>Next</button></div>';
+    const grid =
+      '<div role="table"><div role="row"><span role="columnheader">Tên</span></div>' +
+      ['An', 'Bình', 'Cường'].map((n) => `<div role="row" style="padding:8px"><span role="cell">${n}</span></div>`).join('') +
+      '</div>';
+    const list = '<ul>' + ['An', 'Bình', 'Cường'].map((n) => `<li style="padding:8px">${n} - nhân viên</li>`).join('') + '</ul>';
+    const make = (body) => `<!doctype html><meta charset="utf-8"><title>x</title><body><nav><ul><li>Nhà</li><li>Về</li></ul></nav><main><h1>Nhân viên</h1><section class="card">${body}${pager}</section></main></body>`;
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      for (const [name, body] of [['role-row', grid], ['li', list]]) {
+        const f = join(dir, 'employees.html');
+        writeFileSync(f, make(body));
+        const r = await functionKept(page, f, { hadSearch: false, hadPagination: true });
+        assert.deepEqual(r, { ok: true, problems: [], evidence: [] }, name);
+        const sig = await signatures(page);
+        assert.deepEqual(sig.pagination, { kinds: ['prev-next'], position: 'below' }, name);
+        assert.ok(sig.tableRow && sig.tableRow.rawHeight > 0, name + ' row style');
+      }
+      // and rows really missing are still reported
+      const f = join(dir, 'employees.html');
+      writeFileSync(f, make('<ul></ul>'));
+      const r = await functionKept(page, f, { hadSearch: false, hadPagination: false });
+      assert.ok(r.problems.includes('no data rows'), r.problems.join('|'));
+    } finally {
+      await page.close();
+    }
+  });
 });
