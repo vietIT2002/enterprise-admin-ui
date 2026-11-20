@@ -31,6 +31,17 @@ export const PATTERNS = ['pagination', 'filterBar', 'pageHeader', 'statusBadge',
 const SEARCH_SELECTOR =
   'input[type="search"], [role="searchbox"], input[aria-label*="search" i], input[placeholder*="search" i], input[aria-label*="tìm" i], input[placeholder*="tìm" i], input[aria-label*="搜索"], input[placeholder*="搜索"]';
 
+// The page type and known name, from the file name in the URL; an unknown file is treated as a list page.
+const pageInfo = (url) => {
+  let base = '';
+  try {
+    base = decodeURIComponent(new URL(url).pathname.split('/').pop() || '');
+  } catch {
+    base = '';
+  }
+  return [PAGES[base] || 'list', KNOWN_NAME[base] || null];
+};
+
 const emptySignatures = () => Object.fromEntries(PATTERNS.map((p) => [p, null]));
 const errorSignatures = (message) => Object.fromEntries(PATTERNS.map((p) => [p, { error: message }]));
 
@@ -38,7 +49,7 @@ const errorSignatures = (message) => Object.fromEntries(PATTERNS.map((p) => [p, 
 // In-page extraction. Runs inside the browser; must be self-contained.
 // mode 'signatures' returns the six patterns; mode 'facts' returns what functionKept needs.
 // ---------------------------------------------------------------------------------------------------------------
-function extract([SEARCH, mode]) {
+function extract([SEARCH, mode, pageType, knownName]) {
   const all = (root, sel) => Array.from(root.querySelectorAll(sel));
   const rectOf = (el) => el.getBoundingClientRect();
   const vis = (el) => {
@@ -50,7 +61,19 @@ function extract([SEARCH, mode]) {
   const text = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
   const main = document.querySelector('main, [role="main"]') || document.body;
   const CHROME = 'aside, nav, [role="navigation"], [class*="sidebar" i], [class*="menu" i], [class*="topbar" i]';
-  const inChrome = (el) => !!el.closest(CHROME);
+  // Chrome (sidebar, navigation, menus) never includes an element that holds the page's content, so a layout wrapper
+  // such as <div class="app has-sidebar"> around <main> is not chrome.
+  const chromeCache = new Map();
+  const isChromeEl = (c) => {
+    if (!chromeCache.has(c)) {
+      chromeCache.set(c, c.matches(CHROME) && !c.contains(main) && !c.querySelector('main, [role="main"], h1, table, [role="table"], [role="grid"], [role="row"]'));
+    }
+    return chromeCache.get(c);
+  };
+  const inChrome = (el) => {
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) if (isChromeEl(e)) return true;
+    return false;
+  };
   const accName = (el) => {
     const direct = el.getAttribute('aria-label');
     if (direct && direct.trim()) return direct.trim();
@@ -82,19 +105,38 @@ function extract([SEARCH, mode]) {
   };
   const tableRows = (t) =>
     (t.tagName === 'TABLE' ? all(t, 'tbody tr').filter((r) => !r.closest('thead')) : all(t, '[role="row"]').filter((r) => !r.querySelector('[role="columnheader"]'))).filter(isData);
-  const bestGroup = (els, min) => {
+  const groupsOf = (els, min, keyOf = () => '') => {
     const m = new Map();
     for (const e of els) {
       const p = e.parentElement;
       if (!p) continue;
-      if (!m.has(p)) m.set(p, []);
-      m.get(p).push(e);
+      const key = keyOf(e);
+      if (!m.has(p)) m.set(p, new Map());
+      const byKey = m.get(p);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(e);
     }
+    const out = [];
+    for (const [root, byKey] of m) {
+      for (const list of byKey.values()) {
+        if (list.length < min) continue;
+        if (list.every((e) => text(e).length <= 3)) continue; // a pager of page numbers
+        if (!vis(root)) continue;
+        out.push({ root, rows: list });
+      }
+    }
+    return out;
+  };
+  // the group that holds the known name first, then the largest
+  const pickGroup = (groups) => {
     let best = null;
-    for (const [root, list] of m) {
-      if (list.length < min) continue;
-      if (list.every((e) => text(e).length <= 3)) continue; // a pager of page numbers
-      if (!best || list.length > best.rows.length) best = { root, rows: list };
+    let bestKey = null;
+    for (const g of groups) {
+      const key = [knownName && g.rows.some((r) => (r.textContent || '').includes(knownName)) ? 1 : 0, g.rows.length];
+      if (!best || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) {
+        best = g;
+        bestKey = key;
+      }
     }
     return best;
   };
@@ -110,20 +152,25 @@ function extract([SEARCH, mode]) {
         realTable = true;
       }
     }
-    // a real (even empty) table is the results; lists and role=row rows are only a fallback for table-less pages
-    if (!root) {
-      const g = bestGroup(all(document, '[role="row"]').filter((r) => vis(r) && !inChrome(r) && !r.querySelector('[role="columnheader"]')), 1);
+    // A real (even empty) table is the results. Otherwise, on list pages only: role=row rows, then list items,
+    // articles and repeated same-class blocks (cards), preferring the group that holds the known name.
+    if (!root && pageType === 'list') {
+      // groups are chosen over all members, hidden ones too, so a search that hides rows keeps the same group
+      let g = pickGroup(groupsOf(all(document, '[role="row"]').filter((r) => !inChrome(r) && !r.querySelector('[role="columnheader"]')), 1));
+      if (!g) {
+        const groups = [
+          ...groupsOf(all(main, 'li, [role="listitem"], article').filter((r) => !inChrome(r)), 2, (e) => e.tagName),
+          ...groupsOf(
+            all(main, 'div, section').filter((r) => !inChrome(r) && (r.getAttribute('class') || '').trim() && !r.querySelector('h1, table')),
+            3,
+            (e) => e.tagName + '.' + e.getAttribute('class')
+          ),
+        ];
+        g = pickGroup(groups);
+      }
       if (g) {
         root = g.root.closest('[role="table"], [role="grid"]') || g.root;
-        dataRows = g.rows;
-        realTable = false;
-      }
-    }
-    if (!root) {
-      const g = bestGroup(all(main, 'li, [role="listitem"]').filter((r) => vis(r) && !inChrome(r)), 2);
-      if (g) {
-        root = g.root;
-        dataRows = g.rows;
+        dataRows = g.rows.filter(vis);
         realTable = false;
       }
     }
@@ -420,7 +467,7 @@ export async function signatures(page) {
   try {
     await page.waitForLoadState('load').catch(() => {});
     await page.evaluate(() => (document.fonts && document.fonts.ready ? document.fonts.ready.then(() => null) : null)).catch(() => {});
-    const sig = await page.evaluate(extract, [SEARCH_SELECTOR, 'signatures']);
+    const sig = await page.evaluate(extract, [SEARCH_SELECTOR, 'signatures', ...pageInfo(page.url())]);
     return { ...emptySignatures(), ...sig };
   } catch (e) {
     return errorSignatures(String((e && e.message) || e).split('\n')[0]);
@@ -494,7 +541,7 @@ export function consistency(byPage) {
 // ---------------------------------------------------------------------------------------------------------------
 // Function kept
 // ---------------------------------------------------------------------------------------------------------------
-const pageFacts = (page) => page.evaluate(extract, [SEARCH_SELECTOR, 'facts']);
+const pageFacts = (page) => page.evaluate(extract, [SEARCH_SELECTOR, 'facts', ...pageInfo(page.url())]);
 
 // Poll for the number of data rows to differ from `from`, up to `ms`; returns the facts once they settle.
 async function waitForRowChange(page, from, ms) {
@@ -530,7 +577,7 @@ export async function functionKept(page, file, before = {}) {
     for (const e of errors) evidence.push('script error: ' + e);
 
     const facts = await pageFacts(page);
-    const type = PAGES[name] || (facts.hasTable ? 'list' : 'settings');
+    const type = PAGES[name] || 'list';
     if (type === 'settings') {
       if (facts.labelled < 3) problems.push(`fewer than 3 labelled fields (${facts.labelled})`);
     } else if (facts.rows < 1) {
@@ -563,7 +610,8 @@ export async function functionKept(page, file, before = {}) {
     if (before.hadPagination) {
       await page.goto(pathToFileURL(resolve(file)).href, { waitUntil: 'load' }).catch(() => {});
       const sig = await signatures(page);
-      if (!sig.pagination) problems.push('pattern lost: pagination');
+      if (sig.pagination && sig.pagination.error) problems.push('could not read pagination: ' + sig.pagination.error);
+      else if (!sig.pagination) problems.push('pattern lost: pagination');
     }
   } catch (e) {
     problems.push('check failed: ' + String((e && e.message) || e).split('\n')[0]);

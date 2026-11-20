@@ -849,3 +849,91 @@ test('fix 9: div/role=row lists and ul/li lists read rows and pagination', async
     }
   });
 });
+
+// ---------------------------------------------------------------------------------------------------------------
+// Grader fix round 2.
+// ---------------------------------------------------------------------------------------------------------------
+test('fix A: a layout wrapper with a sidebar class around <main> does not hide the controls or the rows', async () => {
+  const side = '<aside><a href="#a">Một</a><a href="#b">Hai</a><a href="#c">Ba</a></aside>';
+  const chips = '<input type="search" aria-label="Tìm" style="width:200px"><div><button class="active">All</button><button>Open</button><button>Done</button></div><select aria-label="Phòng"><option>A</option><option>B</option></select>';
+  const table = `<table style="width:100%"><thead><tr><th>Tên</th></tr></thead><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>`;
+  const wrap = (inner) => `<!doctype html><meta charset="utf-8"><title>x</title><body class="has-sidebar" style="margin:0"><div class="app sidebar-layout filter-menu" style="display:flex">${side}<main style="flex:1"><h1>Danh sách</h1><section class="card">${inner}</section></main></div></body>`;
+  const sig = await sigOfHtml(wrap(chips + table));
+  assert.deepEqual(sig.filterBar, { search: 'left', control: 'chips' });
+  assert.ok(sig.tableRow && sig.tableRow.rawHeight > 0);
+  // rows as role=row, found through the same wrapper
+  const rows = '<div role="table"><div role="row"><span role="columnheader">Tên</span></div><div role="row" style="padding:8px"><span role="cell">An</span></div><div role="row" style="padding:8px"><span role="cell">Bình</span></div></div><div><button>Previous</button><button>Next</button></div>';
+  const sig2 = await sigOfHtml(wrap(rows));
+  assert.ok(sig2.tableRow && sig2.tableRow.rawHeight > 0, 'role=row rows read inside the wrapper');
+  assert.deepEqual(sig2.pagination, { kinds: ['prev-next'], position: 'below' });
+});
+
+const cardPage = (cardClass, tag, extra = '') =>
+  `<!doctype html><meta charset="utf-8"><title>x</title><body><main><h1>Nhân viên</h1>${extra}<section><input type="search" id="q" aria-label="Tìm nhân viên"><div class="grid">${['Nguyễn Văn An', 'Trần Bình', 'Lê Cường', 'Phạm Dung']
+    .map((n) => `<${tag} class="${cardClass}" style="padding:8px;margin:4px">${n} - Kế toán</${tag}>`)
+    .join('')}</div></section></main><script>
+const q = document.getElementById('q');
+q.addEventListener('input', () => { for (const c of document.querySelectorAll('.${cardClass}')) c.style.display = !q.value || c.textContent.includes(q.value) ? '' : 'none'; });
+</script></body>`;
+
+test('fix B: a card grid (article or repeated div) passes function-kept and its search narrows', async () => {
+  await withTempDir(async (dir) => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      for (const [cls, tag] of [['person', 'article'], ['person', 'div']]) {
+        const f = join(dir, 'employees.html');
+        writeFileSync(f, cardPage(cls, tag));
+        const r = await functionKept(page, f, { hadSearch: true, hadPagination: false });
+        assert.deepEqual(r, { ok: true, problems: [], evidence: [] }, tag);
+      }
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+test('fix C: row fallbacks are for list pages and prefer the group with the known name', async () => {
+  await withTempDir(async (dir) => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      const notices = '<ul>' + [1, 2, 3, 4, 5, 6].map((i) => `<li>Thông báo số ${i}</li>`).join('') + '</ul>';
+      const f = join(dir, 'employees.html');
+      writeFileSync(f, cardPage('person', 'div', notices));
+      const r = await functionKept(page, f, { hadSearch: true, hadPagination: false });
+      assert.deepEqual(r, { ok: true, problems: [], evidence: [] }, 'the 4 cards are the results, not the 6 notices (search narrows them)');
+      const sig = await signatures(page);
+      assert.ok(sig.tableRow && sig.tableRow.rawHeight > 0);
+      // a settings page with a list gets no table-row style
+      const s = join(dir, 'settings.html');
+      writeFileSync(s, '<!doctype html><meta charset="utf-8"><title>x</title><body><main><h1>Cài đặt</h1><ul><li>Một mục</li><li>Hai mục</li><li>Ba mục 2026-11-02</li></ul><label>Tên<input></label></main></body>');
+      await page.goto(pathToFileURL(s).href);
+      const sSig = await signatures(page);
+      assert.equal(sSig.tableRow, null);
+      assert.equal(sSig.dateFormat, null);
+      assert.equal(sSig.statusBadge, null);
+      const rs = await functionKept(page, s, { hadSearch: false, hadPagination: false });
+      assert.ok(rs.problems.some((p) => /fewer than 3 labelled fields/.test(p)), rs.problems.join('|'));
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+test('fix D: a pattern that cannot be read is not "kept"', async () => {
+  await withTempDir(async (dir) => {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      const f = join(dir, 'employees.html');
+      const html = shell('', '<div><button>Previous</button><button>Next</button></div>').replace(
+        '<main>',
+        "<script>const g = window.getComputedStyle; window.getComputedStyle = (e, p) => { if (e && e.tagName === 'BUTTON') throw new Error('boom'); return g.call(window, e, p); };</script><main>"
+      );
+      writeFileSync(f, html);
+      const r = await functionKept(page, f, { hadSearch: false, hadPagination: true });
+      assert.equal(r.ok, false);
+      assert.ok(r.problems.some((p) => /^could not read pagination: .*boom/.test(p)), r.problems.join('|'));
+    } finally {
+      await page.close();
+    }
+  });
+});
