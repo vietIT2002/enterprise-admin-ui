@@ -10,7 +10,7 @@ Five self-contained HTML pages in `fixture/`, no network, fixed data (Vietnamese
 | timesheets | 120 | yes |
 | leave-requests | 36 | yes |
 | reports | 12 | no |
-| settings | form, 6 labelled fields, no table | no |
+| settings | form, 5 labelled fields plus 6 day checkboxes, no table | no |
 
 ## Variants (tokens the grader reuses)
 

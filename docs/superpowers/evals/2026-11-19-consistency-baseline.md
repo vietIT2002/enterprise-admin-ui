@@ -11,12 +11,13 @@ Status: recorded 2026-11-22. This is part 1 of the consistency work: it measures
 
 ## Summary
 
-- **The skill removes every counted template tell, and the first screen changes a lot.**
+- **The skill removes every counted template tell. Outside the sidebar, it changes the screen no more than the runs without it.**
   - In all four runs with the skill, every counted tell is gone (31 → 0), and every page audits at 100. The fixture's uncounted tells, such as oversized radii and card-in-card, show only in the screenshots.
   - Status colours, date format and table row height are the same on every page in all four runs.
-  - In the first-screen pixel difference, every list and report page changed by 34–46%, and Settings by about 20%.
-  - Without the skill, the same prompts leave 2 to 8 tells and change about 20%.
-  - So a small change, as in the user's "it changed by maybe 10%", did not show on this fixture. The two numbers are different kinds of measure: the user's is an impression, and this one is a pixel count. We do not know the user's project or prompt. See "What this baseline cannot tell".
+  - **Whole first screen:** the skill runs changed list and report pages by 34–46% and Settings by about 20%. Without the skill, the change was about 20%, and 6% on Settings.
+  - **The whole gap is the sidebar.** Every skill run turned the navy sidebar light, and that band alone is 16.6 points of every page.
+  - **Content area right of the sidebar:** the change is the same with and without the skill. It is 20–36% on list and report pages, and only 3.5–4.7% on Settings.
+  - So this baseline does not contradict the user's "it changed by maybe 10%". The user's figure is an impression, and ours is a pixel count. We do not know the user's project or prompt. See "Pixel difference" and "What this baseline cannot tell".
 - **The interaction patterns stayed different from page to page, which is the user's main complaint.**
   - In none of the 6 runs is pagination consistent, and in none is the filter bar consistent.
   - The agents restyled each page's pager, and in 5 of 6 runs kept each page's own pager mechanism:
@@ -76,13 +77,24 @@ The fixture graded against itself gives 0/6, the planned tells and 0% difference
 - With the skill, every page scores 100 in all four runs.
 - Without the skill, the pages score 56–100 (r05) and 60–90 (r06).
 
-**Pixel difference with the skill, by page:**
+### Pixel difference
 
-| Page | First-screen change |
-|---|---|
-| list pages | 33.8–46.5% |
-| reports | 34.9–38.1% |
-| settings | 19.5–20.5% |
+The grader reports the whole 1440×900 first screen. For this table, the same screenshots were split at x = 240, the sidebar's width.
+
+| Page | Whole screen, skill | Content area, skill | Content area, no skill |
+|---|---|---|---|
+| employees | 43.6–46.5% | 32.4–35.8% | 34.6–35.5% |
+| timesheets | 35.5–37.1% | 22.7–24.5% | 22.3–23.4% |
+| leave-requests | 33.8–37.3% | 20.6–24.8% | 20.5–21.7% |
+| reports | 34.9–38.1% | 21.9–25.7% | 19.7–19.9% |
+| settings | 19.5–20.5% | 3.5–4.7% | 4.0–4.1% |
+
+- **The sidebar band** adds 16.6 points to every page in the skill runs, and about 2 points without the skill.
+- **The content-area figures** are percentages of the content area (1200×900).
+- **How to read these numbers:**
+  - The metric counts layout shifts as change.
+  - It undercounts light-on-light restyling below its RGB threshold of 32. The Settings form was visibly restyled in every run but scores under 5%.
+  - Read the numbers with the screenshots, not instead of them.
 
 ## What stayed inconsistent
 
@@ -169,12 +181,23 @@ The order follows how directly each point explains the user's main complaint (th
    - None of the six agents reported looking at the rendered pages or clicking through them.
    - The four skill runs ran `audit-cli`. It renders each page but reports scores, not pictures, and by design it cannot see differences between pages. They took its 100 as the finish line.
 
-**Not weak on this fixture:** removing template tells, the audit score, status, date and row consistency, keeping functions, and the amount of visible change.
+**On the second complaint, the small change:**
+- Beyond the shell, the skill runs changed the screen as much as a plain "Improve this app's UI" prompt, and no more.
+- On the form page, they changed under 5% of the content area's pixels.
+- This is consistent with the user's impression. It does not show whether more change was needed, so the screenshots are the better guide.
+- Part 2 should not treat "more pixels changed" as a goal in itself.
+
+**Not weak on this fixture:**
+- removing template tells;
+- the audit score;
+- status, date and row consistency;
+- keeping functions.
 
 ## What this baseline cannot tell
 
 - **Why the user saw only about 10% change.**
   - We do not know the user's project, prompt or how they judged the change.
+  - On this fixture, the content area changed about as much with the skill as without it, and under 5% on the form page. That fits the impression but does not explain it.
   - The fixture is plain HTML with inline styles and no component library or theme. SKILL.md's scope rule never applied: "If the project already has a design system or a customised component library…, keep its components and tokens".
   - In a real app built on an AI-made theme (for example, a customised shadcn theme), that rule would keep the theme. That is one possible cause of a small change, named in the spec. It is untested, and this fixture cannot test it.
   - A fixture variant with a shared theme or token file would be needed.
@@ -186,7 +209,7 @@ The order follows how directly each point explains the user's main complaint (th
   - The signatures are heuristics. Each one is unit-tested on the fixture and on equivalent-markup variants, but an unusual rewrite could still be misread.
   - The filter-bar signature reduces each page to one control kind, as described above.
 - **The scale is small:** 6 runs, one model (sonnet), one fixture and two prompts.
-- **The pixel difference covers the first screen only.** A change below 900px, such as a pager under a long table, does not count.
+- **The pixel difference covers the first screen only.** A change below 900px, such as a pager under a long table, does not count. The sidebar dominates its differences between conditions, as described under "Pixel difference".
 - **Function kept is a narrow check.**
   - It covers only these things: the page loads and audits, it shows data rows or labelled fields, and its search narrows on the known name.
   - Approve, reject, export and saving settings were not exercised.
@@ -202,6 +225,30 @@ The order follows how directly each point explains the user's main complaint (th
   - Part 3 should run from a temporary root outside the session's scratch folder.
 - **The runs overlapped in time** and could each start their own `audit-cli` browser. This was not observed to affect any run.
 
+## Grader limits to fix before part 3
+
+The final review probed the grader with synthetic pages. None of these limits changes this baseline: all 18 list pages had their pager found, no run used a remote resource, and every search box was found. They would matter when part 3 re-measures changed skill output.
+
+- **Pager outside its block.**
+  - A pager that sits beside the table's block inside `<main>` is not found. One example is a Bootstrap `.table-responsive` followed by `<nav class="pagination">`.
+  - The result is a false "pattern lost: pagination", and the page drops out of the pagination comparison.
+- **Filter bar reduced to one kind.**
+  - Two pages can read as the same pattern while being different. For example, search plus selects plus a "Filters" button, against search plus tabs plus the same button: both read as `panel-button`.
+  - The signature should be the set of control kinds, as pagination already uses.
+- **Search found only by the audit's selector.** A visible `<label>Tìm kiếm</label>` on a plain text input is missed.
+- **A one-page numbered pager.** It shows only "1", so it reads differently from the same pager with several pages.
+- **Remote requests are fulfilled through Node without a record.** Output that uses a CDN could grade differently online and offline.
+- **The pixel difference is reported for the whole screen only.** Report the shell and the content area separately.
+- **`report.json` has no grader version.**
+
+## Data
+
+- `tests/agent-eval/consistency/baseline/rNN/` keeps each run's data:
+  - `app/`, the output folder;
+  - `report.json`, graded with `grade.mjs` at commit `6db48a3`;
+  - `reply.md`, the controller's summary of the agent's final reply.
+- Running the grader on the fixture and `app/` rebuilds the screenshots.
+
 ## Run log
 
 | Run | Time | Tool uses | Notes |
@@ -216,4 +263,4 @@ The order follows how directly each point explains the user's main complaint (th
 - Times and tool-use counts come from each agent's completion record.
 - No run needed a re-run.
 - Each grading run took 32–36 s.
-- **Screenshots:** the before-and-after first screens of the fixture, r01, r03, r05 and r06 are on a private Artifact page for the user. Running the grader again rebuilds every screenshot, under `<out>/screens/`.
+- **Screenshots:** the before-and-after first screens of the fixture, r01, r03, r05 and r06 are on a private Artifact page for the user. Running the grader again on `baseline/rNN/app` rebuilds every screenshot, under `<out>/screens/`.

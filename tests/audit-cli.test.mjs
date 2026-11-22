@@ -354,7 +354,7 @@ test('a page that does not finish within --timeout stops the browser, and the ne
     r = await run([`${base}/slow-load`, CLEAN, '--type', 'list', '--timeout', '3', '--json'], { env: own.env });
     assert.deepEqual(profilesIn(own.dir), [], "the stopped browser's profile is removed too");
   } finally {
-    rmSync(own.dir, { recursive: true, force: true });
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
   assert.equal(r.code, 2, r.output);
   assert.ok(r.ms < 20000, `took ${r.ms} ms`);
@@ -540,7 +540,7 @@ test('a temp profile left by a killed run is removed by the next run', async () 
     assert.equal((await run([CLEAN, '--type', 'list'], { env: own.env })).code, 0);
     assert.equal(existsSync(stale), false);
   } finally {
-    rmSync(own.dir, { recursive: true, force: true });
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });
 
@@ -554,7 +554,7 @@ test('Ctrl+C stops the run and removes its temp profile', { skip: !POSIX && 'Win
   try {
     assert.deepEqual(profilesIn(own.dir), [], 'no temp profile left behind');
   } finally {
-    rmSync(own.dir, { recursive: true, force: true });
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });
 

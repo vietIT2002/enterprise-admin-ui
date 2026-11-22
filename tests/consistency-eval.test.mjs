@@ -942,7 +942,7 @@ test('fix D: a pattern that cannot be read is not "kept"', async () => {
 // ---------------------------------------------------------------------------------------------------------------
 // Task 3: grade(before, after) — change metrics, report JSON
 // ---------------------------------------------------------------------------------------------------------------
-const GRADE_TIMEOUT = 600000;
+const GRADE_TIMEOUT = 300000; // one grade takes about 35 s; a stalled test must fail well inside CI's 15-minute job
 const tmpDirs = [];
 const tmp = (prefix) => {
   const d = mkdtempSync(join(tmpdir(), prefix));

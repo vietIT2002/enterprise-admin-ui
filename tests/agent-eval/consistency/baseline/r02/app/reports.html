@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo · ChấmCông Pro</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <p class="group">Nhân sự</p>
+    <a href="employees.html">Nhân viên</a>
+    <p class="group">Chấm công</p>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <p class="group">Phân tích</p>
+    <a href="reports.html" aria-current="page">Báo cáo</a>
+    <p class="group">Hệ thống</p>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <div>
+    <h1>Chuyên cần · Tháng <span id="mlabel">10/2026</span></h1>
+    <p class="basis" id="basis">Đơn vị: ngày công, giờ, %. Tổng hợp theo phòng ban.</p>
+  </div>
+</header>
+
+<div class="toolbar" aria-label="Kỳ báo cáo">
+  <div class="presets" role="group" aria-label="Kỳ nhanh" id="presets">
+    <button type="button" data-m="10" aria-pressed="true">Tháng 10</button>
+    <button type="button" data-m="9" aria-pressed="false">Tháng 9</button>
+    <button type="button" data-m="8" aria-pressed="false">Tháng 8</button>
+  </div>
+  <select id="month" aria-label="Tháng"><option value="10">Tháng 10</option><option value="9">Tháng 9</option><option value="8">Tháng 8</option></select>
+  <select id="year" aria-label="Năm"><option>2026</option><option>2025</option></select>
+</div>
+
+<div data-state="ready" hidden>
+  <section class="kpis" aria-label="Tổng quan">
+    <div class="tile"><div class="l">Tỷ lệ chuyên cần</div><div class="v" id="k1">0</div><div class="c" id="c1"></div></div>
+    <div class="tile"><div class="l">Ngày công chuẩn</div><div class="v" id="k2">22</div><div class="c" id="c2"></div></div>
+    <div class="tile"><div class="l">Giờ làm thêm</div><div class="v" id="k3">0</div><div class="c" id="c3"></div></div>
+    <div class="tile"><div class="l">Lượt đi muộn</div><div class="v" id="k4">0</div><div class="c" id="c4"></div></div>
+  </section>
+  <section class="panel" aria-label="Biểu đồ">
+    <h2>Tỷ lệ chuyên cần theo phòng ban (%)</h2>
+    <div class="hbars" id="bars"></div>
+  </section>
+  <section aria-label="Bảng tổng hợp">
+    <div class="table-wrap">
+      <table data-total-rows="12">
+        <caption class="sr-only">Tổng hợp chấm công theo phòng ban</caption>
+        <thead><tr><th scope="col">Phòng ban</th><th scope="col" class="num">Nhân sự</th><th scope="col" class="num">Ngày công</th><th scope="col" class="num">Đi muộn</th><th scope="col" class="num">Vắng</th><th scope="col" class="num">Nghỉ phép</th><th scope="col" class="num">Làm thêm (giờ)</th><th scope="col" class="num">Chuyên cần (%)</th></tr></thead>
+        <tbody id="rows"></tbody>
+        <tfoot id="foot"></tfoot>
+      </table>
+    </div>
+  </section>
+</div>
+<div data-state="empty" class="state-box" hidden>
+  <p class="t">Chưa có dữ liệu chấm công cho kỳ này</p><p class="d">Báo cáo xuất hiện khi kỳ có bản ghi chấm công.</p>
+  <button type="button" class="btn" data-retry>Xem kỳ gần nhất</button>
+</div>
+<div data-state="loading" class="skel" aria-busy="true" aria-label="Đang tải báo cáo" id="skel" hidden></div>
+<div data-state="error" class="state-error" role="alert" hidden>
+  <p class="t">Không tải được báo cáo.</p><p>Kiểm tra kết nối rồi thử lại.</p>
+  <button type="button" class="btn" data-retry>Thử lại</button>
+</div>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="admin.js"></script>
+<script>
+const DEPTS = [{"d":"Kế toán","hc":4,"i":0},{"d":"Nhân sự","hc":4,"i":1},{"d":"Kinh doanh","hc":4,"i":2},{"d":"Marketing","hc":4,"i":3},{"d":"Kỹ thuật","hc":4,"i":4},{"d":"Vận hành","hc":4,"i":5},{"d":"Chăm sóc khách hàng","hc":4,"i":6},{"d":"Kho vận","hc":4,"i":7},{"d":"Pháp chế","hc":4,"i":8},{"d":"Mua hàng","hc":4,"i":9},{"d":"Sản xuất","hc":4,"i":10},{"d":"Hành chính","hc":4,"i":11}];
+const FIRST_MONTH = 8; // earliest month with data: its comparison base is missing
+function calc(m) {
+  const rows = DEPTS.map((d) => {
+    const l = (d.i * 3 + m) % 9, v = (d.i + m) % 4;
+    return { d: d.d, hc: d.hc, days: d.hc * (22 - (d.i + m) % 3), late: l, absent: v, leave: (d.i * 2 + m) % 5, ot: (d.i * 7 + m * 3) % 40 + 4, rate: 100 - (l + v * 2) * 0.6 };
+  });
+  const sum = (k) => rows.reduce((s, r) => s + r[k], 0);
+  return { rows, hc: sum('hc'), days: sum('days'), late: sum('late'), absent: sum('absent'), leave: sum('leave'), ot: sum('ot'), rate: sum('rate') / rows.length };
+}
+let EMPTY = false;
+const pct = (cur, prev) => (prev ? (cur >= prev ? '+' : '−') + fmtN(Math.abs((cur - prev) / prev) * 100, 1) + '%' : '—');
+function render() {
+  const m = +$('month').value, y = $('year').value;
+  $('mlabel').textContent = m + '/' + y;
+  document.querySelectorAll('#presets button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.m === m)));
+  if (EMPTY) { showState('empty'); return; }
+  const cur = calc(m), hasBase = m > FIRST_MONTH, prev = hasBase ? calc(m - 1) : null, vs = ' so với tháng ' + (m - 1) + '/' + y;
+  const now = new Date();
+  $('basis').textContent = 'Đơn vị: ngày công, giờ, %. Tổng hợp theo phòng ban. Cập nhật ' + new Intl.DateTimeFormat(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Ho_Chi_Minh' }).format(now) + '.';
+  $('k1').textContent = fmtN(cur.rate, 1) + '%';
+  $('c1').textContent = prev ? (cur.rate >= prev.rate ? '+' : '−') + fmtN(Math.abs(cur.rate - prev.rate), 1) + ' điểm %' + vs : '— (chưa có kỳ so sánh)';
+  $('k2').textContent = 22;
+  $('c2').textContent = prev ? 'Không đổi' + vs : '— (chưa có kỳ so sánh)';
+  $('k3').textContent = fmtN(cur.ot);
+  $('c3').textContent = prev ? pct(cur.ot, prev.ot) + vs : '— (chưa có kỳ so sánh)';
+  $('k4').textContent = fmtN(cur.late);
+  $('c4').textContent = prev ? pct(cur.late, prev.late) + vs : '— (chưa có kỳ so sánh)';
+  $('bars').innerHTML = cur.rows.map((r) => '<span>' + esc(r.d) + '</span><div class="track"><div class="fill" style="width:' + r.rate + '%"></div></div><span class="val">' + fmtN(r.rate, 1) + '%</span>').join('') + '<div class="axis"><span>0%</span><span>50%</span><span>100%</span></div>';
+  $('rows').innerHTML = cur.rows.map((r) => '<tr><td>' + esc(r.d) + '</td><td class="num">' + r.hc + '</td><td class="num">' + r.days + '</td><td class="num">' + r.late + '</td><td class="num">' + r.absent + '</td><td class="num">' + r.leave + '</td><td class="num">' + r.ot + '</td><td class="num">' + fmtN(r.rate, 1) + '</td></tr>').join('');
+  $('foot').innerHTML = '<tr><td>Tổng (chuyên cần: trung bình)</td><td class="num">' + cur.hc + '</td><td class="num">' + cur.days + '</td><td class="num">' + cur.late + '</td><td class="num">' + cur.absent + '</td><td class="num">' + cur.leave + '</td><td class="num">' + cur.ot + '</td><td class="num">' + fmtN(cur.rate, 1) + '</td></tr>';
+  showState('ready');
+}
+$('month').addEventListener('change', render); $('year').addEventListener('change', render);
+$('presets').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { $('month').value = b.dataset.m; render(); } });
+skeleton($('skel'), 8);
+boot(render, () => { EMPTY = true; });
+</script>
+</body>
+</html>

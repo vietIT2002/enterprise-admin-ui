@@ -1,0 +1,12 @@
+# r02 — released skill, P1 ("Apply the enterprise-admin-ui skill to this app.")
+- Helper data files in r02/work (its own parent, outside app).
+- Added DESIGN.md (product, HR admin role, vi-VN, one status vocabulary → 5 tones, default ordering, navigation, not-built list) + admin.css + admin.js (tokens, components, formatting, badges, toasts, dialogs, ?state=).
+- audit-cli 100/100 every page (lists/report with --states --checks; settings as form). Settings fails --states (no data region) — left. Did not click through flows in a browser.
+- Light neutral sidebar, grouped text links; removed hero/greeting, gradients, glass, shadows, ALL-CAPS, KPI rows, duplicated chart/notices, team/tips cards. Controls 32px, rows 40px one line, radii 4/6/8. dd/MM/yyyy, vi-VN numbers, diacritic-insensitive search. One status vocabulary.
+- Each list page opens with a SKELETON, data after ~250 ms (grader must wait for settle). ?state=empty|error|loading.
+- Employees: one primary action; search + dept/status filters with removable chips, "Xóa tất cả", URL state; summary line; separate name/code/email columns; newest-joined first; pagination with page size + total.
+- Timesheets: search + status/approval filters, date range + dept behind "Thêm bộ lọc", chips; newest first; Export in header with count.
+- Leave: status tabs with counts; separate columns; pending first; real dates (year inferred); "Xem thêm" → pagination; Duyệt toast with Hoàn tác; Từ chối dialog names request, requires reason, focus Cancel.
+- Reports: title with period, basis line, Updated time, period presets, KPI tiles without icons with named base month, computed; horizontal bars 0–100% from same numbers; dept avatars gone; totals row.
+- Settings: one field per row (pair kept), labels above, required marked, blur validation, error summary at ≥3 errors, sticky Save/Cancel with unsaved indicator, toast names shift, beforeunload; savedSettings and ids unchanged.
+- Left out: add/create forms ("not connected" toast), timesheet approval, roles, change history, settings nav, export does nothing.

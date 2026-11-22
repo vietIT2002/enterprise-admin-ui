@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt · ChấmCông Pro</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <p class="group">Nhân sự</p>
+    <a href="employees.html">Nhân viên</a>
+    <p class="group">Chấm công</p>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <p class="group">Phân tích</p>
+    <a href="reports.html">Báo cáo</a>
+    <p class="group">Hệ thống</p>
+    <a href="settings.html" aria-current="page">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <div>
+    <h1>Cài đặt ca làm việc</h1>
+    <p class="sub">Giờ làm việc mặc định cho toàn công ty.</p>
+  </div>
+</header>
+<form id="f" class="form" novalidate>
+  <div id="errors" role="alert" class="error-summary" hidden></div>
+  <section class="section" aria-labelledby="h-hours">
+    <h2 id="h-hours">Giờ làm việc</h2>
+    <div class="field">
+      <label for="shift">Tên ca <span aria-hidden="true">*</span></label>
+      <input id="shift" type="text" value="Ca hành chính" class="w-md" required aria-describedby="e-shift">
+      <p class="error" id="e-shift" hidden></p>
+    </div>
+    <div class="pair">
+      <div class="field">
+        <label for="start">Giờ vào <span aria-hidden="true">*</span></label>
+        <input id="start" type="time" value="08:00" required aria-describedby="e-start">
+        <p class="error" id="e-start" hidden></p>
+      </div>
+      <div class="field">
+        <label for="end">Giờ tan ca <span aria-hidden="true">*</span></label>
+        <input id="end" type="time" value="17:00" required aria-describedby="e-end">
+        <p class="error" id="e-end" hidden></p>
+      </div>
+    </div>
+    <div class="field">
+      <label for="grace">Số phút cho phép đi muộn</label>
+      <input id="grace" type="number" value="5" min="0" max="60" class="w-sm" aria-describedby="h-grace e-grace">
+      <p class="help" id="h-grace">Từ 0 đến 60 phút.</p>
+      <p class="error" id="e-grace" hidden></p>
+    </div>
+  </section>
+  <section class="section" aria-labelledby="h-days">
+    <h2 id="h-days">Ngày làm việc</h2>
+    <div class="field">
+      <div class="lbl" id="l-days">Ngày làm việc trong tuần <span aria-hidden="true">*</span></div>
+      <div class="days" role="group" aria-labelledby="l-days" id="days">
+        <label><input type="checkbox" name="day" value="2" checked> Thứ 2</label>
+        <label><input type="checkbox" name="day" value="3" checked> Thứ 3</label>
+        <label><input type="checkbox" name="day" value="4" checked> Thứ 4</label>
+        <label><input type="checkbox" name="day" value="5" checked> Thứ 5</label>
+        <label><input type="checkbox" name="day" value="6" checked> Thứ 6</label>
+        <label><input type="checkbox" name="day" value="7"> Thứ 7</label>
+      </div>
+      <p class="error" id="e-days" hidden></p>
+    </div>
+    <div class="field">
+      <label for="round">Làm tròn công</label>
+      <select id="round" class="w-md"><option value="none">Không làm tròn</option><option value="15">15 phút</option><option value="30">30 phút</option></select>
+    </div>
+  </section>
+  <div class="form-bar">
+    <span class="unsaved" id="unsaved" hidden>Có thay đổi chưa lưu</span>
+    <span class="saved" id="saved-note" role="status"></span>
+    <button class="btn" type="button" id="cancel">Hủy</button>
+    <button class="btn primary" type="submit" id="save">Lưu thay đổi</button>
+  </div>
+  <div class="sr-only saved" hidden>Đã lưu cài đặt</div>
+</form>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="admin.js"></script>
+<script>
+window.savedSettings = null;
+const FIELDS = ['shift', 'start', 'end', 'grace', 'round'];
+const read = () => ({ shift: $('shift').value.trim(), start: $('start').value, end: $('end').value, grace: Number($('grace').value), days: [...document.querySelectorAll('input[name=day]:checked')].map((c) => +c.value), round: $('round').value });
+let baseline = JSON.stringify(read()), saving = false;
+const dirty = () => JSON.stringify(read()) !== baseline;
+function validate() {
+  const s = read(), e = {};
+  if (!s.shift) e.shift = 'Nhập tên ca.';
+  if (!s.start) e.start = 'Nhập giờ vào.';
+  if (!s.end) e.end = 'Nhập giờ tan ca.';
+  else if (s.start && s.end <= s.start) e.end = 'Giờ tan ca phải sau giờ vào.';
+  if ($('grace').value === '' || !Number.isInteger(s.grace) || s.grace < 0 || s.grace > 60) e.grace = 'Số phút cho phép đi muộn từ 0 đến 60.';
+  if (!s.days.length) e.days = 'Chọn ít nhất một ngày làm việc.';
+  return e;
+}
+function showFieldError(k, msg) {
+  const p = $('e-' + k); p.hidden = !msg; p.textContent = msg || '';
+  const inp = k === 'days' ? null : $(k);
+  if (inp) { if (msg) inp.setAttribute('aria-invalid', 'true'); else inp.removeAttribute('aria-invalid'); }
+}
+function showErrors(e, focus) {
+  for (const k of ['shift', 'start', 'end', 'grace', 'days']) showFieldError(k, e[k]);
+  const keys = Object.keys(e), box = $('errors');
+  if (!keys.length) { box.hidden = true; box.textContent = ''; return; }
+  const target = (k) => (k === 'days' ? 'day-first' : k);
+  box.hidden = false;
+  box.innerHTML = (keys.length >= 3 ? '<p>Có ' + keys.length + ' lỗi cần sửa:</p>' : '') + '<ul>' + keys.map((k) => '<li><a href="#' + target(k) + '" data-f="' + k + '">' + esc(e[k]) + '</a></li>').join('') + '</ul>';
+  if (focus) focusField(keys[0]);
+}
+function focusField(k) { (k === 'days' ? document.querySelector('input[name=day]') : $(k)).focus(); }
+$('errors').addEventListener('click', (ev) => { const a = ev.target.closest('a[data-f]'); if (a) { ev.preventDefault(); focusField(a.dataset.f); } });
+// Validate a field when it loses focus.
+for (const k of FIELDS) $(k).addEventListener('blur', () => { if (k === 'round') return; const e = validate(); showFieldError(k, e[k]); if (k === 'start' && $('end').value) showFieldError('end', e.end); });
+function refresh() { $('unsaved').hidden = !dirty(); if (dirty()) $('saved-note').textContent = ''; }
+$('f').addEventListener('input', refresh); $('f').addEventListener('change', refresh);
+$('f').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  if (saving) return;
+  document.querySelector('.saved').hidden = true;
+  const e = validate();
+  showErrors(e, true);
+  if (Object.keys(e).length) return;
+  saving = true; $('save').disabled = true; $('save').innerHTML = '<span class="spinner"></span>Đang lưu';
+  setTimeout(() => {
+    const s = read();
+    window.savedSettings = s; baseline = JSON.stringify(s); saving = false;
+    $('save').disabled = false; $('save').textContent = 'Lưu thay đổi';
+    document.querySelector('.saved').hidden = false;
+    const t = new Date();
+    $('saved-note').textContent = 'Đã lưu ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    toast('Đã lưu cài đặt ca "' + esc(s.shift) + '".');
+    refresh();
+  }, 300);
+});
+$('cancel').addEventListener('click', () => {
+  if (dirty() && !confirm('Bỏ các thay đổi chưa lưu?')) return;
+  const b = JSON.parse(baseline);
+  $('shift').value = b.shift; $('start').value = b.start; $('end').value = b.end; $('grace').value = b.grace; $('round').value = b.round;
+  document.querySelectorAll('input[name=day]').forEach((c) => (c.checked = b.days.includes(+c.value)));
+  showErrors({}, false); refresh();
+});
+window.addEventListener('beforeunload', (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ''; } });
+document.querySelector('.sidebar').addEventListener('click', (e) => { const a = e.target.closest('a'); if (a && dirty() && !confirm('Bạn có thay đổi chưa lưu. Rời trang?')) e.preventDefault(); });
+</script>
+</body>
+</html>

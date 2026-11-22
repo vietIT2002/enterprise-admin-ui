@@ -1,7 +1,8 @@
 // Grader for the multi-page consistency evaluation.
 //
-// Part 1 (this file, so far): per-page pattern signatures read from the rendered DOM, the cross-page consistency
-// score, and the function-kept check. The heuristics accept equivalent markup, because the grader later runs on pages
+// Per-page pattern signatures read from the rendered DOM, the cross-page consistency score, the function-kept check,
+// and grade(): audit and counted tells, first-screen pixel difference, screenshots, report.json and the CLI. The heuristics
+// accept equivalent markup, because the grader runs on pages
 // that AI agents rewrote: icon-only Prev/Next (found by accessible name), chips as buttons, links or role="tab", range
 // text anywhere in the table's container, English and Vietnamese labels, rows as table rows, role=row or list items.
 // Nothing here throws on unusual markup. An absent pattern is `null`; a pattern whose extractor failed is

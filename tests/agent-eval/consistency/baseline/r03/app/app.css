@@ -1,0 +1,116 @@
+/* ChấmCông Pro - shared admin styles. Accent #1d4ed8, 4px spacing base, 32px controls. */
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+:root{--accent:#1d4ed8;--accent-subtle:#eff6ff;--text:#0f172a;--muted:#475569;--border:#e2e8f0;--input-border:#8592a6;--bg:#f8fafc}
+body{margin:0;font-family:system-ui,"Segoe UI",-apple-system,Roboto,Arial,sans-serif;font-size:14px;line-height:20px;background:var(--bg);color:var(--text)}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* shell */
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:#fff;border-right:1px solid var(--border);padding:16px 12px}
+.logo{font-weight:600;font-size:16px;margin:0 8px 24px;padding-top:4px}
+.sidebar nav a{display:flex;align-items:center;height:32px;padding:0 8px;border-radius:4px;color:var(--muted);text-decoration:none;margin-bottom:4px}
+.sidebar nav a:hover{background:#f1f5f9;color:var(--text)}
+.sidebar nav a[aria-current="page"]{background:var(--accent-subtle);color:var(--accent);font-weight:500}
+main{margin-left:240px;padding:24px 32px 32px;min-height:100vh}
+main>*{max-width:1200px}
+
+/* page header */
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+.page-head h1{margin:0;font-size:20px;line-height:28px;font-weight:600}
+.sub{color:var(--muted);margin:0;font-size:14px}
+.page-actions{display:flex;gap:8px;flex:none}
+
+/* controls */
+button{font:inherit;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.btn{display:inline-flex;align-items:center;justify-content:center;height:32px;padding:0 12px;border:1px solid var(--accent);border-radius:4px;background:var(--accent);color:#fff;font-weight:500;font-size:14px}
+.btn:hover:not(:disabled){background:#1e40af}
+.btn.secondary,.btn.ghost{background:#fff;color:var(--text);border-color:var(--input-border)}
+.btn.secondary:hover:not(:disabled){background:#f1f5f9}
+.btn.sm{height:28px;padding:0 8px;font-size:13px}
+input,select{font:inherit;font-size:14px;height:32px;border:1px solid var(--input-border);border-radius:4px;padding:0 8px;background:#fff;color:var(--text)}
+input[type=checkbox]{height:auto}
+label.f{display:block;font-weight:500;margin-bottom:16px}
+label.f input,label.f select{display:block;margin-top:4px;font-weight:400}
+
+/* surfaces */
+.card{background:#fff;border:1px solid var(--border);border-radius:6px;padding:16px}
+.summary{margin:0 0 12px;color:var(--muted)}
+.summary b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.summary .sep{margin:0 8px;color:#64748b}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input[type=search]{width:280px}
+.filter-panel{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding:12px;margin-bottom:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px}
+.filter-panel label{display:flex;flex-direction:column;gap:4px;font-weight:500}
+.filter-panel label input,.filter-panel label select{font-weight:400}
+
+/* status tabs with counts */
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chips button{height:32px;padding:0 12px;border:1px solid var(--border);background:#fff;border-radius:4px;color:var(--muted)}
+.chips button[aria-pressed="true"]{background:var(--accent-subtle);color:var(--accent);border-color:#bfdbfe;font-weight:500}
+.chips .count{margin-left:6px;font-variant-numeric:tabular-nums}
+
+/* tables */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{height:36px;padding:0 12px;text-align:left;font-size:13px;font-weight:600;color:var(--muted);white-space:nowrap;background:var(--bg);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+td{height:40px;padding:0 12px;white-space:nowrap;border-bottom:1px solid #eef2f6;vertical-align:middle}
+tbody tr:hover{background:#f8fafc}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.tab{font-variant-numeric:tabular-nums}
+tfoot td{font-weight:600;background:var(--bg);border-bottom:0}
+.who{display:flex;gap:8px;align-items:center}
+.avatar{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#334155;font-size:11px;font-weight:600;flex:none}
+.muted{color:var(--muted)}
+.act{display:flex;gap:4px}
+
+/* status badges: five tones, always with text */
+.badge{display:inline-block;border:1px solid transparent;border-radius:999px;padding:0 8px;font-size:12px;line-height:18px;font-weight:500;white-space:nowrap}
+.b-dang-lam,.b-da-duyet,.b-dung-gio{background:#f0fdf4;color:#166534;border-color:#bbf7d0}
+.b-thu-viec,.b-cho-duyet,.b-nghi-phep,.b-nghi-thai-san,.b-lam-them{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+.b-tam-hoan,.b-di-muon{background:#fffbeb;color:#92400e;border-color:#fde68a}
+.b-tu-choi,.b-vang{background:#fef2f2;color:#991b1b;border-color:#fecaca}
+.b-da-nghi,.b-da-huy{background:#f1f5f9;color:#334155;border-color:#cbd5e1}
+
+/* footer / pager */
+.pager{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:12px;color:var(--muted);flex-wrap:wrap}
+.pager .nums,.pager .ctrl{display:flex;gap:4px;align-items:center}
+.pager button.num,.pager button.prev,.pager button.next,.pager .load-more{height:32px;min-width:32px;padding:0 8px;border:1px solid var(--input-border);background:#fff;border-radius:4px;color:var(--text)}
+.pager button.num[aria-current="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* states */
+.state{text-align:center;padding:40px 16px;color:var(--muted)}
+.state .state-title{margin:0 0 4px;font-size:16px;font-weight:600;color:var(--text)}
+.state p{margin:0 0 12px}
+.state[role=alert]{border:1px solid #fecaca;background:#fef2f2;border-radius:6px;color:#991b1b}
+.state[role=alert] strong{color:#991b1b}
+.sk-bar{display:block;height:12px;border-radius:4px;background:linear-gradient(90deg,#e2e8f0,#f1f5f9,#e2e8f0);background-size:200% 100%;animation:sk 1.2s linear infinite}
+@keyframes sk{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk-bar{animation:none}}
+
+/* horizontal bar chart, labelled */
+.chart h2,.section h2{margin:0 0 12px;font-size:16px;line-height:24px;font-weight:600}
+.hbar{display:grid;grid-template-columns:160px 1fr 56px;align-items:center;gap:8px;height:28px}
+.hbar .track{height:12px;background:#f1f5f9;border-radius:2px}
+.hbar .fill{display:block;height:100%;background:var(--accent);border-radius:2px}
+.hbar .v{text-align:right;font-variant-numeric:tabular-nums}
+.chart .note{margin:8px 0 0;color:var(--muted);font-size:12px}
+
+/* forms */
+.section{margin-bottom:16px}
+.form-narrow{max-width:640px}
+fieldset{border:0;margin:0 0 16px;padding:0}
+legend{font-weight:500;padding:0;margin-bottom:8px}
+.pair{display:grid;grid-template-columns:160px 160px;gap:16px}
+.days{display:flex;gap:8px 16px;flex-wrap:wrap}
+.days label{display:flex;gap:8px;align-items:center;min-height:24px}
+.field-err{color:#b91c1c;margin:4px 0 0;font-size:14px;font-weight:400}
+input[aria-invalid=true],select[aria-invalid=true]{border-color:#b91c1c}
+.err-summary{border:1px solid #fecaca;background:#fef2f2;color:#991b1b;border-radius:6px;padding:12px 16px;margin-bottom:16px}
+.err-summary ul{margin:4px 0 0;padding-left:20px}
+.err-summary a{color:#991b1b}
+.actionbar{position:sticky;bottom:0;display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 32px;margin:24px -32px -32px;background:#fff;border-top:1px solid var(--border);max-width:none}
+.actionbar .status{margin-right:auto;color:var(--muted)}
+.actionbar .dirty{color:#92400e;font-weight:500}
+.saved{color:#166534;font-weight:500}
