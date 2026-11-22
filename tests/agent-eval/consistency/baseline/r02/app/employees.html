@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nhân viên · ChấmCông Pro</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <p class="group">Nhân sự</p>
+    <a href="employees.html" aria-current="page">Nhân viên</a>
+    <p class="group">Chấm công</p>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <p class="group">Phân tích</p>
+    <a href="reports.html">Báo cáo</a>
+    <p class="group">Hệ thống</p>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <h1>Nhân viên</h1>
+  <div class="actions"><button class="btn primary" type="button" id="add">Thêm nhân viên</button></div>
+</header>
+
+<div class="toolbar">
+  <input type="search" id="q" placeholder="Tìm theo tên, mã hoặc email" aria-label="Tìm nhân viên">
+  <select id="dept" aria-label="Phòng ban"><option value="">Tất cả phòng ban</option><option>Kế toán</option><option>Nhân sự</option><option>Kinh doanh</option><option>Marketing</option><option>Kỹ thuật</option><option>Vận hành</option><option>Chăm sóc khách hàng</option><option>Kho vận</option><option>Pháp chế</option><option>Mua hàng</option><option>Sản xuất</option><option>Hành chính</option></select>
+  <select id="st" aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option>Đang làm</option><option>Thử việc</option><option>Nghỉ phép</option><option>Nghỉ thai sản</option><option>Tạm hoãn</option><option>Đã nghỉ</option></select>
+  <div class="chips" id="chips"></div>
+</div>
+<p class="summary" id="summary" aria-live="polite"></p>
+
+<section aria-label="Danh sách nhân viên">
+  <div data-state="ready" hidden>
+    <div class="table-wrap">
+      <table data-total-rows="48">
+        <caption class="sr-only">Danh sách nhân viên</caption>
+        <thead><tr><th scope="col">Mã</th><th scope="col">Nhân viên</th><th scope="col">Email</th><th scope="col">Phòng ban</th><th scope="col">Chức vụ</th><th scope="col">Ngày vào làm</th><th scope="col">Trạng thái</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="pager" id="pager">
+      <label for="size">Số dòng mỗi trang</label>
+      <select id="size"><option>10</option><option>20</option><option>50</option></select>
+      <span id="range" class="tnum"></span>
+      <div class="nums" id="nums"></div>
+    </div>
+  </div>
+  <div data-state="empty" class="state-box" id="empty" hidden>
+    <p class="t" id="empty-title"></p><p class="d" id="empty-text"></p>
+    <button type="button" class="btn" id="empty-action"></button>
+  </div>
+  <div data-state="loading" class="skel" aria-busy="true" aria-label="Đang tải danh sách nhân viên" id="skel" hidden></div>
+  <div data-state="error" class="state-error" role="alert" hidden>
+    <p class="t">Không tải được danh sách nhân viên.</p><p>Kiểm tra kết nối rồi thử lại.</p>
+    <button type="button" class="btn" data-retry>Thử lại</button>
+  </div>
+</section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="admin.js"></script>
+<script>
+const DATA = [{"id":"NV001","name":"Nguyễn Văn An","email":"nguyen.van.an@congtyabc.vn","dept":"Nhân sự","pos":"Chuyên viên","join":"2019-01-01","status":"Đang làm"},{"id":"NV002","name":"Huỳnh Quốc Lan","email":"huynh.quoc.lan@congtyabc.vn","dept":"Chăm sóc khách hàng","pos":"Trưởng nhóm","join":"2020-06-12","status":"Đang làm"},{"id":"NV003","name":"Đỗ Ngọc Sơn","email":"do.ngoc.son@congtyabc.vn","dept":"Hành chính","pos":"Nhân viên","join":"2021-11-23","status":"Thử việc"},{"id":"NV004","name":"Phạm Thị Trang","email":"pham.thi.trang@congtyabc.vn","dept":"Kỹ thuật","pos":"Quản lý","join":"2022-04-06","status":"Đang làm"},{"id":"NV005","name":"Đặng Thu Hải","email":"dang.thu.hai@congtyabc.vn","dept":"Mua hàng","pos":"Thực tập sinh","join":"2023-09-17","status":"Nghỉ phép"},{"id":"NV006","name":"Trần Đức Nam","email":"tran.duc.nam@congtyabc.vn","dept":"Kinh doanh","pos":"Giám sát","join":"2024-02-28","status":"Đang làm"},{"id":"NV007","name":"Phan Minh Yến","email":"phan.minh.yen@congtyabc.vn","dept":"Kho vận","pos":"Chuyên viên","join":"2025-07-11","status":"Nghỉ thai sản"},{"id":"NV008","name":"Hồ Hoài Cường","email":"ho.hoai.cuong@congtyabc.vn","dept":"Kế toán","pos":"Trưởng nhóm","join":"2019-12-22","status":"Đang làm"},{"id":"NV009","name":"Hoàng Văn Long","email":"hoang.van.long@congtyabc.vn","dept":"Vận hành","pos":"Nhân viên","join":"2020-05-05","status":"Tạm hoãn"},{"id":"NV010","name":"Bùi Quốc Tuấn","email":"bui.quoc.tuan@congtyabc.vn","dept":"Sản xuất","pos":"Quản lý","join":"2021-10-16","status":"Thử việc"},{"id":"NV011","name":"Lê Ngọc Loan","email":"le.ngoc.loan@congtyabc.vn","dept":"Marketing","pos":"Thực tập sinh","join":"2022-03-27","status":"Đang làm"},{"id":"NV012","name":"Vũ Thị Khoa","email":"vu.thi.khoa@congtyabc.vn","dept":"Pháp chế","pos":"Giám sát","join":"2023-08-10","status":"Đã nghỉ"},{"id":"NV013","name":"Nguyễn Thu Quân","email":"nguyen.thu.quan@congtyabc.vn","dept":"Nhân sự","pos":"Chuyên viên","join":"2024-01-21","status":"Đang làm"},{"id":"NV014","name":"Huỳnh Đức Dũng","email":"huynh.duc.dung@congtyabc.vn","dept":"Chăm sóc khách hàng","pos":"Trưởng nhóm","join":"2025-06-04","status":"Đang làm"},{"id":"NV015","name":"Đỗ Minh Hà","email":"do.minh.ha@congtyabc.vn","dept":"Hành chính","pos":"Nhân viên","join":"2019-11-15","status":"Thử việc"},{"id":"NV016","name":"Phạm Hoài Mai","email":"pham.hoai.mai@congtyabc.vn","dept":"Kỹ thuật","pos":"Quản lý","join":"2020-04-26","status":"Đang làm"},{"id":"NV017","name":"Đặng Văn Yến","email":"dang.van.yen@congtyabc.vn","dept":"Mua hàng","pos":"Thực tập sinh","join":"2021-09-09","status":"Nghỉ phép"},{"id":"NV018","name":"Trần Quốc Cường","email":"tran.quoc.cuong@congtyabc.vn","dept":"Kinh doanh","pos":"Giám sát","join":"2022-02-20","status":"Đang làm"},{"id":"NV019","name":"Phan Ngọc Linh","email":"phan.ngoc.linh@congtyabc.vn","dept":"Kho vận","pos":"Chuyên viên","join":"2023-07-03","status":"Nghỉ thai sản"},{"id":"NV020","name":"Hồ Thị Thảo","email":"ho.thi.thao@congtyabc.vn","dept":"Kế toán","pos":"Trưởng nhóm","join":"2024-12-14","status":"Đang làm"},{"id":"NV021","name":"Hoàng Thu Hiếu","email":"hoang.thu.hieu@congtyabc.vn","dept":"Vận hành","pos":"Nhân viên","join":"2025-05-25","status":"Tạm hoãn"},{"id":"NV022","name":"Bùi Đức Hương","email":"bui.duc.huong@congtyabc.vn","dept":"Sản xuất","pos":"Quản lý","join":"2019-10-08","status":"Thử việc"},{"id":"NV023","name":"Lê Minh Phúc","email":"le.minh.phuc@congtyabc.vn","dept":"Marketing","pos":"Thực tập sinh","join":"2020-03-19","status":"Đang làm"},{"id":"NV024","name":"Vũ Hoài Hạnh","email":"vu.hoai.hanh@congtyabc.vn","dept":"Pháp chế","pos":"Giám sát","join":"2021-08-02","status":"Đã nghỉ"},{"id":"NV025","name":"Nguyễn Văn Hà","email":"nguyen.van.ha@congtyabc.vn","dept":"Nhân sự","pos":"Chuyên viên","join":"2022-01-13","status":"Đang làm"},{"id":"NV026","name":"Huỳnh Quốc Mai","email":"huynh.quoc.mai@congtyabc.vn","dept":"Chăm sóc khách hàng","pos":"Trưởng nhóm","join":"2023-06-24","status":"Đang làm"},{"id":"NV027","name":"Đỗ Ngọc Vy","email":"do.ngoc.vy@congtyabc.vn","dept":"Hành chính","pos":"Nhân viên","join":"2024-11-07","status":"Thử việc"},{"id":"NV028","name":"Phạm Thị Bình","email":"pham.thi.binh@congtyabc.vn","dept":"Kỹ thuật","pos":"Quản lý","join":"2025-04-18","status":"Đang làm"},{"id":"NV029","name":"Đặng Thu Lan","email":"dang.thu.lan@congtyabc.vn","dept":"Mua hàng","pos":"Thực tập sinh","join":"2019-09-01","status":"Nghỉ phép"},{"id":"NV030","name":"Trần Đức Sơn","email":"tran.duc.son@congtyabc.vn","dept":"Kinh doanh","pos":"Giám sát","join":"2020-02-12","status":"Đang làm"},{"id":"NV031","name":"Phan Minh Trang","email":"phan.minh.trang@congtyabc.vn","dept":"Kho vận","pos":"Chuyên viên","join":"2021-07-23","status":"Nghỉ thai sản"},{"id":"NV032","name":"Hồ Hoài Hải","email":"ho.hoai.hai@congtyabc.vn","dept":"Kế toán","pos":"Trưởng nhóm","join":"2022-12-06","status":"Đang làm"},{"id":"NV033","name":"Hoàng Văn Phúc","email":"hoang.van.phuc@congtyabc.vn","dept":"Vận hành","pos":"Nhân viên","join":"2023-05-17","status":"Tạm hoãn"},{"id":"NV034","name":"Bùi Quốc Hạnh","email":"bui.quoc.hanh@congtyabc.vn","dept":"Sản xuất","pos":"Quản lý","join":"2024-10-28","status":"Thử việc"},{"id":"NV035","name":"Lê Ngọc Dung","email":"le.ngoc.dung@congtyabc.vn","dept":"Marketing","pos":"Thực tập sinh","join":"2025-03-11","status":"Đang làm"},{"id":"NV036","name":"Vũ Thị Long","email":"vu.thi.long@congtyabc.vn","dept":"Pháp chế","pos":"Giám sát","join":"2019-08-22","status":"Đã nghỉ"},{"id":"NV037","name":"Nguyễn Thu Tuấn","email":"nguyen.thu.tuan@congtyabc.vn","dept":"Nhân sự","pos":"Chuyên viên","join":"2020-01-05","status":"Đang làm"},{"id":"NV038","name":"Huỳnh Đức Loan","email":"huynh.duc.loan@congtyabc.vn","dept":"Chăm sóc khách hàng","pos":"Trưởng nhóm","join":"2021-06-16","status":"Đang làm"},{"id":"NV039","name":"Đỗ Minh Khoa","email":"do.minh.khoa@congtyabc.vn","dept":"Hành chính","pos":"Nhân viên","join":"2022-11-27","status":"Thử việc"},{"id":"NV040","name":"Phạm Hoài Quân","email":"pham.hoai.quan@congtyabc.vn","dept":"Kỹ thuật","pos":"Quản lý","join":"2023-04-10","status":"Đang làm"},{"id":"NV041","name":"Đặng Văn Trang","email":"dang.van.trang@congtyabc.vn","dept":"Mua hàng","pos":"Thực tập sinh","join":"2024-09-21","status":"Nghỉ phép"},{"id":"NV042","name":"Trần Quốc Hải","email":"tran.quoc.hai@congtyabc.vn","dept":"Kinh doanh","pos":"Giám sát","join":"2025-02-04","status":"Đang làm"},{"id":"NV043","name":"Phan Ngọc Nam","email":"phan.ngoc.nam@congtyabc.vn","dept":"Kho vận","pos":"Chuyên viên","join":"2019-07-15","status":"Nghỉ thai sản"},{"id":"NV044","name":"Hồ Thị Yến","email":"ho.thi.yen@congtyabc.vn","dept":"Kế toán","pos":"Trưởng nhóm","join":"2020-12-26","status":"Đang làm"},{"id":"NV045","name":"Hoàng Thu Cường","email":"hoang.thu.cuong@congtyabc.vn","dept":"Vận hành","pos":"Nhân viên","join":"2021-05-09","status":"Tạm hoãn"},{"id":"NV046","name":"Bùi Đức Linh","email":"bui.duc.linh@congtyabc.vn","dept":"Sản xuất","pos":"Quản lý","join":"2022-10-20","status":"Thử việc"},{"id":"NV047","name":"Lê Minh Thảo","email":"le.minh.thao@congtyabc.vn","dept":"Marketing","pos":"Thực tập sinh","join":"2023-03-03","status":"Đang làm"},{"id":"NV048","name":"Vũ Hoài Hiếu","email":"vu.hoai.hieu@congtyabc.vn","dept":"Pháp chế","pos":"Giám sát","join":"2024-08-14","status":"Đã nghỉ"}];
+let EMP = DATA;
+let page = 1, size = 10;
+const qs = new URLSearchParams(location.search);
+const ui = { q: qs.get('q') || '', dept: qs.get('dept') || '', st: qs.get('st') || '' };
+const byJoinDesc = (a, b) => (a.join < b.join ? 1 : a.join > b.join ? -1 : 0);
+function list() {
+  const q = norm(ui.q.trim());
+  return EMP.filter((e) => (!q || norm(e.name).includes(q) || norm(e.id).includes(q) || e.email.includes(q)) && (!ui.dept || e.dept === ui.dept) && (!ui.st || e.status === ui.st)).sort(byJoinDesc);
+}
+function syncUrl() {
+  const p = new URLSearchParams();
+  for (const k of ['q', 'dept', 'st']) if (ui[k]) p.set(k, ui[k]);
+  if (FORCED) p.set('state', FORCED);
+  history.replaceState(null, '', p.toString() ? '?' + p : location.pathname);
+}
+function renderChips() {
+  const c = [];
+  if (ui.q) c.push(['q', 'Từ khóa: ' + ui.q]);
+  if (ui.dept) c.push(['dept', 'Phòng ban: ' + ui.dept]);
+  if (ui.st) c.push(['st', 'Trạng thái: ' + ui.st]);
+  $('chips').innerHTML = c.map(([k, t]) => '<span class="chip">' + esc(t) + '<button type="button" data-chip="' + k + '" aria-label="Bỏ bộ lọc ' + esc(t) + '">×</button></span>').join('') + (c.length ? '<button type="button" class="link-btn" id="clear-all">Xóa tất cả</button>' : '');
+}
+function render() {
+  syncUrl(); renderChips();
+  const all = list(), pages = Math.max(1, Math.ceil(all.length / size));
+  if (page > pages) page = pages;
+  const cnt = (s) => all.filter((e) => e.status === s).length;
+  $('summary').textContent = all.length ? fmtN(all.length) + ' nhân viên · Đang làm ' + cnt('Đang làm') + ' · Thử việc ' + cnt('Thử việc') + ' · Nghỉ phép ' + cnt('Nghỉ phép') + ' · Nghỉ thai sản ' + cnt('Nghỉ thai sản') + ' · Tạm hoãn ' + cnt('Tạm hoãn') + ' · Đã nghỉ ' + cnt('Đã nghỉ') : '0 nhân viên';
+  if (!all.length) {
+    const first = EMP.length === 0;
+    $('empty-title').textContent = first ? 'Chưa có nhân viên' : 'Không có nhân viên nào khớp bộ lọc';
+    $('empty-text').textContent = first ? 'Nhân viên được thêm vào sẽ hiển thị ở đây.' : 'Thử từ khóa khác hoặc xóa bộ lọc.';
+    $('empty-action').textContent = first ? 'Thêm nhân viên' : 'Xóa bộ lọc';
+    showState('empty'); return;
+  }
+  showState('ready');
+  const rows = all.slice((page - 1) * size, page * size);
+  $('rows').innerHTML = rows.map((e) => '<tr><td>' + esc(e.id) + '</td><td>' + esc(e.name) + '</td><td><a href="mailto:' + esc(e.email) + '">' + esc(e.email) + '</a></td><td>' + esc(e.dept) + '</td><td>' + esc(e.pos) + '</td><td class="tnum">' + fmtDate(e.join) + '</td><td>' + badge(e.status) + '</td></tr>').join('');
+  $('range').textContent = ((page - 1) * size + 1) + '–' + Math.min(page * size, all.length) + ' / ' + all.length + ' nhân viên';
+  let h = '';
+  for (let i = 1; i <= pages; i++) h += '<button type="button" class="num" aria-label="Trang ' + i + '"' + (i === page ? ' aria-current="true"' : '') + '>' + i + '</button>';
+  $('nums').innerHTML = h;
+}
+function clearAll() { ui.q = ui.dept = ui.st = ''; $('q').value = ''; $('dept').value = ''; $('st').value = ''; page = 1; render(); }
+$('nums').addEventListener('click', (ev) => { const b = ev.target.closest('button.num'); if (b) { page = +b.textContent; render(); } });
+$('size').addEventListener('change', () => { size = +$('size').value; page = 1; render(); });
+let t;
+$('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { ui.q = $('q').value; page = 1; render(); }, 200); });
+$('dept').addEventListener('change', () => { ui.dept = $('dept').value; page = 1; render(); });
+$('st').addEventListener('change', () => { ui.st = $('st').value; page = 1; render(); });
+$('chips').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-chip]');
+  if (c) { ui[c.dataset.chip] = ''; $(c.dataset.chip).value = ''; page = 1; render(); }
+  if (e.target.id === 'clear-all') clearAll();
+});
+$('empty-action').addEventListener('click', () => (EMP.length ? clearAll() : $('add').click()));
+$('add').addEventListener('click', () => toast('Biểu mẫu thêm nhân viên chưa được kết nối.'));
+$('q').value = ui.q; $('dept').value = ui.dept; $('st').value = ui.st;
+skeleton($('skel'), 10);
+boot(render, () => { EMP = []; });
+</script>
+</body>
+</html>

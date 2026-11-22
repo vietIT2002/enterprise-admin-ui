@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt · ChấmCông Pro</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <a href="reports.html">Báo cáo</a>
+    <a href="settings.html" aria-current="page">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="employees.html">Trang chủ</a> / Cài đặt</nav>
+<header class="page-head">
+  <div>
+    <h1>Cài đặt ca làm việc</h1>
+    <p class="sub">Thiết lập giờ làm việc mặc định cho toàn công ty.</p>
+  </div>
+  <div class="page-actions"></div>
+</header>
+<form id="f" class="form" novalidate>
+  <div id="errors" role="alert" class="err"></div>
+  <section class="section card">
+    <h2>Giờ làm việc</h2>
+    <label class="field" for="shift"><span>Tên ca *</span><input id="shift" type="text" value="Ca hành chính"></label>
+    <div class="pair">
+      <label class="field" for="start"><span>Giờ vào *</span><input id="start" type="time" value="08:00"></label>
+      <label class="field" for="end"><span>Giờ tan ca *</span><input id="end" type="time" value="17:00"></label>
+    </div>
+    <label class="field" for="grace"><span>Số phút cho phép đi muộn</span><input id="grace" type="number" value="5" min="0" max="60"></label>
+  </section>
+  <section class="section card">
+    <h2>Ngày làm việc</h2>
+    <div class="days" role="group" aria-label="Ngày làm việc">
+      <label><input type="checkbox" name="day" value="2" checked> Thứ 2</label>
+      <label><input type="checkbox" name="day" value="3" checked> Thứ 3</label>
+      <label><input type="checkbox" name="day" value="4" checked> Thứ 4</label>
+      <label><input type="checkbox" name="day" value="5" checked> Thứ 5</label>
+      <label><input type="checkbox" name="day" value="6" checked> Thứ 6</label>
+      <label><input type="checkbox" name="day" value="7"> Thứ 7</label>
+    </div>
+    <label class="field" for="round"><span>Làm tròn công</span><select id="round"><option value="none">Không làm tròn</option><option value="15">15 phút</option><option value="30">30 phút</option></select></label>
+  </section>
+  <div class="actionbar">
+    <span class="dirty" id="dirty" hidden>Có thay đổi chưa lưu</span>
+    <div class="saved" role="status" hidden>Đã lưu cài đặt ca làm việc</div>
+    <button class="btn" type="button" id="cancel">Hủy</button>
+    <button class="btn primary" type="submit">Lưu thay đổi</button>
+  </div>
+</form>
+</main>
+<script src="app.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+window.savedSettings = null;
+const snap = () => JSON.stringify([$('shift').value, $('start').value, $('end').value, $('grace').value, [...document.querySelectorAll('input[name=day]')].map((c) => c.checked), $('round').value]);
+let base = snap();
+const restore = JSON.parse(base);
+function setDirty() { const d = snap() !== base; $('dirty').hidden = !d; if (d) document.querySelector('.saved').hidden = true; }
+$('f').addEventListener('input', setDirty); $('f').addEventListener('change', setDirty);
+window.addEventListener('beforeunload', (e) => { if (snap() !== base) { e.preventDefault(); e.returnValue = ''; } });
+$('cancel').addEventListener('click', () => {
+  const [a, b, c, d, days, r] = JSON.parse(base);
+  $('shift').value = a; $('start').value = b; $('end').value = c; $('grace').value = d; $('round').value = r;
+  document.querySelectorAll('input[name=day]').forEach((x, i) => { x.checked = days[i]; });
+  $('errors').innerHTML = ''; setDirty();
+});
+$('f').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const errs = [];
+  const s = { shift: $('shift').value.trim(), start: $('start').value, end: $('end').value, grace: Number($('grace').value), days: [...document.querySelectorAll('input[name=day]:checked')].map((c) => +c.value), round: $('round').value };
+  if (!s.shift) errs.push(['shift', 'Nhập tên ca.']);
+  if (!s.start || !s.end) errs.push([!s.start ? 'start' : 'end', 'Nhập giờ vào và giờ tan ca.']);
+  else if (s.end <= s.start) errs.push(['end', 'Giờ tan ca phải sau giờ vào.']);
+  if (!Number.isInteger(s.grace) || s.grace < 0 || s.grace > 60) errs.push(['grace', 'Số phút cho phép đi muộn từ 0 đến 60.']);
+  if (!s.days.length) errs.push(['', 'Chọn ít nhất một ngày làm việc.']);
+  $('errors').innerHTML = errs.length ? '<ul>' + errs.map((e) => '<li>' + (e[0] ? '<a href="#' + e[0] + '">' + e[1] + '</a>' : e[1]) + '</li>').join('') + '</ul>' : '';
+  document.querySelector('.saved').hidden = true;
+  if (errs.length) { const f = errs[0][0] ? $(errs[0][0]) : document.querySelector('input[name=day]'); f.focus(); return; }
+  window.savedSettings = s;
+  base = snap(); setDirty();
+  document.querySelector('.saved').hidden = false;
+  toast('Đã lưu ca "' + s.shift + '"');
+});
+</script>
+</body>
+</html>

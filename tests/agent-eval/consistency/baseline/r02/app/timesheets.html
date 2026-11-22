@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bảng chấm công · ChấmCông Pro</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <p class="group">Nhân sự</p>
+    <a href="employees.html">Nhân viên</a>
+    <p class="group">Chấm công</p>
+    <a href="timesheets.html" aria-current="page">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <p class="group">Phân tích</p>
+    <a href="reports.html">Báo cáo</a>
+    <p class="group">Hệ thống</p>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <h1>Bảng chấm công</h1>
+  <div class="actions"><button class="btn primary" type="button" id="export">Xuất Excel</button></div>
+</header>
+
+<div class="toolbar">
+  <input type="search" id="q" placeholder="Tìm theo tên nhân viên" aria-label="Tìm theo tên">
+  <select id="st" aria-label="Trạng thái chấm công"><option value="">Mọi trạng thái</option><option>Đúng giờ</option><option>Đi muộn</option><option>Vắng</option><option>Nghỉ phép</option><option>Làm thêm</option></select>
+  <select id="ap" aria-label="Duyệt công"><option value="">Mọi trạng thái duyệt</option><option>Chờ duyệt</option><option>Đã duyệt</option></select>
+  <button type="button" class="btn filter-toggle" aria-expanded="false" aria-controls="panel">Thêm bộ lọc</button>
+  <div class="chips" id="chips"></div>
+</div>
+<div class="more-panel" id="panel" hidden>
+  <label>Từ ngày<input type="date" id="from" min="2026-11-02" max="2026-11-13"></label>
+  <label>Đến ngày<input type="date" id="to" min="2026-11-02" max="2026-11-13"></label>
+  <label>Phòng ban<select id="dept"><option value="">Tất cả</option><option>Kế toán</option><option>Nhân sự</option><option>Kinh doanh</option><option>Marketing</option><option>Kỹ thuật</option><option>Vận hành</option><option>Chăm sóc khách hàng</option><option>Kho vận</option><option>Pháp chế</option><option>Mua hàng</option><option>Sản xuất</option><option>Hành chính</option></select></label>
+  <button type="button" class="btn" id="apply">Áp dụng</button>
+</div>
+<p class="summary" id="summary" aria-live="polite"></p>
+
+<section aria-label="Bản ghi chấm công">
+  <div data-state="ready" hidden>
+    <div class="table-wrap">
+      <table data-total-rows="120">
+        <caption class="sr-only">Bản ghi chấm công</caption>
+        <thead><tr><th scope="col">Ngày</th><th scope="col">Nhân viên</th><th scope="col">Phòng ban</th><th scope="col" class="num">Giờ vào</th><th scope="col" class="num">Giờ ra</th><th scope="col" class="num">Số giờ</th><th scope="col">Trạng thái</th><th scope="col">Duyệt công</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <label for="size">Số dòng mỗi trang</label>
+      <select id="size"><option>10</option><option selected>20</option><option>50</option></select>
+      <span id="range" class="tnum"></span>
+      <button type="button" class="icon-btn prev" id="prev" aria-label="Trang trước">‹</button>
+      <button type="button" class="icon-btn next" id="next" aria-label="Trang sau">›</button>
+    </div>
+  </div>
+  <div data-state="empty" class="state-box" hidden>
+    <p class="t" id="empty-title"></p><p class="d" id="empty-text"></p>
+    <button type="button" class="btn" id="empty-action"></button>
+  </div>
+  <div data-state="loading" class="skel" aria-busy="true" aria-label="Đang tải bản ghi chấm công" id="skel" hidden></div>
+  <div data-state="error" class="state-error" role="alert" hidden>
+    <p class="t">Không tải được bản ghi chấm công.</p><p>Kiểm tra kết nối rồi thử lại.</p>
+    <button type="button" class="btn" data-retry>Thử lại</button>
+  </div>
+</section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="admin.js"></script>
+<script>
+const DATA = [{"date":"2026-11-02","name":"Nguyễn Văn An","dept":"Nhân sự","cin":"07:40","cout":"17:05","hours":"8,0","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-02","name":"Trần Đức Nam","dept":"Kinh doanh","cin":"07:41","cout":"19:12","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Lê Ngọc Loan","dept":"Marketing","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Phạm Hoài Mai","dept":"Kỹ thuật","cin":"08:09","cout":"17:26","hours":"8,4","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-02","name":"Hoàng Thu Hiếu","dept":"Vận hành","cin":"08:12","cout":"17:33","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Huỳnh Quốc Mai","dept":"Chăm sóc khách hàng","cin":"07:45","cout":"17:40","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Phan Minh Trang","dept":"Kho vận","cin":"08:26","cout":"17:47","hours":"8,3","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-02","name":"Vũ Thị Long","dept":"Pháp chế","cin":"08:27","cout":"17:54","hours":"8,1","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Đặng Văn Trang","dept":"Mua hàng","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Bùi Đức Linh","dept":"Sản xuất","cin":"08:13","cout":"17:18","hours":"8,2","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-02","name":"Đỗ Ngọc Sơn","dept":"Hành chính","cin":"07:50","cout":"17:25","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-02","name":"Hồ Hoài Cường","dept":"Kế toán","cin":"07:51","cout":"17:32","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Huỳnh Đức Dũng","dept":"Chăm sóc khách hàng","cin":"08:08","cout":"17:39","hours":"8,1","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-03","name":"Phan Ngọc Linh","dept":"Kho vận","cin":"08:33","cout":"17:46","hours":"8,4","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Vũ Hoài Hạnh","dept":"Pháp chế","cin":"08:34","cout":"17:53","hours":"8,2","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Đặng Thu Lan","dept":"Mua hàng","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Chờ duyệt"},{"date":"2026-11-03","name":"Bùi Quốc Hạnh","dept":"Sản xuất","cin":"07:56","cout":"17:17","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Đỗ Minh Khoa","dept":"Hành chính","cin":"08:09","cout":"17:24","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Hồ Thị Yến","dept":"Kế toán","cin":"08:12","cout":"19:31","hours":"10,5","status":"Làm thêm","approval":"Chờ duyệt"},{"date":"2026-11-03","name":"Nguyễn Văn An","dept":"Nhân sự","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Trần Đức Nam","dept":"Kinh doanh","cin":"08:40","cout":"17:45","hours":"8,0","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Lê Ngọc Loan","dept":"Marketing","cin":"08:41","cout":"17:52","hours":"8,3","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-03","name":"Phạm Hoài Mai","dept":"Kỹ thuật","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-03","name":"Hoàng Thu Hiếu","dept":"Vận hành","cin":"08:13","cout":"17:16","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Đỗ Ngọc Vy","dept":"Hành chính","cin":"07:45","cout":"17:23","hours":"8,2","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-04","name":"Hồ Hoài Hải","dept":"Kế toán","cin":"07:46","cout":"19:30","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Nguyễn Thu Tuấn","dept":"Nhân sự","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Trần Quốc Hải","dept":"Kinh doanh","cin":"08:11","cout":"17:44","hours":"8,1","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-04","name":"Lê Minh Thảo","dept":"Marketing","cin":"07:49","cout":"17:51","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Phạm Thị Trang","dept":"Kỹ thuật","cin":"07:50","cout":"17:08","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Hoàng Văn Long","dept":"Vận hành","cin":"07:51","cout":"17:15","hours":"8,0","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-04","name":"Huỳnh Đức Dũng","dept":"Chăm sóc khách hàng","cin":"08:09","cout":"17:22","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Phan Ngọc Linh","dept":"Kho vận","cin":"08:12","cout":"19:29","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Vũ Hoài Hạnh","dept":"Pháp chế","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Chờ duyệt"},{"date":"2026-11-04","name":"Đặng Thu Lan","dept":"Mua hàng","cin":"07:55","cout":"17:43","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-04","name":"Bùi Quốc Hạnh","dept":"Sản xuất","cin":"07:56","cout":"17:50","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Phạm Hoài Quân","dept":"Kỹ thuật","cin":"08:10","cout":"17:07","hours":"8,3","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-05","name":"Hoàng Thu Cường","dept":"Vận hành","cin":"08:32","cout":"17:14","hours":"8,1","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Huỳnh Quốc Lan","dept":"Chăm sóc khách hàng","cin":"08:33","cout":"17:21","hours":"8,4","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Phan Minh Yến","dept":"Kho vận","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Chờ duyệt"},{"date":"2026-11-05","name":"Vũ Thị Khoa","dept":"Pháp chế","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Đặng Văn Yến","dept":"Mua hàng","cin":"08:11","cout":"17:42","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Bùi Đức Hương","dept":"Sản xuất","cin":"07:44","cout":"17:49","hours":"8,1","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-05","name":"Đỗ Ngọc Vy","dept":"Hành chính","cin":"07:45","cout":"17:06","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Hồ Hoài Hải","dept":"Kế toán","cin":"08:39","cout":"17:13","hours":"8,2","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Nguyễn Thu Tuấn","dept":"Nhân sự","cin":"08:40","cout":"17:20","hours":"8,0","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-05","name":"Trần Quốc Hải","dept":"Kinh doanh","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-05","name":"Lê Minh Thảo","dept":"Marketing","cin":"07:49","cout":"17:34","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Đặng Thu Hải","dept":"Mua hàng","cin":"07:50","cout":"17:41","hours":"8,4","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-06","name":"Bùi Quốc Tuấn","dept":"Sản xuất","cin":"07:51","cout":"19:48","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Đỗ Minh Hà","dept":"Hành chính","cin":"08:10","cout":"17:05","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Hồ Thị Thảo","dept":"Kế toán","cin":"08:21","cout":"17:12","hours":"8,3","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-06","name":"Nguyễn Văn Hà","dept":"Nhân sự","cin":"08:22","cout":"17:19","hours":"8,1","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Trần Đức Sơn","dept":"Kinh doanh","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Lê Ngọc Dung","dept":"Marketing","cin":"08:08","cout":"17:33","hours":"8,2","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-06","name":"Phạm Hoài Quân","dept":"Kỹ thuật","cin":"08:11","cout":"17:40","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Hoàng Thu Cường","dept":"Vận hành","cin":"07:58","cout":"19:47","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Huỳnh Quốc Lan","dept":"Chăm sóc khách hàng","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Chờ duyệt"},{"date":"2026-11-06","name":"Phan Minh Yến","dept":"Kho vận","cin":"07:41","cout":"17:11","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-06","name":"Vũ Thị Khoa","dept":"Pháp chế","cin":"08:09","cout":"17:18","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Trần Quốc Cường","dept":"Kinh doanh","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Chờ duyệt"},{"date":"2026-11-09","name":"Lê Minh Phúc","dept":"Marketing","cin":"07:44","cout":"17:32","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Phạm Thị Bình","dept":"Kỹ thuật","cin":"07:45","cout":"17:39","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Hoàng Văn Phúc","dept":"Vận hành","cin":"07:46","cout":"19:46","hours":"10,5","status":"Làm thêm","approval":"Chờ duyệt"},{"date":"2026-11-09","name":"Huỳnh Đức Loan","dept":"Chăm sóc khách hàng","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Phan Ngọc Nam","dept":"Kho vận","cin":"08:13","cout":"17:10","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Vũ Hoài Hiếu","dept":"Pháp chế","cin":"07:49","cout":"17:17","hours":"8,3","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-09","name":"Đặng Thu Hải","dept":"Mua hàng","cin":"07:50","cout":"17:24","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Bùi Quốc Tuấn","dept":"Sản xuất","cin":"08:38","cout":"17:31","hours":"8,4","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Đỗ Minh Hà","dept":"Hành chính","cin":"08:39","cout":"17:38","hours":"8,2","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-09","name":"Hồ Thị Thảo","dept":"Kế toán","cin":"07:53","cout":"19:45","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-09","name":"Nguyễn Văn Hà","dept":"Nhân sự","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Phan Minh Trang","dept":"Kho vận","cin":"07:55","cout":"17:09","hours":"8,1","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-10","name":"Vũ Thị Long","dept":"Pháp chế","cin":"08:09","cout":"17:16","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Đặng Văn Trang","dept":"Mua hàng","cin":"08:12","cout":"17:23","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Bùi Đức Linh","dept":"Sản xuất","cin":"08:20","cout":"17:30","hours":"8,0","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-10","name":"Đỗ Ngọc Sơn","dept":"Hành chính","cin":"08:21","cout":"17:37","hours":"8,3","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Hồ Hoài Cường","dept":"Kế toán","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Nguyễn Thu Quân","dept":"Nhân sự","cin":"08:10","cout":"17:51","hours":"8,4","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-10","name":"Trần Quốc Cường","dept":"Kinh doanh","cin":"08:13","cout":"17:08","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Lê Minh Phúc","dept":"Marketing","cin":"07:44","cout":"17:15","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Phạm Thị Bình","dept":"Kỹ thuật","cin":"07:45","cout":"17:22","hours":"8,3","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-10","name":"Hoàng Văn Phúc","dept":"Vận hành","cin":"08:27","cout":"17:29","hours":"8,1","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-10","name":"Huỳnh Đức Loan","dept":"Chăm sóc khách hàng","cin":"08:28","cout":"17:36","hours":"8,4","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Hồ Thị Yến","dept":"Kế toán","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Chờ duyệt"},{"date":"2026-11-11","name":"Nguyễn Văn An","dept":"Nhân sự","cin":"07:49","cout":"17:50","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Trần Đức Nam","dept":"Kinh doanh","cin":"07:50","cout":"17:07","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Lê Ngọc Loan","dept":"Marketing","cin":"08:09","cout":"19:14","hours":"10,5","status":"Làm thêm","approval":"Chờ duyệt"},{"date":"2026-11-11","name":"Phạm Hoài Mai","dept":"Kỹ thuật","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Hoàng Thu Hiếu","dept":"Vận hành","cin":"07:53","cout":"17:28","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Huỳnh Quốc Mai","dept":"Chăm sóc khách hàng","cin":"08:35","cout":"17:35","hours":"8,0","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-11","name":"Phan Minh Trang","dept":"Kho vận","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Vũ Thị Long","dept":"Pháp chế","cin":"08:10","cout":"17:49","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Đặng Văn Trang","dept":"Mua hàng","cin":"08:13","cout":"17:06","hours":"8,4","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-11","name":"Bùi Đức Linh","dept":"Sản xuất","cin":"07:58","cout":"19:13","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-11","name":"Đỗ Ngọc Sơn","dept":"Hành chính","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Hoàng Văn Long","dept":"Vận hành","cin":"08:08","cout":"17:27","hours":"8,3","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-12","name":"Huỳnh Đức Dũng","dept":"Chăm sóc khách hàng","cin":"08:11","cout":"17:34","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Phan Ngọc Linh","dept":"Kho vận","cin":"07:43","cout":"17:41","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Vũ Hoài Hạnh","dept":"Pháp chế","cin":"08:44","cout":"17:48","hours":"8,2","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-12","name":"Đặng Thu Lan","dept":"Mua hàng","cin":"07:45","cout":"17:05","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Bùi Quốc Hạnh","dept":"Sản xuất","cin":"08:09","cout":"19:12","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Đỗ Minh Khoa","dept":"Hành chính","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Chờ duyệt"},{"date":"2026-11-12","name":"Hồ Thị Yến","dept":"Kế toán","cin":"07:48","cout":"17:26","hours":"8,4","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Nguyễn Văn An","dept":"Nhân sự","cin":"07:49","cout":"17:33","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Trần Đức Nam","dept":"Kinh doanh","cin":"07:50","cout":"17:40","hours":"8,0","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-12","name":"Lê Ngọc Loan","dept":"Marketing","cin":"08:26","cout":"17:47","hours":"8,3","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-12","name":"Phạm Hoài Mai","dept":"Kỹ thuật","cin":"08:27","cout":"17:54","hours":"8,1","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Bùi Đức Hương","dept":"Sản xuất","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Chờ duyệt"},{"date":"2026-11-13","name":"Đỗ Ngọc Vy","dept":"Hành chính","cin":"07:54","cout":"17:18","hours":"8,2","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Hồ Hoài Hải","dept":"Kế toán","cin":"08:08","cout":"17:25","hours":"8,0","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Nguyễn Thu Tuấn","dept":"Nhân sự","cin":"08:11","cout":"17:32","hours":"8,3","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-13","name":"Trần Quốc Hải","dept":"Kinh doanh","cin":"07:57","cout":"17:39","hours":"8,1","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Lê Minh Thảo","dept":"Marketing","cin":"08:33","cout":"17:46","hours":"8,4","status":"Đi muộn","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Phạm Thị Trang","dept":"Kỹ thuật","cin":"08:34","cout":"17:53","hours":"8,2","status":"Đi muộn","approval":"Chờ duyệt"},{"date":"2026-11-13","name":"Hoàng Văn Long","dept":"Vận hành","cin":"–","cout":"–","hours":"0,0","status":"Nghỉ phép","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Huỳnh Đức Dũng","dept":"Chăm sóc khách hàng","cin":"08:12","cout":"17:17","hours":"8,3","status":"Đúng giờ","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Phan Ngọc Linh","dept":"Kho vận","cin":"07:43","cout":"17:24","hours":"8,1","status":"Đúng giờ","approval":"Chờ duyệt"},{"date":"2026-11-13","name":"Vũ Hoài Hạnh","dept":"Pháp chế","cin":"07:44","cout":"19:31","hours":"10,5","status":"Làm thêm","approval":"Đã duyệt"},{"date":"2026-11-13","name":"Đặng Thu Lan","dept":"Mua hàng","cin":"–","cout":"–","hours":"0,0","status":"Vắng","approval":"Đã duyệt"}];
+let REC = DATA;
+let page = 1, applied = { from: '', to: '', dept: '' };
+const ui = { q: '', st: '', ap: '' };
+const hrs = (r) => parseFloat(String(r.hours).replace(',', '.')) || 0;
+function list() {
+  const q = norm(ui.q.trim());
+  return REC.filter((r) => (!q || norm(r.name).includes(q)) && (!ui.st || r.status === ui.st) && (!ui.ap || r.approval === ui.ap) && (!applied.dept || r.dept === applied.dept) && (!applied.from || r.date >= applied.from) && (!applied.to || r.date <= applied.to))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+function renderChips() {
+  const c = [];
+  if (ui.q) c.push(['q', 'Tên: ' + ui.q]);
+  if (ui.st) c.push(['st', 'Trạng thái: ' + ui.st]);
+  if (ui.ap) c.push(['ap', 'Duyệt công: ' + ui.ap]);
+  if (applied.from) c.push(['from', 'Từ ngày: ' + fmtDate(applied.from)]);
+  if (applied.to) c.push(['to', 'Đến ngày: ' + fmtDate(applied.to)]);
+  if (applied.dept) c.push(['dept', 'Phòng ban: ' + applied.dept]);
+  $('chips').innerHTML = c.map(([k, t]) => '<span class="chip">' + esc(t) + '<button type="button" data-chip="' + k + '" aria-label="Bỏ bộ lọc ' + esc(t) + '">×</button></span>').join('') + (c.length ? '<button type="button" class="link-btn" id="clear-all">Xóa tất cả</button>' : '');
+}
+function render() {
+  renderChips();
+  const all = list(), size = +$('size').value, pages = Math.max(1, Math.ceil(all.length / size));
+  if (page > pages) page = pages;
+  const n = (s) => all.filter((r) => r.status === s).length;
+  $('export').textContent = 'Xuất ' + fmtN(all.length) + ' bản ghi ra Excel';
+  $('summary').textContent = fmtN(all.length) + ' bản ghi · ' + fmtN(all.reduce((s, r) => s + hrs(r), 0), 1) + ' giờ làm · Đúng giờ ' + n('Đúng giờ') + ' · Đi muộn ' + n('Đi muộn') + ' · Vắng ' + n('Vắng') + ' · Nghỉ phép ' + n('Nghỉ phép') + ' · Làm thêm ' + n('Làm thêm') + ' · Chờ duyệt ' + all.filter((r) => r.approval === 'Chờ duyệt').length;
+  if (!all.length) {
+    const first = REC.length === 0;
+    $('empty-title').textContent = first ? 'Chưa có bản ghi chấm công' : 'Không có bản ghi nào khớp bộ lọc';
+    $('empty-text').textContent = first ? 'Bản ghi chấm công sẽ hiển thị ở đây khi nhân viên chấm công.' : 'Thử từ khóa khác hoặc xóa bộ lọc.';
+    $('empty-action').textContent = first ? 'Tải lại' : 'Xóa bộ lọc';
+    $('empty-action').hidden = false;
+    showState('empty'); return;
+  }
+  showState('ready');
+  const rows = all.slice((page - 1) * size, page * size);
+  $('rows').innerHTML = rows.map((r) => '<tr><td class="tnum">' + fmtDate(r.date) + '</td><td>' + esc(r.name) + '</td><td>' + esc(r.dept) + '</td><td class="num">' + esc(r.cin === '–' ? '—' : r.cin) + '</td><td class="num">' + esc(r.cout === '–' ? '—' : r.cout) + '</td><td class="num">' + esc(r.hours) + '</td><td>' + badge(r.status) + '</td><td>' + badge(r.approval) + '</td></tr>').join('');
+  $('range').textContent = ((page - 1) * size + 1) + '–' + Math.min(page * size, all.length) + ' / ' + all.length + ' bản ghi';
+  $('prev').disabled = page <= 1;
+  $('next').disabled = page >= pages;
+}
+function clearAll() {
+  ui.q = ui.st = ui.ap = ''; applied = { from: '', to: '', dept: '' };
+  for (const id of ['q', 'st', 'ap', 'from', 'to', 'dept']) $(id).value = '';
+  page = 1; render();
+}
+$('prev').addEventListener('click', () => { page--; render(); });
+$('next').addEventListener('click', () => { page++; render(); });
+$('size').addEventListener('change', () => { page = 1; render(); });
+let t;
+$('q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { ui.q = $('q').value; page = 1; render(); }, 200); });
+$('st').addEventListener('change', () => { ui.st = $('st').value; page = 1; render(); });
+$('ap').addEventListener('change', () => { ui.ap = $('ap').value; page = 1; render(); });
+document.querySelector('.filter-toggle').addEventListener('click', function () { const p = $('panel'); p.hidden = !p.hidden; this.setAttribute('aria-expanded', String(!p.hidden)); });
+$('apply').addEventListener('click', () => { applied = { from: $('from').value, to: $('to').value, dept: $('dept').value }; page = 1; render(); });
+$('chips').addEventListener('click', (e) => {
+  const c = e.target.closest('[data-chip]');
+  if (c) { const k = c.dataset.chip; if (k in ui) ui[k] = ''; else applied[k] = ''; $(k).value = ''; page = 1; render(); }
+  if (e.target.id === 'clear-all') clearAll();
+});
+$('empty-action').addEventListener('click', () => (REC.length ? clearAll() : (location.search = '')));
+$('export').addEventListener('click', () => toast('Đã yêu cầu xuất ' + fmtN(list().length) + ' bản ghi chấm công ra Excel.'));
+skeleton($('skel'), 10);
+boot(render, () => { REC = []; });
+</script>
+</body>
+</html>

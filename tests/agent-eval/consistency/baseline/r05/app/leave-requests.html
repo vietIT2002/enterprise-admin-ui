@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đơn nghỉ phép · ChấmCông Pro</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html" aria-current="page">Đơn nghỉ phép</a>
+    <a href="reports.html">Báo cáo</a>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="employees.html">Trang chủ</a> / <a href="leave-requests.html">Nghỉ phép</a> / Đơn nghỉ phép</nav>
+<header class="page-head">
+  <div>
+    <h1>Đơn nghỉ phép</h1>
+    <p class="sub">Duyệt và theo dõi các đơn nghỉ phép của nhân viên.</p>
+  </div>
+  <button class="btn" type="button">Tạo đơn nghỉ</button>
+</header>
+<section class="kpis" aria-label="Tổng quan">
+  <div class="card kpi"><div class="lbl">Chờ duyệt</div><div class="val"><span id="k1">0</span></div></div>
+  <div class="card kpi"><div class="lbl">Đã duyệt</div><div class="val"><span id="k2">0</span></div></div>
+  <div class="card kpi"><div class="lbl">Từ chối</div><div class="val"><span id="k3">0</span></div></div>
+  <div class="card kpi"><div class="lbl">Tổng số ngày</div><div class="val"><span id="k4">0</span></div></div>
+</section>
+<section class="card" aria-label="Danh sách đơn nghỉ phép">
+  <div class="filters">
+    <input type="search" id="q" placeholder="Tìm theo tên nhân viên…" aria-label="Tìm theo tên nhân viên">
+    <div class="chips" role="group" aria-label="Lọc theo trạng thái">
+      <button type="button" aria-pressed="true" data-s="">Tất cả</button>
+      <button type="button" aria-pressed="false" data-s="Chờ duyệt">Chờ duyệt</button>
+      <button type="button" aria-pressed="false" data-s="Đã duyệt">Đã duyệt</button>
+      <button type="button" aria-pressed="false" data-s="Từ chối">Từ chối</button>
+      <button type="button" aria-pressed="false" data-s="Đã hủy">Đã hủy</button>
+    </div>
+  </div>
+  <table data-total-rows="36">
+    <thead><tr><th>Mã đơn</th><th>Nhân viên</th><th>Loại nghỉ</th><th>Từ ngày</th><th>Đến ngày</th><th>Số ngày</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="empty" id="empty" hidden>
+    <p>Không có đơn nghỉ nào khớp bộ lọc.</p>
+    <button type="button" class="btn" id="reset">Xóa bộ lọc</button>
+  </div>
+  <div class="more"><button type="button" class="load-more" id="more">Xem thêm</button></div>
+</section>
+</main>
+<script>
+const DATA = [{"code":"NP-1001","name":"Nguyễn Văn An","dept":"Nhân sự","type":"Nghỉ phép năm","from":"Oct 26","to":"Oct 26","days":1,"reason":"Việc gia đình","status":"Chờ duyệt"},{"code":"NP-1002","name":"Hồ Hoài Cường","dept":"Kế toán","type":"Nghỉ ốm","from":"Oct 28","to":"Oct 29","days":2,"reason":"Khám sức khỏe","status":"Từ chối"},{"code":"NP-1003","name":"Đỗ Minh Hà","dept":"Hành chính","type":"Nghỉ không lương","from":"Oct 30","to":"Nov 1","days":3,"reason":"Về quê","status":"Đã hủy"},{"code":"NP-1004","name":"Bùi Đức Hương","dept":"Sản xuất","type":"Nghỉ việc riêng","from":"Nov 1","to":"Nov 4","days":4,"reason":"Đi du lịch","status":"Chờ duyệt"},{"code":"NP-1005","name":"Đặng Thu Lan","dept":"Mua hàng","type":"Nghỉ thai sản","from":"Nov 3","to":"Nov 3","days":1,"reason":"Chăm con ốm","status":"Chờ duyệt"},{"code":"NP-1006","name":"Vũ Thị Long","dept":"Pháp chế","type":"Nghỉ phép năm","from":"Nov 5","to":"Nov 6","days":2,"reason":"Làm thủ tục giấy tờ","status":"Chờ duyệt"},{"code":"NP-1007","name":"Phan Ngọc Nam","dept":"Kho vận","type":"Nghỉ ốm","from":"Nov 7","to":"Nov 9","days":3,"reason":"Việc gia đình","status":"Đã duyệt"},{"code":"NP-1008","name":"Huỳnh Quốc Lan","dept":"Chăm sóc khách hàng","type":"Nghỉ không lương","from":"Nov 9","to":"Nov 12","days":4,"reason":"Khám sức khỏe","status":"Đã duyệt"},{"code":"NP-1009","name":"Hoàng Văn Long","dept":"Vận hành","type":"Nghỉ việc riêng","from":"Nov 11","to":"Nov 11","days":1,"reason":"Về quê","status":"Đã duyệt"},{"code":"NP-1010","name":"Phạm Hoài Mai","dept":"Kỹ thuật","type":"Nghỉ thai sản","from":"Nov 13","to":"Nov 14","days":2,"reason":"Đi du lịch","status":"Từ chối"},{"code":"NP-1011","name":"Lê Minh Phúc","dept":"Marketing","type":"Nghỉ phép năm","from":"Nov 15","to":"Nov 17","days":3,"reason":"Chăm con ốm","status":"Đã hủy"},{"code":"NP-1012","name":"Trần Đức Sơn","dept":"Kinh doanh","type":"Nghỉ ốm","from":"Nov 17","to":"Nov 20","days":4,"reason":"Làm thủ tục giấy tờ","status":"Chờ duyệt"},{"code":"NP-1013","name":"Nguyễn Thu Tuấn","dept":"Nhân sự","type":"Nghỉ không lương","from":"Nov 19","to":"Nov 19","days":1,"reason":"Việc gia đình","status":"Chờ duyệt"},{"code":"NP-1014","name":"Hồ Thị Yến","dept":"Kế toán","type":"Nghỉ việc riêng","from":"Nov 21","to":"Nov 22","days":2,"reason":"Khám sức khỏe","status":"Chờ duyệt"},{"code":"NP-1015","name":"Đỗ Ngọc Sơn","dept":"Hành chính","type":"Nghỉ thai sản","from":"Nov 23","to":"Nov 25","days":3,"reason":"Về quê","status":"Đã duyệt"},{"code":"NP-1016","name":"Bùi Quốc Tuấn","dept":"Sản xuất","type":"Nghỉ phép năm","from":"Nov 25","to":"Nov 28","days":4,"reason":"Đi du lịch","status":"Đã duyệt"},{"code":"NP-1017","name":"Đặng Văn Yến","dept":"Mua hàng","type":"Nghỉ ốm","from":"Nov 27","to":"Nov 27","days":1,"reason":"Chăm con ốm","status":"Đã duyệt"},{"code":"NP-1018","name":"Vũ Hoài Hạnh","dept":"Pháp chế","type":"Nghỉ không lương","from":"Nov 29","to":"Nov 30","days":2,"reason":"Làm thủ tục giấy tờ","status":"Từ chối"},{"code":"NP-1019","name":"Phan Minh Trang","dept":"Kho vận","type":"Nghỉ việc riêng","from":"Dec 1","to":"Dec 3","days":3,"reason":"Việc gia đình","status":"Đã hủy"},{"code":"NP-1020","name":"Huỳnh Đức Loan","dept":"Chăm sóc khách hàng","type":"Nghỉ thai sản","from":"Dec 3","to":"Dec 6","days":4,"reason":"Khám sức khỏe","status":"Chờ duyệt"},{"code":"NP-1021","name":"Hoàng Thu Cường","dept":"Vận hành","type":"Nghỉ phép năm","from":"Dec 5","to":"Dec 5","days":1,"reason":"Về quê","status":"Chờ duyệt"},{"code":"NP-1022","name":"Phạm Thị Trang","dept":"Kỹ thuật","type":"Nghỉ ốm","from":"Dec 7","to":"Dec 8","days":2,"reason":"Đi du lịch","status":"Chờ duyệt"},{"code":"NP-1023","name":"Lê Ngọc Loan","dept":"Marketing","type":"Nghỉ không lương","from":"Dec 9","to":"Dec 11","days":3,"reason":"Chăm con ốm","status":"Đã duyệt"},{"code":"NP-1024","name":"Trần Quốc Cường","dept":"Kinh doanh","type":"Nghỉ việc riêng","from":"Dec 11","to":"Dec 14","days":4,"reason":"Làm thủ tục giấy tờ","status":"Đã duyệt"},{"code":"NP-1025","name":"Nguyễn Văn Hà","dept":"Nhân sự","type":"Nghỉ thai sản","from":"Dec 13","to":"Dec 13","days":1,"reason":"Việc gia đình","status":"Đã duyệt"},{"code":"NP-1026","name":"Hồ Hoài Hải","dept":"Kế toán","type":"Nghỉ phép năm","from":"Dec 15","to":"Dec 16","days":2,"reason":"Khám sức khỏe","status":"Từ chối"},{"code":"NP-1027","name":"Đỗ Minh Khoa","dept":"Hành chính","type":"Nghỉ ốm","from":"Dec 17","to":"Dec 19","days":3,"reason":"Về quê","status":"Đã hủy"},{"code":"NP-1028","name":"Bùi Đức Linh","dept":"Sản xuất","type":"Nghỉ không lương","from":"Dec 19","to":"Dec 22","days":4,"reason":"Đi du lịch","status":"Chờ duyệt"},{"code":"NP-1029","name":"Đặng Thu Hải","dept":"Mua hàng","type":"Nghỉ việc riêng","from":"Dec 21","to":"Dec 21","days":1,"reason":"Chăm con ốm","status":"Chờ duyệt"},{"code":"NP-1030","name":"Vũ Thị Khoa","dept":"Pháp chế","type":"Nghỉ thai sản","from":"Dec 23","to":"Dec 24","days":2,"reason":"Làm thủ tục giấy tờ","status":"Chờ duyệt"},{"code":"NP-1031","name":"Phan Ngọc Linh","dept":"Kho vận","type":"Nghỉ phép năm","from":"Dec 25","to":"Dec 27","days":3,"reason":"Việc gia đình","status":"Đã duyệt"},{"code":"NP-1032","name":"Huỳnh Quốc Mai","dept":"Chăm sóc khách hàng","type":"Nghỉ ốm","from":"Dec 27","to":"Dec 30","days":4,"reason":"Khám sức khỏe","status":"Đã duyệt"},{"code":"NP-1033","name":"Hoàng Văn Phúc","dept":"Vận hành","type":"Nghỉ không lương","from":"Dec 29","to":"Dec 29","days":1,"reason":"Về quê","status":"Đã duyệt"},{"code":"NP-1034","name":"Phạm Hoài Quân","dept":"Kỹ thuật","type":"Nghỉ việc riêng","from":"Dec 31","to":"Jan 1","days":2,"reason":"Đi du lịch","status":"Từ chối"},{"code":"NP-1035","name":"Lê Minh Thảo","dept":"Marketing","type":"Nghỉ thai sản","from":"Jan 2","to":"Jan 4","days":3,"reason":"Chăm con ốm","status":"Đã hủy"},{"code":"NP-1036","name":"Trần Đức Nam","dept":"Kinh doanh","type":"Nghỉ phép năm","from":"Jan 4","to":"Jan 7","days":4,"reason":"Làm thủ tục giấy tờ","status":"Chờ duyệt"}];
+const STEP = 12;
+let shown = STEP, status = '';
+const $ = (id) => document.getElementById(id);
+const slugOf = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z]+/g, '-');
+const code2 = (t) => t.split(' ').slice(1).map((w) => w[0]).join('').toUpperCase().slice(0, 2);
+function list() {
+  const q = $('q').value.trim().toLowerCase();
+  return DATA.filter((r) => (!q || r.name.toLowerCase().includes(q)) && (!status || r.status === status));
+}
+function render() {
+  const all = list(), rows = all.slice(0, shown);
+  $('rows').innerHTML = rows.map((r) => '<tr data-code="' + r.code + '"><td><div class="code"><span class="avatar">' + code2(r.type) + '</span>' + r.code + '</div></td><td><div class="who">' + r.name + '<small>' + r.reason + '</small></div></td><td>' + r.type + '</td><td>' + r.from + '</td><td>' + r.to + '</td><td>' + r.days + '</td><td><span class="badge b-' + slugOf(r.status) + '">' + r.status + '</span></td><td class="act">' + (r.status === 'Chờ duyệt' ? '<button type="button" class="ok" data-action="approve">Duyệt</button><button type="button" class="no" data-action="reject">Từ chối</button>' : '') + '</td></tr>').join('');
+  $('empty').hidden = rows.length > 0;
+  $('more').hidden = shown >= all.length;
+  $('k1').textContent = DATA.filter((r) => r.status === 'Chờ duyệt').length;
+  $('k2').textContent = DATA.filter((r) => r.status === 'Đã duyệt').length;
+  $('k3').textContent = DATA.filter((r) => r.status === 'Từ chối').length;
+  $('k4').textContent = DATA.reduce((a, r) => a + r.days, 0);
+}
+$('more').addEventListener('click', () => { shown += STEP; render(); });
+$('q').addEventListener('input', () => { shown = STEP; render(); });
+document.querySelector('.chips').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  status = b.dataset.s; shown = STEP;
+  document.querySelectorAll('.chips button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  render();
+});
+$('rows').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button[data-action]'); if (!b) return;
+  const r = DATA.find((x) => x.code === b.closest('tr').dataset.code);
+  r.status = b.dataset.action === 'approve' ? 'Đã duyệt' : 'Từ chối';
+  render();
+});
+$('reset').addEventListener('click', () => { $('q').value = ''; status = ''; shown = STEP; document.querySelectorAll('.chips button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.s === ''))); render(); });
+render();
+</script>
+</body>
+</html>

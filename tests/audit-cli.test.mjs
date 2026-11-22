@@ -37,7 +37,13 @@ try {
 
 const POSIX = process.platform !== 'win32';
 const FAKE_BROWSER = join(ROOT, 'tests/helpers/fake-browser.mjs');
-const profiles = () => readdirSync(tmpdir()).filter((name) => name.startsWith('eaui-audit-'));
+// Each test that looks at the temp profiles gives its CLI child a temp folder of its own, so a profile that another test
+// file's browser run leaves in the shared temp folder (node --test runs files in parallel) is never seen here.
+const profilesIn = (dir) => readdirSync(dir).filter((name) => name.startsWith('eaui-audit-'));
+const ownTmp = () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eaui-own-tmp-'));
+  return { dir, env: { TEMP: dir, TMP: dir, TMPDIR: dir } };
+};
 
 // The CLI gives each page, state and check --timeout seconds (90 by default) and prints only when it is done. A run
 // with --states or --checks opens several tabs, so it gets 30 s per step here and 180 s in all. Then a stalled step
@@ -342,9 +348,14 @@ test('--states fails a page that ignores ?state=', async () => {
 });
 
 test('a page that does not finish within --timeout stops the browser, and the next page still gets audited', async () => {
-  const before = new Set(profiles());
-  const r = await run([`${base}/slow-load`, CLEAN, '--type', 'list', '--timeout', '3', '--json']);
-  assert.deepEqual(profiles().filter((name) => !before.has(name)), [], 'the stopped browser\'s profile is removed too');
+  const own = ownTmp();
+  let r;
+  try {
+    r = await run([`${base}/slow-load`, CLEAN, '--type', 'list', '--timeout', '3', '--json'], { env: own.env });
+    assert.deepEqual(profilesIn(own.dir), [], "the stopped browser's profile is removed too");
+  } finally {
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
   assert.equal(r.code, 2, r.output);
   assert.ok(r.ms < 20000, `took ${r.ms} ms`);
   const [slow, clean] = JSON.parse(r.stdout);
@@ -520,26 +531,31 @@ test('without --checks, no behaviour is checked', async () => {
 });
 
 test('a temp profile left by a killed run is removed by the next run', async () => {
-  const stale = join(tmpdir(), `eaui-audit-left-by-a-killed-run-${process.pid}`);
+  const own = ownTmp();
+  const stale = join(own.dir, `eaui-audit-left-by-a-killed-run-${process.pid}`);
   mkdirSync(stale, { recursive: true });
   const old = Date.now() / 1000 - 2 * 24 * 3600;
   utimesSync(stale, old, old);
   try {
-    assert.equal((await run([CLEAN, '--type', 'list'])).code, 0);
+    assert.equal((await run([CLEAN, '--type', 'list'], { env: own.env })).code, 0);
     assert.equal(existsSync(stale), false);
   } finally {
-    rmSync(stale, { recursive: true, force: true });
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });
 
 test('Ctrl+C stops the run and removes its temp profile', { skip: !POSIX && 'Windows cannot send SIGINT to a child process' }, async () => {
-  const before = new Set(profiles());
-  const child = spawn(process.execPath, [CLI, `${base}/never`], { cwd: ROOT, env: ENV, stdio: 'ignore' });
+  const own = ownTmp();
+  const child = spawn(process.execPath, [CLI, `${base}/never`], { cwd: ROOT, env: { ...ENV, ...own.env }, stdio: 'ignore' });
   await new Promise((resolve) => setTimeout(resolve, 3000)); // the browser is up and the page is settling
   child.kill('SIGINT');
   const code = await new Promise((resolve) => child.once('exit', (c, signal) => resolve(c ?? signal)));
   assert.equal(code, 130);
-  assert.deepEqual(profiles().filter((name) => !before.has(name)), [], 'no temp profile left behind');
+  try {
+    assert.deepEqual(profilesIn(own.dir), [], 'no temp profile left behind');
+  } finally {
+    rmSync(own.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
 });
 
 test('a browser that sends a message that is not JSON exits 2', { skip: !POSIX && 'the fake browser is a script, which Windows cannot run as a program' }, async () => {

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo · ChấmCông Pro</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <a href="reports.html" aria-current="page">Báo cáo</a>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="employees.html">Trang chủ</a> / Báo cáo</nav>
+<header class="page-head">
+  <div>
+    <h1>Báo cáo chấm công tháng <span id="mlabel">10/2026</span></h1>
+    <p class="sub">Tổng hợp theo phòng ban.</p>
+  </div>
+</header>
+<div class="filters"><select id="month" aria-label="Tháng"><option value="10">Tháng 10</option><option value="9">Tháng 9</option><option value="8">Tháng 8</option></select><select id="year" aria-label="Năm"><option>2026</option><option>2025</option></select></div>
+<section class="kpis" aria-label="Tổng quan">
+  <div class="card kpi"><div class="lbl">Tỷ lệ chuyên cần</div><div class="val"><span id="k1">96%</span></div></div>
+  <div class="card kpi"><div class="lbl">Ngày công chuẩn</div><div class="val">22</div></div>
+  <div class="card kpi"><div class="lbl">Giờ làm thêm</div><div class="val"><span id="k3">0</span></div></div>
+  <div class="card kpi"><div class="lbl">Đi muộn</div><div class="val"><span id="k4">0</span></div></div>
+</section>
+<section class="card chart" aria-label="Biểu đồ">
+  <h2>Chuyên cần theo phòng ban</h2>
+  <div class="bars" id="bars"></div>
+</section>
+<section class="card" aria-label="Bảng tổng hợp">
+  <table data-total-rows="12">
+    <thead><tr><th>Phòng ban</th><th class="num">Nhân sự</th><th class="num">Ngày công</th><th class="num">Đi muộn</th><th class="num">Vắng</th><th class="num">Nghỉ phép</th><th class="num">Làm thêm (giờ)</th><th class="num">Chuyên cần</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</section>
+</main>
+<script>
+const DEPTS = [{"d":"Kế toán","hc":4,"i":0},{"d":"Nhân sự","hc":4,"i":1},{"d":"Kinh doanh","hc":4,"i":2},{"d":"Marketing","hc":4,"i":3},{"d":"Kỹ thuật","hc":4,"i":4},{"d":"Vận hành","hc":4,"i":5},{"d":"Chăm sóc khách hàng","hc":4,"i":6},{"d":"Kho vận","hc":4,"i":7},{"d":"Pháp chế","hc":4,"i":8},{"d":"Mua hàng","hc":4,"i":9},{"d":"Sản xuất","hc":4,"i":10},{"d":"Hành chính","hc":4,"i":11}];
+const $ = (id) => document.getElementById(id);
+function render() {
+  const m = +$('month').value;
+  $('mlabel').textContent = m + '/' + $('year').value;
+  let ot = 0, late = 0;
+  $('rows').innerHTML = DEPTS.map((d) => {
+    const days = d.hc * (22 - (d.i + m) % 3), l = (d.i * 3 + m) % 9, v = (d.i + m) % 4, p = (d.i * 2 + m) % 5, o = (d.i * 7 + m * 3) % 40 + 4, rate = 100 - (l + v * 2) * 0.6;
+    ot += o; late += l;
+    return '<tr><td><div class="dept"><span class="avatar">' + d.d.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() + '</span>' + d.d + '</div></td><td class="num">' + d.hc + '</td><td class="num">' + days + '</td><td class="num">' + l + '</td><td class="num">' + v + '</td><td class="num">' + p + '</td><td class="num">' + o + '</td><td class="num">' + rate.toFixed(1).replace('.', ',') + '%</td></tr>';
+  }).join('');
+  $('bars').innerHTML = DEPTS.map((d) => '<span style="height:' + (60 + (d.i * 7 + m) % 40) + '%"></span>').join('');
+  $('k3').textContent = ot; $('k4').textContent = late;
+}
+$('month').addEventListener('change', render); $('year').addEventListener('change', render);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt ca làm việc · ChấmCông Pro</title>
+<link rel="stylesheet" href="app.css">
+<style>[hidden]{display:none !important}.err{margin:0}input[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--danger)}.saved{color:var(--success-fg);margin:0 0 12px}</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <a href="reports.html">Báo cáo</a>
+    <a href="settings.html" aria-current="page">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <div>
+    <h1>Cài đặt</h1>
+    <p class="sub">Thiết lập giờ làm việc mặc định cho toàn công ty.</p>
+  </div>
+</header>
+<div class="settings">
+  <nav class="settings-nav" aria-label="Nhóm cài đặt">
+    <a href="#grp-hours" aria-current="true">Giờ làm việc</a>
+    <a href="#grp-days">Ngày làm việc</a>
+  </nav>
+  <section class="card" aria-label="Cài đặt ca làm việc">
+    <form id="f" novalidate>
+      <div id="errors" role="alert" class="err"></div>
+      <p class="saved" role="status" hidden>Đã lưu cài đặt</p>
+      <fieldset id="grp-hours">
+        <legend>Giờ làm việc</legend>
+        <div class="fld"><label class="block" for="shift">Tên ca *</label><input id="shift" type="text" value="Ca hành chính" required style="width:320px;max-width:100%"></div>
+        <div class="pair">
+          <div class="fld"><label class="block" for="start">Giờ vào *</label><input id="start" type="time" value="08:00" required></div>
+          <div class="fld"><label class="block" for="end">Giờ tan ca *</label><input id="end" type="time" value="17:00" required></div>
+        </div>
+        <div class="fld"><label class="block" for="grace">Số phút cho phép đi muộn</label><input id="grace" type="number" value="5" min="0" max="60" style="width:96px"><p class="help">Từ 0 đến 60 phút. Vào muộn hơn mức này được tính là đi muộn.</p></div>
+      </fieldset>
+      <fieldset id="grp-days">
+        <legend>Ngày làm việc</legend>
+        <div class="days" role="group" aria-label="Ngày làm việc">
+          <label><input type="checkbox" name="day" value="2" checked> Thứ 2</label>
+          <label><input type="checkbox" name="day" value="3" checked> Thứ 3</label>
+          <label><input type="checkbox" name="day" value="4" checked> Thứ 4</label>
+          <label><input type="checkbox" name="day" value="5" checked> Thứ 5</label>
+          <label><input type="checkbox" name="day" value="6" checked> Thứ 6</label>
+          <label><input type="checkbox" name="day" value="7"> Thứ 7</label>
+        </div>
+        <div class="fld" style="margin-top:16px"><label class="block" for="round">Làm tròn công</label><select id="round"><option value="none">Không làm tròn</option><option value="15">15 phút</option><option value="30">30 phút</option></select></div>
+      </fieldset>
+      <div class="sticky-bar">
+        <span class="unsaved" id="unsaved" hidden>Có thay đổi chưa lưu</span>
+        <button class="btn secondary" type="button" id="cancel">Hủy</button>
+        <button class="btn" type="submit" id="save">Lưu thay đổi</button>
+      </div>
+    </form>
+  </section>
+</div>
+</main>
+<script src="app.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+(function () {
+  const m = EA.state(); if (!m) return;
+  const sec = document.querySelector('section.card'), f = $('f');
+  const box = document.createElement('div'); box.className = 'state'; sec.appendChild(box); f.hidden = true;
+  const bl = '<span style="display:block;height:32px;background:#f1f5f9;border-radius:4px"></span>';
+  if (m === 'loading') { sec.setAttribute('aria-busy', 'true'); box.className = 'skel'; box.innerHTML = '<div style="display:grid;gap:12px">' + bl + bl + bl + bl + '</div>'; }
+  else if (m === 'error') { box.setAttribute('role', 'alert'); box.innerHTML = '<strong>Không tải được cài đặt ca làm việc.</strong>Kiểm tra kết nối rồi thử lại.<br><button type="button" class="btn secondary" id="retry">Thử lại</button>'; $('retry').onclick = () => { location.search = ''; }; }
+  else if (m === 'empty') { box.innerHTML = '<strong>Chưa thiết lập ca làm việc.</strong>Công ty chưa có ca mặc định.<br><button type="button" class="btn" id="setup">Thiết lập ca mặc định</button>'; $('setup').onclick = () => { location.search = ''; }; }
+})();
+window.savedSettings = null;
+const read = () => ({ shift: $('shift').value.trim(), start: $('start').value, end: $('end').value, grace: $('grace').value === '' ? NaN : Number($('grace').value), days: [...document.querySelectorAll('input[name=day]:checked')].map((c) => +c.value), round: $('round').value });
+let baseline = JSON.stringify(read()), dirty = false;
+function validate() {
+  const s = read(), errs = [];
+  const add = (id, msg) => errs.push({ id, msg });
+  if (!s.shift) add('shift', 'Nhập tên ca.');
+  if (!s.start) add('start', 'Nhập giờ vào.');
+  if (!s.end) add('end', 'Nhập giờ tan ca.');
+  else if (s.start && s.end <= s.start) add('end', 'Giờ tan ca phải sau giờ vào.');
+  if (!Number.isInteger(s.grace) || s.grace < 0 || s.grace > 60) add('grace', 'Số phút cho phép đi muộn từ 0 đến 60.');
+  if (!s.days.length) add('day-group', 'Chọn ít nhất một ngày làm việc.');
+  return { s, errs };
+}
+function showErrors(errs, focus) {
+  document.querySelectorAll('[aria-invalid]').forEach((e) => e.removeAttribute('aria-invalid'));
+  document.querySelectorAll('.field-error.inline').forEach((e) => e.remove());
+  for (const e of errs) {
+    const el = e.id === 'day-group' ? document.querySelector('input[name=day]') : $(e.id);
+    el.setAttribute('aria-invalid', 'true');
+    const p = document.createElement('p'); p.className = 'field-error inline'; p.textContent = e.msg; (el.closest('.fld') || el.closest('.days')).appendChild(p);
+  }
+  const box = $('errors');
+  if (errs.length >= 3) box.innerHTML = '<div class="summary-box"><strong>Có ' + errs.length + ' lỗi cần sửa:</strong><ul>' + errs.map((e) => '<li><a href="#' + (e.id === 'day-group' ? '' : e.id) + '" data-f="' + e.id + '">' + e.msg + '</a></li>').join('') + '</ul></div>';
+  else box.textContent = errs.map((e) => e.msg).join(' ');
+  if (focus && errs.length) (errs[0].id === 'day-group' ? document.querySelector('input[name=day]') : $(errs[0].id)).focus();
+}
+$('errors').addEventListener('click', (ev) => { const a = ev.target.closest('a[data-f]'); if (!a) return; ev.preventDefault(); (a.dataset.f === 'day-group' ? document.querySelector('input[name=day]') : $(a.dataset.f)).focus(); });
+function mark() { dirty = JSON.stringify(read()) !== baseline; $('unsaved').hidden = !dirty; }
+$('f').addEventListener('input', () => { mark(); document.querySelector('.saved').hidden = true; });
+for (const id of ['shift', 'start', 'end', 'grace']) $(id).addEventListener('blur', () => { const { errs } = validate(); showErrors(errs.filter((e) => e.id === id || (id === 'start' && e.id === 'end' && $('end').value)), false); });
+$('f').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const { s, errs } = validate();
+  showErrors(errs, true);
+  document.querySelector('.saved').hidden = true;
+  if (errs.length) return;
+  window.savedSettings = s;
+  baseline = JSON.stringify(read()); mark();
+  document.querySelector('.saved').hidden = false;
+  EA.toast('Đã lưu cài đặt ca “' + s.shift + '”');
+});
+$('cancel').addEventListener('click', () => {
+  const b = JSON.parse(baseline);
+  $('shift').value = b.shift; $('start').value = b.start; $('end').value = b.end; $('grace').value = b.grace; $('round').value = b.round;
+  document.querySelectorAll('input[name=day]').forEach((c) => { c.checked = b.days.includes(+c.value); });
+  showErrors([], false); mark();
+});
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[href]'); if (!a || !dirty || a.getAttribute('href').startsWith('#')) return;
+  if (!confirm('Bạn có thay đổi chưa lưu. Rời trang và bỏ thay đổi?')) e.preventDefault();
+});
+</script>
+</body>
+</html>

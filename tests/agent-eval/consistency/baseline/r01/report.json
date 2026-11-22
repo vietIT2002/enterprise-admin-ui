@@ -1,0 +1,599 @@
+{
+  "consistency": {
+    "before": {
+      "score": {
+        "consistent": 0,
+        "of": 6
+      },
+      "patterns": {
+        "pagination": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "kinds": [
+                "numbered",
+                "range-text"
+              ],
+              "position": "below"
+            },
+            "timesheets.html": {
+              "kinds": [
+                "page-size-select",
+                "prev-next"
+              ],
+              "position": "below"
+            },
+            "leave-requests.html": {
+              "kinds": [
+                "load-more"
+              ],
+              "position": "below"
+            }
+          }
+        },
+        "filterBar": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "search": "left",
+              "control": "select"
+            },
+            "timesheets.html": {
+              "search": "right",
+              "control": "panel-button"
+            },
+            "leave-requests.html": {
+              "search": "left",
+              "control": "chips"
+            },
+            "reports.html": {
+              "search": "none",
+              "control": "select"
+            }
+          }
+        },
+        "pageHeader": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html",
+            "settings.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "tag": "h1",
+              "fontSize": 28,
+              "action": "header-right",
+              "breadcrumb": false
+            },
+            "timesheets.html": {
+              "tag": "h1",
+              "fontSize": 24,
+              "action": "below-title",
+              "breadcrumb": false
+            },
+            "leave-requests.html": {
+              "tag": "h1",
+              "fontSize": 32,
+              "action": "header-right",
+              "breadcrumb": true
+            },
+            "reports.html": {
+              "tag": "h1",
+              "fontSize": 26,
+              "action": "none",
+              "breadcrumb": true
+            },
+            "settings.html": {
+              "tag": "h1",
+              "fontSize": 22,
+              "action": "none",
+              "breadcrumb": false
+            }
+          }
+        },
+        "statusBadge": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "Đang làm": "#dcfce7",
+              "Thử việc": "#dbeafe",
+              "Nghỉ phép": "#f3e8ff",
+              "Nghỉ thai sản": "#fce7f3",
+              "Tạm hoãn": "#ffedd5"
+            },
+            "timesheets.html": {
+              "Đúng giờ": "#bbf7d0",
+              "Chờ duyệt": "#fef08a",
+              "Làm thêm": "#e9d5ff",
+              "Đã duyệt": "#99f6e4",
+              "Vắng": "#fecaca",
+              "Đi muộn": "#fed7aa",
+              "Nghỉ phép": "#bfdbfe"
+            },
+            "leave-requests.html": {
+              "Chờ duyệt": "#fed7aa",
+              "Từ chối": "#fecaca",
+              "Đã hủy": "#e2e8f0",
+              "Đã duyệt": "#bbf7d0"
+            }
+          }
+        },
+        "dateFormat": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "formats": [
+                "dd/mm/yyyy"
+              ]
+            },
+            "timesheets.html": {
+              "formats": [
+                "iso"
+              ]
+            },
+            "leave-requests.html": {
+              "formats": [
+                "month-name"
+              ]
+            }
+          }
+        },
+        "tableRow": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "height": 72,
+              "rawHeight": 73,
+              "fontSize": 14
+            },
+            "timesheets.html": {
+              "height": 32,
+              "rawHeight": 30,
+              "fontSize": 12
+            },
+            "leave-requests.html": {
+              "height": 60,
+              "rawHeight": 60,
+              "fontSize": 15
+            },
+            "reports.html": {
+              "height": 48,
+              "rawHeight": 49,
+              "fontSize": 13
+            }
+          }
+        }
+      }
+    },
+    "after": {
+      "score": {
+        "consistent": 3,
+        "of": 6
+      },
+      "patterns": {
+        "pagination": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "kinds": [
+                "numbered",
+                "range-text"
+              ],
+              "position": "below"
+            },
+            "timesheets.html": {
+              "kinds": [
+                "page-size-select",
+                "prev-next",
+                "range-text"
+              ],
+              "position": "below"
+            },
+            "leave-requests.html": {
+              "kinds": [
+                "load-more"
+              ],
+              "position": "below"
+            }
+          }
+        },
+        "filterBar": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "search": "left",
+              "control": "select"
+            },
+            "timesheets.html": {
+              "search": "left",
+              "control": "select"
+            },
+            "leave-requests.html": {
+              "search": "left",
+              "control": "chips"
+            },
+            "reports.html": {
+              "search": "none",
+              "control": "select"
+            }
+          }
+        },
+        "pageHeader": {
+          "consistent": false,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html",
+            "settings.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "tag": "h1",
+              "fontSize": 20,
+              "action": "header-right",
+              "breadcrumb": false
+            },
+            "timesheets.html": {
+              "tag": "h1",
+              "fontSize": 20,
+              "action": "header-right",
+              "breadcrumb": false
+            },
+            "leave-requests.html": {
+              "tag": "h1",
+              "fontSize": 20,
+              "action": "header-right",
+              "breadcrumb": true
+            },
+            "reports.html": {
+              "tag": "h1",
+              "fontSize": 20,
+              "action": "none",
+              "breadcrumb": true
+            },
+            "settings.html": {
+              "tag": "h1",
+              "fontSize": 20,
+              "action": "none",
+              "breadcrumb": false
+            }
+          }
+        },
+        "statusBadge": {
+          "consistent": true,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "Nghỉ thai sản": "#eff6ff",
+              "Đang làm": "#f0fdf4",
+              "Tạm hoãn": "#fffbeb",
+              "Thử việc": "#eff6ff",
+              "Nghỉ phép": "#eff6ff"
+            },
+            "timesheets.html": {
+              "Nghỉ phép": "#eff6ff",
+              "Chờ duyệt": "#eff6ff",
+              "Đúng giờ": "#f0fdf4",
+              "Đã duyệt": "#f0fdf4",
+              "Đi muộn": "#fffbeb",
+              "Làm thêm": "#eff6ff",
+              "Vắng": "#fef2f2"
+            },
+            "leave-requests.html": {
+              "Chờ duyệt": "#eff6ff"
+            }
+          }
+        },
+        "dateFormat": {
+          "consistent": true,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "formats": [
+                "dd/mm/yyyy"
+              ]
+            },
+            "timesheets.html": {
+              "formats": [
+                "dd/mm/yyyy"
+              ]
+            },
+            "leave-requests.html": {
+              "formats": [
+                "dd/mm/yyyy"
+              ]
+            }
+          }
+        },
+        "tableRow": {
+          "consistent": true,
+          "counted": true,
+          "present": [
+            "employees.html",
+            "timesheets.html",
+            "leave-requests.html",
+            "reports.html"
+          ],
+          "byPage": {
+            "employees.html": {
+              "height": 40,
+              "rawHeight": 40,
+              "fontSize": 14
+            },
+            "timesheets.html": {
+              "height": 40,
+              "rawHeight": 40,
+              "fontSize": 14
+            },
+            "leave-requests.html": {
+              "height": 40,
+              "rawHeight": 40,
+              "fontSize": 14
+            },
+            "reports.html": {
+              "height": 40,
+              "rawHeight": 40,
+              "fontSize": 14
+            }
+          }
+        }
+      }
+    }
+  },
+  "pages": {
+    "employees.html": {
+      "type": "list",
+      "audit": {
+        "before": {
+          "score": 10,
+          "errors": 7,
+          "warnings": 5
+        },
+        "after": {
+          "score": 100,
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "tells": {
+        "before": [
+          "emoji-icon",
+          "greeting-header",
+          "no-backdrop-blur",
+          "no-gradient",
+          "rainbow-status",
+          "surface-shadow",
+          "table-above-fold",
+          "uppercase-text"
+        ],
+        "after": []
+      },
+      "pixelDiffPct": 44.09,
+      "functionKept": {
+        "ok": true,
+        "problems": [],
+        "evidence": []
+      }
+    },
+    "timesheets.html": {
+      "type": "list",
+      "audit": {
+        "before": {
+          "score": 0,
+          "errors": 9,
+          "warnings": 3
+        },
+        "after": {
+          "score": 100,
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "tells": {
+        "before": [
+          "emoji-icon",
+          "no-gradient",
+          "rainbow-status",
+          "surface-shadow",
+          "table-above-fold",
+          "uppercase-text"
+        ],
+        "after": []
+      },
+      "pixelDiffPct": 36.31,
+      "functionKept": {
+        "ok": true,
+        "problems": [],
+        "evidence": []
+      }
+    },
+    "leave-requests.html": {
+      "type": "list",
+      "audit": {
+        "before": {
+          "score": 0,
+          "errors": 9,
+          "warnings": 4
+        },
+        "after": {
+          "score": 100,
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "tells": {
+        "before": [
+          "emoji-icon",
+          "greeting-header",
+          "initials-avatar-non-person",
+          "no-backdrop-blur",
+          "no-gradient",
+          "surface-shadow",
+          "table-above-fold",
+          "uppercase-text"
+        ],
+        "after": []
+      },
+      "pixelDiffPct": 35.21,
+      "functionKept": {
+        "ok": true,
+        "problems": [],
+        "evidence": []
+      }
+    },
+    "reports.html": {
+      "type": "report",
+      "audit": {
+        "before": {
+          "score": 38,
+          "errors": 5,
+          "warnings": 3
+        },
+        "after": {
+          "score": 100,
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "tells": {
+        "before": [
+          "emoji-icon",
+          "initials-avatar-non-person",
+          "no-gradient",
+          "surface-shadow",
+          "uppercase-text"
+        ],
+        "after": []
+      },
+      "pixelDiffPct": 38.05,
+      "functionKept": {
+        "ok": true,
+        "problems": [],
+        "evidence": []
+      }
+    },
+    "settings.html": {
+      "type": "settings",
+      "audit": {
+        "before": {
+          "score": 52,
+          "errors": 4,
+          "warnings": 2
+        },
+        "after": {
+          "score": 100,
+          "errors": 0,
+          "warnings": 0
+        }
+      },
+      "tells": {
+        "before": [
+          "emoji-icon",
+          "no-gradient",
+          "surface-shadow",
+          "uppercase-text"
+        ],
+        "after": []
+      },
+      "pixelDiffPct": 19.51,
+      "functionKept": {
+        "ok": true,
+        "problems": [],
+        "evidence": []
+      }
+    }
+  },
+  "summary": {
+    "consistency": {
+      "before": {
+        "consistent": 0,
+        "of": 6
+      },
+      "after": {
+        "consistent": 3,
+        "of": 6
+      }
+    },
+    "auditScoreMean": {
+      "before": 20,
+      "after": 100
+    },
+    "tellsTotal": {
+      "before": 31,
+      "after": 0
+    },
+    "pixelDiffPct": {
+      "median": 36.31,
+      "min": 19.51,
+      "max": 44.09
+    },
+    "functionKept": {
+      "ok": 5,
+      "of": 5
+    },
+    "pagesMissing": [],
+    "excluded": []
+  },
+  "generatedAt": "2026-11-22T10:48:48.676Z"
+}

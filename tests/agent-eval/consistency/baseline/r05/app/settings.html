@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt · ChấmCông Pro</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <a href="reports.html">Báo cáo</a>
+    <a href="settings.html" aria-current="page">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <div>
+    <h1>Cài đặt ca làm việc</h1>
+    <p class="sub">Thiết lập giờ làm việc mặc định cho toàn công ty.</p>
+  </div>
+</header>
+<section class="card panel">
+  <form id="f" novalidate>
+    <div class="group">
+      <h2>Giờ làm việc</h2>
+      <label class="f" for="shift">Tên ca<input id="shift" type="text" value="Ca hành chính"></label>
+      <div class="row">
+        <label class="f" for="start">Giờ vào<input id="start" type="time" value="08:00"></label>
+        <label class="f" for="end">Giờ tan ca<input id="end" type="time" value="17:00"></label>
+      </div>
+      <label class="f" for="grace">Số phút cho phép đi muộn<input id="grace" type="number" value="5" min="0" max="60"></label>
+    </div>
+    <div class="group">
+      <h2>Ngày làm việc</h2>
+      <div class="days" role="group" aria-label="Ngày làm việc">
+        <label><input type="checkbox" name="day" value="2" checked> Thứ 2</label>
+        <label><input type="checkbox" name="day" value="3" checked> Thứ 3</label>
+        <label><input type="checkbox" name="day" value="4" checked> Thứ 4</label>
+        <label><input type="checkbox" name="day" value="5" checked> Thứ 5</label>
+        <label><input type="checkbox" name="day" value="6" checked> Thứ 6</label>
+        <label><input type="checkbox" name="day" value="7"> Thứ 7</label>
+      </div>
+      <label class="f" for="round" style="margin-top:16px">Làm tròn công<select id="round"><option value="none">Không làm tròn</option><option value="15">15 phút</option><option value="30">30 phút</option></select></label>
+    </div>
+    <div id="errors" role="alert" class="err"></div>
+    <button class="btn" type="submit">Lưu thay đổi</button>
+    <div class="saved" hidden>Đã lưu cài đặt</div>
+  </form>
+</section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+window.savedSettings = null;
+$('f').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const errs = [];
+  const s = { shift: $('shift').value.trim(), start: $('start').value, end: $('end').value, grace: Number($('grace').value), days: [...document.querySelectorAll('input[name=day]:checked')].map((c) => +c.value), round: $('round').value };
+  if (!s.shift) errs.push('Nhập tên ca.');
+  if (!s.start || !s.end) errs.push('Nhập giờ vào và giờ tan ca.');
+  else if (s.end <= s.start) errs.push('Giờ tan ca phải sau giờ vào.');
+  if (!Number.isInteger(s.grace) || s.grace < 0 || s.grace > 60) errs.push('Số phút cho phép đi muộn từ 0 đến 60.');
+  if (!s.days.length) errs.push('Chọn ít nhất một ngày làm việc.');
+  $('errors').textContent = errs.join(' ');
+  document.querySelector('.saved').hidden = true;
+  if (errs.length) return;
+  window.savedSettings = s;
+  document.querySelector('.saved').hidden = false;
+});
+</script>
+</body>
+</html>

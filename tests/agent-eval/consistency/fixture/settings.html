@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài đặt · ChấmCông Pro</title>
+<style>
+*{box-sizing:border-box}
+.insights{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:24px}.insights .card{min-height:410px}.insights h3{margin:0 0 16px;font-size:18px}.insights li{margin-bottom:14px;color:#475569;font-size:14px}.insights ul{padding-left:18px}
+.bars7{display:flex;align-items:end;gap:14px;height:240px}.bars7 span{flex:1;border-radius:14px 14px 0 0;background:linear-gradient(180deg,#6366f1,#a78bfa)}
+body{margin:0;font-family:system-ui,"Segoe UI",Roboto,Arial,sans-serif;background:#f1f5f9;color:#0f172a;line-height:1.4}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:#0f172a;color:#cbd5e1;padding:24px 14px}
+.logo{display:flex;align-items:center;gap:12px;color:#fff;font-weight:700;font-size:18px;margin:0 6px 32px}
+.logo i{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#6366f1,#a855f7);display:flex;align-items:center;justify-content:center;font-style:normal}
+.sidebar nav a{display:flex;gap:10px;align-items:center;padding:12px 14px;border-radius:12px;color:#cbd5e1;text-decoration:none;font-size:14px;margin-bottom:6px}
+.sidebar nav a[aria-current="page"]{background:#6366f1;color:#fff;box-shadow:0 8px 20px rgba(99,102,241,.45)}
+main{margin-left:240px;padding:32px 40px 56px}
+.card{background:#fff;border-radius:20px;box-shadow:0 10px 25px rgba(15,23,42,.08);padding:24px}
+button{font:inherit;cursor:pointer}
+.btn{border:0;border-radius:12px;padding:10px 18px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;font-weight:600;font-size:14px}
+.btn.ghost{background:#eef2ff;color:#4338ca}
+input,select{font:inherit;font-size:14px;border:1px solid #e2e8f0;border-radius:12px;padding:10px 14px;background:#fff}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;margin:0 0 24px}
+.kpi{display:flex;gap:16px;align-items:center;padding:24px}
+.kpi .ico{width:56px;height:56px;border-radius:18px;font-size:26px;display:flex;align-items:center;justify-content:center;flex:none}
+.kpi .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#64748b;font-weight:600}
+.kpi .val{font-size:32px;font-weight:800;line-height:1.2}
+.kpi .delta{font-size:12px;color:#16a34a;background:#dcfce7;border-radius:999px;padding:2px 8px;margin-left:6px;font-weight:600}
+.blue{background:#dbeafe}.green{background:#dcfce7}.orange{background:#ffedd5}.purple{background:#f3e8ff}.pink{background:#fce7f3}.teal{background:#ccfbf1}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;text-transform:uppercase;letter-spacing:.08em;color:#64748b;font-weight:700;white-space:nowrap}
+td{border-top:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:nth-child(even){background:#f8fafc}
+.badge{display:inline-block;border-radius:999px;padding:3px 12px;font-size:12px;font-weight:600;white-space:nowrap}
+.avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#e0e7ff;color:#4338ca;font-weight:700;flex:none}
+.crumbs{font-size:13px;color:#64748b;margin-bottom:6px}.crumbs a{color:#6366f1;text-decoration:none}
+.page-head h1{margin:0}
+.sub{color:#64748b;margin:4px 0 0;font-size:14px}
+.empty{text-align:center;padding:40px 20px;color:#64748b}
+button:disabled{opacity:.45;cursor:default}
+.hero{border-radius:24px;padding:44px 40px;margin-bottom:24px;background:linear-gradient(120deg,#4f46e5,#7c3aed 60%,#db2777);color:#fff}
+.hero h1{color:#fff}.hero .sub{color:#e0e7ff}
+
+.page-head h1{font-size:22px;font-weight:600}
+.panel{max-width:760px;margin-top:24px;border-radius:24px;padding:32px}
+.group{background:#f8fafc;border-radius:20px;padding:24px;margin-bottom:20px;box-shadow:0 6px 16px rgba(15,23,42,.06)}
+.group h2{margin:0 0 16px;font-size:16px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label.f{display:flex;flex-direction:column;gap:8px;font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:#475569;font-weight:700;margin-bottom:12px}
+label.f input,label.f select{text-transform:none;letter-spacing:0;font-weight:400;color:#0f172a}
+.days{display:flex;gap:10px;flex-wrap:wrap}.days label{font-size:14px;display:flex;gap:6px;align-items:center;background:#fff;border-radius:999px;padding:6px 14px;border:1px solid #e2e8f0}
+.err{color:#b91c1c;font-size:13px;margin:4px 0;text-transform:none}
+.saved[hidden]{display:none}.saved{color:#15803d;background:#dcfce7;border-radius:12px;padding:10px 16px;margin-top:16px;display:inline-block}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo"><i>⏰</i><span>ChấmCông Pro</span></div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html"><span>👥</span> Nhân viên</a>
+    <a href="timesheets.html"><span>🕒</span> Bảng chấm công</a>
+    <a href="leave-requests.html"><span>🏖️</span> Đơn nghỉ phép</a>
+    <a href="reports.html"><span>📊</span> Báo cáo</a>
+    <a href="settings.html" aria-current="page"><span>⚙️</span> Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <h1>Cài đặt ca làm việc</h1>
+  <p class="sub">Thiết lập giờ làm việc mặc định cho toàn công ty.</p>
+</header>
+<section class="card panel">
+  <form id="f" novalidate>
+    <div class="group">
+      <h2>🕘 Giờ làm việc</h2>
+      <label class="f" for="shift">Tên ca<input id="shift" type="text" value="Ca hành chính"></label>
+      <div class="row">
+        <label class="f" for="start">Giờ vào<input id="start" type="time" value="08:00"></label>
+        <label class="f" for="end">Giờ tan ca<input id="end" type="time" value="17:00"></label>
+      </div>
+      <label class="f" for="grace">Số phút cho phép đi muộn<input id="grace" type="number" value="5" min="0" max="60"></label>
+    </div>
+    <div class="group">
+      <h2>📅 Ngày làm việc</h2>
+      <div class="days" role="group" aria-label="Ngày làm việc">
+        <label><input type="checkbox" name="day" value="2" checked> Thứ 2</label>
+        <label><input type="checkbox" name="day" value="3" checked> Thứ 3</label>
+        <label><input type="checkbox" name="day" value="4" checked> Thứ 4</label>
+        <label><input type="checkbox" name="day" value="5" checked> Thứ 5</label>
+        <label><input type="checkbox" name="day" value="6" checked> Thứ 6</label>
+        <label><input type="checkbox" name="day" value="7"> Thứ 7</label>
+      </div>
+      <label class="f" for="round" style="margin-top:16px">Làm tròn công<select id="round"><option value="none">Không làm tròn</option><option value="15">15 phút</option><option value="30">30 phút</option></select></label>
+    </div>
+    <div id="errors" role="alert" class="err"></div>
+    <button class="btn" type="submit">💾 Lưu thay đổi</button>
+    <div class="saved" hidden>Đã lưu cài đặt</div>
+  </form>
+</section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+window.savedSettings = null;
+$('f').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const errs = [];
+  const s = { shift: $('shift').value.trim(), start: $('start').value, end: $('end').value, grace: Number($('grace').value), days: [...document.querySelectorAll('input[name=day]:checked')].map((c) => +c.value), round: $('round').value };
+  if (!s.shift) errs.push('Nhập tên ca.');
+  if (!s.start || !s.end) errs.push('Nhập giờ vào và giờ tan ca.');
+  else if (s.end <= s.start) errs.push('Giờ tan ca phải sau giờ vào.');
+  if (!Number.isInteger(s.grace) || s.grace < 0 || s.grace > 60) errs.push('Số phút cho phép đi muộn từ 0 đến 60.');
+  if (!s.days.length) errs.push('Chọn ít nhất một ngày làm việc.');
+  $('errors').textContent = errs.join(' ');
+  document.querySelector('.saved').hidden = true;
+  if (errs.length) return;
+  window.savedSettings = s;
+  document.querySelector('.saved').hidden = false;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo · ChấmCông Pro</title>
+<link rel="stylesheet" href="app.css">
+<script src="app.js"></script>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a><a href="timesheets.html">Bảng chấm công</a><a href="leave-requests.html">Đơn nghỉ phép</a><a href="reports.html" aria-current="page">Báo cáo</a><a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<header class="page-head">
+  <div>
+    <h1>Chuyên cần · Tháng <span id="mlabel">10/2026</span></h1>
+    <p class="sub">Tổng hợp theo phòng ban. Đơn vị: ngày công, giờ; chuyên cần tính theo tỷ lệ phần trăm. So sánh với tháng trước.</p>
+  </div>
+</header>
+<div class="toolbar"><select id="month" aria-label="Tháng"><option value="10">Tháng 10</option><option value="9">Tháng 9</option><option value="8">Tháng 8</option></select><select id="year" aria-label="Năm"><option>2026</option><option>2025</option></select></div>
+<p class="summary" aria-label="Tổng quan">Tỷ lệ chuyên cần <b id="k1">96%</b><span class="sep">·</span>Ngày công chuẩn <b>22</b><span class="sep">·</span>Giờ làm thêm <b id="k3">0</b><span class="sep">·</span>Lượt đi muộn <b id="k4">0</b></p>
+<div class="card state" id="err" role="alert" hidden>
+  <p class="state-title">Không tải được báo cáo.</p>
+  <p>Kiểm tra kết nối rồi thử lại.</p>
+  <button type="button" class="btn" data-retry>Thử lại</button>
+</div>
+<div id="region">
+<section class="card chart" aria-label="Biểu đồ" style="margin-bottom:16px">
+  <h2>Chuyên cần theo phòng ban (%)</h2>
+  <div id="bars"></div>
+</section>
+<section class="card" aria-label="Bảng tổng hợp">
+  <div class="table-wrap">
+  <table data-total-rows="12">
+    <thead><tr><th>Phòng ban</th><th class="num">Nhân sự</th><th class="num">Ngày công</th><th class="num">Đi muộn</th><th class="num">Vắng</th><th class="num">Nghỉ phép</th><th class="num">Làm thêm (giờ)</th><th class="num">Chuyên cần (%)</th></tr></thead>
+    <tbody id="rows"></tbody>
+    <tfoot id="foot"></tfoot>
+  </table>
+  </div>
+  <div class="state" id="empty" hidden><p class="state-title">Chưa có dữ liệu chấm công cho kỳ này</p><p>Chọn tháng khác hoặc kiểm tra dữ liệu chấm công.</p><a class="btn secondary" href="timesheets.html">Mở bảng chấm công</a></div>
+</section>
+</div>
+</main>
+<script>
+const DEPTS = [{"d":"Kế toán","hc":4,"i":0},{"d":"Nhân sự","hc":4,"i":1},{"d":"Kinh doanh","hc":4,"i":2},{"d":"Marketing","hc":4,"i":3},{"d":"Kỹ thuật","hc":4,"i":4},{"d":"Vận hành","hc":4,"i":5},{"d":"Chăm sóc khách hàng","hc":4,"i":6},{"d":"Kho vận","hc":4,"i":7},{"d":"Pháp chế","hc":4,"i":8},{"d":"Mua hàng","hc":4,"i":9},{"d":"Sản xuất","hc":4,"i":10},{"d":"Hành chính","hc":4,"i":11}];
+const $ = (id) => document.getElementById(id);
+const SRC = AppState.source(DEPTS);
+const vn = new Intl.NumberFormat('vi-VN');
+const pct = (x) => x.toFixed(1).replace('.', ',');
+function render() {
+  if (AppState.held) return;
+  const m = +$('month').value;
+  $('mlabel').textContent = m + '/' + $('year').value;
+  let ot = 0, late = 0, hc = 0, days = 0, vang = 0, leave = 0, wsum = 0;
+  const data = SRC.map((d) => {
+    const dd = d.hc * (22 - (d.i + m) % 3), l = (d.i * 3 + m) % 9, v = (d.i + m) % 4, p = (d.i * 2 + m) % 5, o = (d.i * 7 + m * 3) % 40 + 4, rate = 100 - (l + v * 2) * 0.6;
+    ot += o; late += l; hc += d.hc; days += dd; vang += v; leave += p; wsum += rate * d.hc;
+    return { d: d.d, hc: d.hc, days: dd, l, v, p, o, rate };
+  });
+  $('empty').hidden = data.length > 0;
+  $('rows').innerHTML = data.map((r) => '<tr><td>' + r.d + '</td><td class="num">' + r.hc + '</td><td class="num">' + r.days + '</td><td class="num">' + r.l + '</td><td class="num">' + r.v + '</td><td class="num">' + r.p + '</td><td class="num">' + r.o + '</td><td class="num">' + pct(r.rate) + '</td></tr>').join('');
+  $('foot').innerHTML = data.length ? '<tr><td>Tổng</td><td class="num">' + hc + '</td><td class="num">' + days + '</td><td class="num">' + late + '</td><td class="num">' + vang + '</td><td class="num">' + leave + '</td><td class="num">' + ot + '</td><td class="num">' + pct(wsum / hc) + '</td></tr>' : '';
+  $('bars').innerHTML = data.map((r) => '<div class="hbar"><span>' + r.d + '</span><span class="track"><span class="fill" style="width:' + Math.max(0, (r.rate - 80) / 20 * 100) + '%"></span></span><span class="v">' + pct(r.rate) + '</span></div>').join('') + (data.length ? '<p class="note">Trục từ 80% đến 100%.</p>' : '');
+  $('k1').textContent = data.length ? pct(wsum / hc) + '%' : '—';
+  $('k3').textContent = ot; $('k4').textContent = late;
+}
+$('month').addEventListener('change', render); $('year').addEventListener('change', render);
+AppState.start({ render, tbody: $('rows'), cols: 8, region: $('region'), error: $('err') });
+</script>
+</body>
+</html>

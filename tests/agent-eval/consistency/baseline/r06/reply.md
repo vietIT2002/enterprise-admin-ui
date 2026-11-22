@@ -1,0 +1,11 @@
+# r06 — no skill, P2 ("Redesign this attendance admin so it looks professional and consistent.") — 176 s, 10 tool uses
+- Shared styles.css (removed 5 inline style blocks); one flat style, single indigo accent, 8px radii, thin borders; dropped gradients, glass blur, hero banner, oversized KPI icons, pastel rainbow icon backgrounds.
+- Tables: same header/padding/font/hover everywhere; numeric right-aligned.
+- Status badges: one colour set across pages.
+- KPI cards, filters, pager share one style; KPI grids auto-fit.
+- Page header: breadcrumb + h1 24px + subtitle + primary action right on every page.
+- Greetings replaced with page titles.
+- Removed filler: hard-coded chart, notices box, department highlight cards, tip block, spacer divs.
+- Settings uses same card/input/label styles. Focus outlines, <800px sidebar stacks, tables scroll.
+- Did NOT open pages in a browser; did not edit JS.
+- LEFT ALONE: pagination still differs per page (numbered / Xem thêm / prev-next) — "unifying would mean changing the scripts". Emoji size inline style in timesheets empty state.

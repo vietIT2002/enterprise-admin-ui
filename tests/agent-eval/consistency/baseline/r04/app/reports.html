@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Báo cáo chấm công · ChấmCông Pro</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo">ChấmCông Pro</div>
+  <nav aria-label="Điều hướng chính">
+    <a href="employees.html">Nhân viên</a>
+    <a href="timesheets.html">Bảng chấm công</a>
+    <a href="leave-requests.html">Đơn nghỉ phép</a>
+    <a href="reports.html" aria-current="page">Báo cáo</a>
+    <a href="settings.html">Cài đặt</a>
+  </nav>
+</aside>
+<main>
+<nav class="crumbs" aria-label="Breadcrumb"><a href="employees.html">Trang chủ</a> / Báo cáo</nav>
+<header class="page-head">
+  <div>
+    <h1>Báo cáo chấm công · Tháng <span id="mlabel">10/2026</span></h1>
+    <p class="sub">Tổng hợp theo phòng ban. Đơn vị: ngày công, lần, giờ; tỷ lệ chuyên cần tính theo %.</p>
+  </div>
+  <div class="page-actions"></div>
+</header>
+<div class="filters card" style="margin-bottom:16px"><label>Tháng <select id="month" aria-label="Tháng"><option value="10">Tháng 10</option><option value="9">Tháng 9</option><option value="8">Tháng 8</option></select></label><label>Năm <select id="year" aria-label="Năm"><option>2026</option><option>2025</option></select></label></div>
+<section class="kpis" aria-label="Tổng quan">
+  <div class="card kpi"><div class="lbl">Tỷ lệ chuyên cần</div><div class="val" id="k1" role="status">0%</div></div>
+  <div class="card kpi"><div class="lbl">Ngày công chuẩn</div><div class="val">22</div></div>
+  <div class="card kpi"><div class="lbl">Giờ làm thêm</div><div class="val" id="k3">0</div></div>
+  <div class="card kpi"><div class="lbl">Đi muộn (lần)</div><div class="val" id="k4">0</div></div>
+</section>
+<section class="card chart" aria-label="Biểu đồ">
+  <h2>Chuyên cần theo phòng ban (%)</h2>
+  <div id="bars"></div>
+  <div class="axis" aria-hidden="true"><span></span><div><span>0%</span><span>50%</span><span>100%</span></div><span></span></div>
+</section>
+<section class="card flush" aria-label="Bảng tổng hợp">
+  <div class="tbl-wrap"><table data-total-rows="12">
+    <thead><tr><th>Phòng ban</th><th class="num">Nhân sự</th><th class="num">Ngày công</th><th class="num">Đi muộn</th><th class="num">Vắng</th><th class="num">Nghỉ phép</th><th class="num">Làm thêm (giờ)</th><th class="num">Chuyên cần</th></tr></thead>
+    <tbody id="rows"></tbody>
+    <tfoot id="foot"></tfoot>
+  </table></div>
+</section>
+</main>
+<script src="app.js"></script>
+<script>
+const DEPTS = [{"d":"Kế toán","hc":4,"i":0},{"d":"Nhân sự","hc":4,"i":1},{"d":"Kinh doanh","hc":4,"i":2},{"d":"Marketing","hc":4,"i":3},{"d":"Kỹ thuật","hc":4,"i":4},{"d":"Vận hành","hc":4,"i":5},{"d":"Chăm sóc khách hàng","hc":4,"i":6},{"d":"Kho vận","hc":4,"i":7},{"d":"Pháp chế","hc":4,"i":8},{"d":"Mua hàng","hc":4,"i":9},{"d":"Sản xuất","hc":4,"i":10},{"d":"Hành chính","hc":4,"i":11}];
+const $ = (id) => document.getElementById(id);
+const pct = (x) => x.toFixed(1).replace('.', ',') + '%';
+function render() {
+  if (pageState) {
+    $('bars').innerHTML = ''; $('foot').innerHTML = '';
+    $('rows').innerHTML = pageState === 'loading' ? skeleton(8) : pageState === 'error' ? stateRow(8, 'Không tải được báo cáo chấm công', '', 'retry', 'Thử lại') : stateRow(8, 'Chưa có dữ liệu chấm công cho kỳ này', 'Chọn kỳ khác hoặc quay lại sau khi có bản ghi chấm công.', 'add', 'Chọn tháng 10/2026');
+    return;
+  }
+  const m = +$('month').value;
+  $('mlabel').textContent = m + '/' + $('year').value;
+  const T = { hc: 0, days: 0, l: 0, v: 0, p: 0, o: 0, rate: 0 };
+  const rows = DEPTS.map((d) => {
+    const days = d.hc * (22 - (d.i + m) % 3), l = (d.i * 3 + m) % 9, v = (d.i + m) % 4, p = (d.i * 2 + m) % 5, o = (d.i * 7 + m * 3) % 40 + 4, rate = 100 - (l + v * 2) * 0.6;
+    T.hc += d.hc; T.days += days; T.l += l; T.v += v; T.p += p; T.o += o; T.rate += rate * d.hc;
+    return { d: d.d, hc: d.hc, days, l, v, p, o, rate };
+  });
+  $('rows').innerHTML = rows.map((r) => '<tr><td>' + r.d + '</td><td class="num">' + r.hc + '</td><td class="num">' + r.days + '</td><td class="num">' + r.l + '</td><td class="num">' + r.v + '</td><td class="num">' + r.p + '</td><td class="num">' + r.o + '</td><td class="num">' + pct(r.rate) + '</td></tr>').join('');
+  const avg = T.rate / T.hc;
+  $('foot').innerHTML = '<tr><td>Tổng cộng</td><td class="num">' + T.hc + '</td><td class="num">' + T.days + '</td><td class="num">' + T.l + '</td><td class="num">' + T.v + '</td><td class="num">' + T.p + '</td><td class="num">' + T.o + '</td><td class="num">' + pct(avg) + '</td></tr>';
+  $('bars').innerHTML = rows.map((r) => '<div class="hbar"><span>' + r.d + '</span><div class="track"><span style="width:' + r.rate.toFixed(1) + '%"></span></div><span class="v">' + pct(r.rate) + '</span></div>').join('');
+  $('k1').textContent = pct(avg); $('k3').textContent = T.o; $('k4').textContent = T.l;
+}
+$('month').addEventListener('change', render); $('year').addEventListener('change', render);
+render();
+</script>
+</body>
+</html>
