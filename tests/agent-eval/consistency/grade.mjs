@@ -544,7 +544,7 @@ export function consistency(byPage) {
 // Function kept
 // ---------------------------------------------------------------------------------------------------------------
 // Runs in the page. Copied from settleInPage in skills/enterprise-admin-ui/scripts/audit-cli.mjs (not exported, and the skill is
-// not changed here): wait for a DOM-mutation quiet period, then for loading placeholders (aria-busy, .animate-pulse blocks) to go,
+// not changed here): wait for a DOM-mutation quiet period, then for loading placeholders (aria-busy, and .animate-pulse, skeleton, skel and shimmer blocks; the last three are an addition to the original) to go,
 // both within capMs, then finish animations and scroll to the top. Resolves with the number of placeholders still present.
 async function settleInPage({ quietMs, capMs }) {
   const started = Date.now();
@@ -577,7 +577,7 @@ async function settleInPage({ quietMs, capMs }) {
   };
   const count = () =>
     [...document.querySelectorAll('[aria-busy="true"]')].filter(visible).length +
-    [...document.querySelectorAll('.animate-pulse')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
+    [...document.querySelectorAll('.animate-pulse, [class*="skeleton" i], [class~="skel"], .shimmer')].filter((el) => !el.closest('[aria-busy="true"]') && placeholder(el)).length;
   const left = await new Promise((resolve) => {
     const end = Date.now() + remaining;
     const tick = () => {
@@ -711,7 +711,8 @@ export const PIXEL_THRESHOLD = 32;
 const AUDIT_TELLS = ['no-gradient', 'no-backdrop-blur', 'surface-shadow', 'uppercase-text', 'emoji-icon', 'table-above-fold'];
 const round2 = (n) => Math.round(n * 100) / 100;
 const firstLine = (e) => String((e && e.message) || e).split('\n')[0];
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// unref'd, so a timer that is still pending never keeps the process alive
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms).unref());
 
 // ---- audit: one audit-cli child per page, one at a time ---------------------------------------------------------------------
 function chromiumPath() {
@@ -1082,7 +1083,7 @@ async function captureSide(env, file, name, outDir, side, guardMs) {
       }
       await settle(page);
       res.sigs = await signatures(page);
-      res.detectors = await detectorsOf(page);
+      res.detectors = await detectorsOf(page).catch(() => null);
       const dir = join(outDir, 'screens', side);
       mkdirSync(dir, { recursive: true });
       const stem = name.replace(/\.html?$/i, '');
@@ -1201,7 +1202,7 @@ export async function grade(beforeDir, afterDir, options = {}) {
       else if (paths[side][n]) sigsBySide[side][n] = errorSignatures((c && c.error) || launchError || 'page could not be read');
       if (reason) continue;
       if (!paths[side][n]) reason = `page missing ${side}`;
-      else if (!c || c.error || !c.sigs || !c.detectors) reason = `${side} side failed to load: ${(c && c.error) || launchError || 'page could not be read'}`;
+      else if (!c || c.error || !c.sigs) reason = `${side} side failed to load: ${(c && c.error) || launchError || 'page could not be read'}`;
       else if (audits[side][n] && audits[side][n].error) reason = `${side} audit error: ${audits[side][n].error}`;
     }
     const auditOf = (side) => {
@@ -1220,7 +1221,9 @@ export async function grade(beforeDir, afterDir, options = {}) {
       const aa = audits.after[n];
       if (aa && aa.error) problems.push('audit error: ' + aa.error);
       if (problems.length) for (const e of base.evidence) if (e.startsWith('script error: ')) problems.push('page error: ' + e.slice('script error: '.length));
-      kept = { ok: problems.length === 0, problems, evidence: base.evidence };
+      const evidence = [...base.evidence];
+      for (const side of ['before', 'after']) if (cap[side][n] && cap[side][n].sigs && !cap[side][n].detectors && !cap[side][n].error) evidence.push(`detector tells could not be read (${side})`);
+      kept = { ok: problems.length === 0, problems, evidence };
     }
     if (reason) excluded.push({ page: n, reason });
     pages[n] = {
@@ -1332,5 +1335,7 @@ const isMain = (() => {
 if (isMain) {
   main().then((code) => {
     process.exitCode = code;
+    // leave once the output is flushed, so a browser that will not close can never hold the process
+    process.stdout.write('', () => process.stderr.write('', () => process.exit(code)));
   });
 }

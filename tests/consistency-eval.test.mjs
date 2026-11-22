@@ -6,7 +6,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -1162,42 +1162,77 @@ test('detectors: rainbow-status counts badge-like hues, merges red and rose, and
   assert.equal(await hues(['#ef4444', '#f97316', '#22c55e', '#3b82f6', '#a855f7'].map((c, i) => dot(c, 'Item ' + 'ABCDE'[i])).join('')), 5, 'dot and text badges');
 });
 
-// A rewrite that shows a skeleton first and renders its rows 400 ms later is read after the rows are there.
-const LATE_REPORT = `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo</title>
+const GRADE_FILE = join(ROOT, 'tests', 'agent-eval', 'consistency', 'grade.mjs');
+
+// A rewrite that shows a skeleton first and renders its rows later is read after the rows are there.
+// reports: the skeleton is marked aria-busy / animate-pulse, rows after 400 ms.
+// leave-requests: the skeleton is only a row with class="skeleton-row", rows after 900 ms (after the 300 ms quiet period).
+const lateReport = (skeletonRow, delay) => `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Báo cáo</title>
 <style>body{margin:0;font:14px sans-serif}main{padding:24px}td,th{padding:20px;text-align:left}.skel-block{position:absolute;left:300px;top:200px;width:200px;height:100px;background:#f00}</style></head>
 <body><main><h1>Báo cáo</h1><table><thead><tr><th>Phòng ban</th><th>Nhân sự</th></tr></thead><tbody id="b"></tbody></table></main>
 <script>
 const b = document.getElementById('b');
-b.innerHTML = '<tr class="skel"><td aria-busy="true"><div class="skel-block animate-pulse"></div></td><td></td></tr>';
-setTimeout(() => { b.innerHTML = ['Kế toán', 'Nhân sự', 'Kinh doanh'].map((d, i) => '<tr><td>' + d + '</td><td>' + (4 + i) + '</td></tr>').join(''); }, 400);
+b.innerHTML = '${skeletonRow}';
+setTimeout(() => { b.innerHTML = ['Kế toán', 'Nhân sự', 'Kinh doanh'].map((d, i) => '<tr><td>' + d + '</td><td>' + (4 + i) + '</td></tr>').join(''); }, ${delay});
 </script></body></html>`;
 
-test('grade: a page that renders a skeleton first is read after its rows arrive', { timeout: GRADE_TIMEOUT }, async () => {
-  const copy = tmp('eval-skel-');
-  cpSync(FIXTURE, copy, { recursive: true });
-  writeFileSync(join(copy, 'reports.html'), LATE_REPORT);
-  const outDir = tmp('eval-skel-out-');
-  const report = await grade(FIXTURE, copy, { outDir, auditCli: fakeAuditCli() });
-  const row = report.consistency.after.patterns.tableRow.byPage['reports.html'];
-  assert.ok(row && row.rawHeight >= 55 && row.rawHeight <= 70, `real rows, not the skeleton: ${JSON.stringify(row)}`);
-  assert.equal(report.pages['reports.html'].functionKept.ok, true, JSON.stringify(report.pages['reports.html'].functionKept.problems));
-  const png = readFileSync(join(outDir, 'screens', 'after', 'reports.png')).toString('base64');
+async function pixelAt(png, x, y) {
   const page = await browser.newPage();
   try {
     await page.setContent('<canvas id="c"></canvas>');
-    const px = await page.evaluate(async (b64) => {
-      const im = new Image();
-      im.src = 'data:image/png;base64,' + b64;
-      await im.decode();
-      const c = document.getElementById('c');
-      c.width = im.width;
-      c.height = im.height;
-      const g = c.getContext('2d');
-      g.drawImage(im, 0, 0);
-      return Array.from(g.getImageData(400, 250, 1, 1).data);
-    }, png);
-    assert.notDeepEqual(px.slice(0, 3), [255, 0, 0], 'the skeleton block is not in the screenshot');
+    return await page.evaluate(
+      async ([b64, px, py]) => {
+        const im = new Image();
+        im.src = 'data:image/png;base64,' + b64;
+        await im.decode();
+        const c = document.getElementById('c');
+        c.width = im.width;
+        c.height = im.height;
+        const g = c.getContext('2d');
+        g.drawImage(im, 0, 0);
+        return Array.from(g.getImageData(px, py, 1, 1).data);
+      },
+      [readFileSync(png).toString('base64'), x, y]
+    );
   } finally {
     await page.close();
   }
+}
+
+test('grade: skeleton pages are read after their rows arrive; a detector that throws keeps the page', { timeout: GRADE_TIMEOUT }, async () => {
+  const copy = tmp('eval-skel-');
+  cpSync(FIXTURE, copy, { recursive: true });
+  writeFileSync(join(copy, 'reports.html'), lateReport('<tr class="skel"><td aria-busy="true"><div class="skel-block animate-pulse"></div></td><td></td></tr>', 400));
+  writeFileSync(join(copy, 'leave-requests.html'), lateReport('<tr class="skeleton-row"><td><div class="skel-block"></div></td><td></td></tr>', 900));
+  // every layout call throws: the detectors cannot read this page, but it still loads and is photographed
+  const settings = join(copy, 'settings.html');
+  writeFileSync(settings, readFileSync(settings, 'utf8').replace('<script>', '<script>Element.prototype.getBoundingClientRect = function () { throw new Error("odd markup"); };'));
+  const outDir = tmp('eval-skel-out-');
+  const report = await grade(FIXTURE, copy, { outDir, auditCli: fakeAuditCli() });
+  for (const f of ['reports.html', 'leave-requests.html']) {
+    const row = report.consistency.after.patterns.tableRow.byPage[f];
+    assert.ok(row && row.rawHeight >= 55 && row.rawHeight <= 70, `${f}: real rows, not the skeleton: ${JSON.stringify(row)}`);
+    const px = await pixelAt(join(outDir, 'screens', 'after', f.replace('.html', '.png')), 400, 250);
+    assert.notDeepEqual(px.slice(0, 3), [255, 0, 0], `${f}: the skeleton block is not in the screenshot`);
+  }
+  assert.equal(report.pages['reports.html'].functionKept.ok, true, JSON.stringify(report.pages['reports.html'].functionKept.problems));
+  const s = report.pages['settings.html'];
+  assert.ok(Array.isArray(s.tells.after), 'settings is not excluded');
+  assert.ok(!report.summary.excluded.some((x) => x.page === 'settings.html'), JSON.stringify(report.summary.excluded));
+  assert.ok(s.functionKept.evidence.some((e) => /detector tells could not be read \(after\)/.test(e)), JSON.stringify(s.functionKept.evidence));
+  assert.ok(existsSync(join(outDir, 'screens', 'after', 'settings.png')));
+});
+
+test('grade CLI: a run on one page exits 0 promptly, writes report.json under --out and prints the table', { timeout: 180000 }, async () => {
+  const [before, after, out] = ['eval-cli-b-', 'eval-cli-a-', 'eval-cli-out-'].map(tmp);
+  for (const d of [before, after]) cpSync(join(FIXTURE, 'settings.html'), join(d, 'settings.html'));
+  const started = Date.now();
+  const r = await new Promise((done) =>
+    execFile(process.execPath, [GRADE_FILE, before, after, '--out', out], { timeout: 150000, encoding: 'utf8' }, (err, stdout, stderr) => done({ code: err ? err.code : 0, stdout, stderr }))
+  );
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(Date.now() - started < 60000, `took ${Date.now() - started} ms`);
+  assert.ok(existsSync(join(out, 'report.json')));
+  assert.match(r.stdout, /settings\.html/);
+  assert.match(r.stdout, /Consistency \(before -> after\)/);
 });
