@@ -66,3 +66,17 @@ test('shipped list template: the pager passes the pagination rule', async () => 
     await page.close();
   }
 });
+
+test('list-pager-arrows: the pagination finding names both gaps, and script text is not a total', async () => {
+  const fixture = fixtures.find((f) => f.file === 'list-pager-arrows.html');
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.goto(pathToFileURL(fixture.path).href);
+    await page.addScriptTag({ path: AUDIT });
+    const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
+    const v = result.violations.find((x) => x.rule === 'pagination');
+    assert.equal(v.examples[0].actual, 'no range or total; no page size next to the pager');
+  } finally {
+    await page.close();
+  }
+});
