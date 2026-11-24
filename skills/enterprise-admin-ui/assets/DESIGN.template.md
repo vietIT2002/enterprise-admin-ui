@@ -109,20 +109,6 @@ Cards and panels use a 1px border and no shadow. Only menus, popovers, dialogs a
 
 Build on the project's component library (shadcn/ui unless stated otherwise) and the tokens in `tokens.css`. One icon set (lucide).
 
-## Shared patterns
-
-Every screen uses these. Build each once and reuse it. A screen that cannot follow one names the reason in the Decisions log.
-
-| Pattern | This app |
-|---|---|
-| Pagination | Below the table. "1–25 of 128" on the left. Rows per page (25 · 50 · 100) and Previous / Next on the right. Record lists never use Load more or infinite scroll. |
-| Filter bar | Search on the left (280–320px), up to three filters, More filters (n), chips with Clear all. A filter that appears on several lists uses the same control on all of them. Status is shown as status tabs with counts on every list whose records have a status. |
-| Page header | Breadcrumb on pages that have a parent. Top-level lists have none, or all of them show the module. Title on the left, one primary action on the right. |
-| Status badge | See Status vocabulary. |
-| Dates and numbers | See Locale. |
-| Table rows | 40px, one line. |
-| Empty, loading, error | One component each, used on every list. |
-
 ## Do's and Don'ts
 
 - Do keep list pages table-first; summary numbers live in tab counts or one text line.

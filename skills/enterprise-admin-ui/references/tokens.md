@@ -9,7 +9,6 @@ Read this when you apply `assets/tokens.css` in a project (shadcn, Tailwind v3 o
 - [Changing the accent](#changing-the-accent)
 - [Contrast rules](#contrast-rules)
 - [Mapping to existing design systems](#mapping-to-existing-design-systems)
-- [Replacing a template theme](#replacing-a-template-theme)
 - [Code: Tailwind v3/CDN config and v4 imports](#code-tailwind-v3cdn-config-and-v4-imports)
 - [Single HTML file (Tailwind Play CDN)](#single-html-file-tailwind-play-cdn)
 
@@ -113,23 +112,6 @@ When the project already uses a design system, keep its tokens and map these rol
 | `--control-height` | `controlHeight` (32) | `size="small"` | `size="md"` / `sm` |
 
 Check the muted-text pairing in the existing theme with the contrast rules above before you reuse it.
-
-## Replacing a template theme
-
-Applies only when SKILL.md Scope and precedence allows it: the task covers the whole app (applying this skill to it, redesigning it or giving it a new look), and the project defines the theme itself. A library default (MUI, Ant Design) or an installed kit is not replaced; map it with the table above. A request about some screens keeps the theme.
-
-Change each value where the project defines it, once:
-- **shadcn `globals.css`:** `--radius`, the `--sidebar*` variables in `:root` (a dark `--sidebar` becomes the light slate-50 one; the `.dark` block keeps its dark sidebar), and the shadow classes in the card component (`shadow-*` on `Card` goes; cards are border-only).
-- **Tailwind config:** `theme.extend.borderRadius` (cap at 8px), `boxShadow` (drop card shadows), and `colors` (status colours become the five tones; `primary` stays).
-- **Plain CSS variables:** the same names, or the project's own names set to the values in the table under [What tokens.css defines](#what-tokenscss-defines).
-
-Gradients and glass (`bg-gradient-*`, `backdrop-blur`) are removed from the classes or variables that define them and become the flat `--card` or `--background` surface.
-
-What each becomes is the matching value in `tokens.css`: `--radius` 6px, `--sidebar` `#f8fafc` with `--sidebar-accent` `#e2e8f0`, surfaces white and slate-50, status from the solid colours and the `--neutral-subtle`, `--info-subtle`, `--success-subtle`, `--warning-subtle` and `--danger-subtle` pairs.
-
-The accent stays: `--primary` and its pair (`--primary-foreground`, `--ring`, `--sidebar-primary`) keep the project's value. If neither DESIGN.md nor the user named it as the brand, the reply names the colour in use and offers `#1d4ed8`; see [Changing the accent](#changing-the-accent).
-
-Do this once in the theme. Never fix it as page-level overrides (`!important`, per-page classes) that leave the theme as it was.
 
 ## Code: Tailwind v3/CDN config and v4 imports
 

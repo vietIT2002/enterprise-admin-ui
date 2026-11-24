@@ -12,23 +12,16 @@ People use management software all day to find records, change them safely and s
 
 - These rules apply to screens behind a login in business apps. Marketing pages are out of scope.
 - If the project already has a design system or a customised component library (shadcn theme, Ant Design, MUI, an internal kit), keep its components and tokens and apply the layout, state and behaviour rules below.
-- Exception, when the task covers the whole app (applying this skill to it, redesigning it or giving it a new look): theme values the project defines itself (CSS variables, the Tailwind config, a theme file, shared component classes) that are template tells (`references/anti-patterns.md`: dark sidebar, gradients, glass, card shadows, oversized radius, one colour per status) are replaced with the Foundations values where they are defined (`references/tokens.md`). A request about some screens keeps the theme. Keep the accent and any colour DESIGN.md or the user names as the brand; library defaults and installed kits stay. The reply lists what was replaced and names an accent nobody declared, offering `#1d4ed8`.
 - If the project has no design system, use `assets/tokens.css` (values under Foundations).
 - On app screens these rules take precedence over aesthetic skills for density, colour and decoration.
 
 ## Workflow
 
-1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md` before changing any screen, whatever the request is called (apply, improve, redesign). Fill product, roles, locale, status vocabulary and the accent the project uses from the user or the code. A single standalone file needs no DESIGN.md.
-2. **Shared patterns:** when the task builds, redesigns or applies this skill to two or more screens:
-   - List how each screen does pagination, the filter bar, the page header, status badges, dates and table rows.
-   - Choose one implementation for each: what DESIGN.md already records wins; otherwise use the defaults in its Shared patterns section, and add that section when an existing DESIGN.md lacks it.
-   - Build each one once (one component, partial or shared script) and move every screen to it, behaviour included. A list with Load more gets the same pager as the others.
-   - Keep a different pattern only when the product needs it (an API that pages by cursor only), and write the reason in DESIGN.md and the reply.
-   - A task on one screen of a larger app uses the Shared patterns for what it builds or changes and leaves the rest of that screen and the other screens alone; the reply names the screens that differ and offers to move them.
-3. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, server-side export, approval, background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
-4. **Pick the page type** below and build its anatomy in order.
-5. **Apply** States, Saving, Tables and Foundations.
-6. **Verify** with the audit and the checklist at the end.
+1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md`, filling product, roles, locale and status vocabulary from the user or the code. A single standalone file needs no DESIGN.md.
+2. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, server-side export, approval, background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
+3. **Pick the page type** below and build its anatomy in order.
+4. **Apply** States, Saving, Tables and Foundations.
+5. **Verify** with the audit and the checklist at the end.
 
 ## Every screen ships with
 
@@ -49,7 +42,7 @@ These are the parts most often left out. Build them even for a quick draft:
 3. Filter bar: search + the 2–3 most-used filters, the rest in a "More filters" panel. Applied filters appear as removable chips followed by "Clear all".
 4. The table, starting in the first viewport. Summary figures go into tab counts or one text line above the table ("96 orders · 596.722.000 ₫") — the page has no row of KPI cards.
 5. Bulk selection: header checkbox (checked / indeterminate / empty). Selecting rows shows a bar with "N selected" and the bulk actions; when results span pages the bar offers "Select all 1.284 matching".
-6. Pagination: the app's one pager (DESIGN.md Shared patterns): range and total, Rows per page, Previous / Next. Not Load more.
+6. Pagination with page size and total.
 7. States: first use ("No orders yet" + Create order), no results ("No orders match these filters" + Clear filters), loading skeleton rows, error with Retry.
 
 ### Record detail
@@ -211,7 +204,7 @@ Use these values when the project has no design system; `assets/tokens.css` impl
 When the user asks to review or audit existing screens, report findings instead of rewriting code:
 
 1. Run the audit (see Verify) on each screen and map every violation to its source line.
-2. Walk the page recipe for the screen type, the manual checklist and `references/anti-patterns.md`; each miss is a finding. Compare the screens with each other: a shared pattern built differently on two screens is one `layout` finding that names both files.
+2. Walk the page recipe for the screen type, the manual checklist and `references/anti-patterns.md`; each miss is a finding.
 3. Write one finding per line: `path/to/file.tsx:42 — <rule> — <fix>`, for example `app/orders/page.tsx:88 — numeric-align — add text-right tabular-nums to the Total header and cells`.
 4. Group the findings by level, most severe first: `data` (lost or wrong data: saving, destructive actions) → `states` (missing states) → `a11y` (contrast, names, targets) → `layout` (density and alignment) → `tells` (template tells).
 5. End with the count per level, e.g. `data 1 · states 2 · a11y 3 · layout 4 · tells 2`. Change code when the user asks for fixes.
@@ -223,7 +216,6 @@ When the user asks to review or audit existing screens, report findings instead 
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.
 - **Manual checklist:**
-  - [ ] Every screen uses the same pager, filter controls and page header (DESIGN.md's Shared patterns when the project has one); exceptions are written down
   - [ ] Every list and related list has first-use, no-results, loading and error states
   - [ ] Form fields sit one per row, except a pair that reads as one value
   - [ ] Save stays enabled until submit; the error summary and unsaved-changes warning exist
