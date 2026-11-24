@@ -76,6 +76,12 @@
     return /per page|page size|\/\s*(?:page|trang)|số dòng|hiển thị|mỗi trang/iu.test(String(text || ''));
   }
 
+  // Text that states a page size outright: "Rows per page:", "10 / page", "Số dòng mỗi trang". Bare "Hiển thị" is not enough here
+  // (it also opens range text such as "Hiển thị 1–10 trên 48"); a control labelled "Hiển thị" is judged by isPageSizeLabel.
+  function isPageSizeText(text) {
+    return /per page|page size|\/\s*(?:page|trang)|số dòng|mỗi trang/iu.test(String(text || ''));
+  }
+
   // Amounts, percents and counts. Rejects ids, phone numbers (leading 0) and dates.
   // Currency: symbol or code before (USD 1,250.00, $151,000) or after (1.250.000 VNĐ, 1.250,00 €), any case.
   const NUMERIC_RE = new RegExp(
@@ -794,7 +800,12 @@
     const nameOf = (el) => accessibleName(ctx, el);
 
     const loadMore = controls.find((el) => isLoadMoreName(nameOf(el)));
-    let pager = controls.find((el) => isNextPageName(nameOf(el)) || isNextPageName(el.getAttribute('title')) || (el.getAttribute('rel') || '').split(/\s+/).includes('next'));
+    // Ant Design puts title="Next Page" on the <li> around the Next button; a list item inside the table's rows is not a pager.
+    const itemTitle = (el) => {
+      const li = el.closest('li');
+      return li && scope.contains(li) && !li.closest('thead, tbody') ? li.getAttribute('title') : null;
+    };
+    let pager = controls.find((el) => isNextPageName(nameOf(el)) || isNextPageName(el.getAttribute('title')) || isNextPageName(itemTitle(el)) || (el.getAttribute('rel') || '').split(/\s+/).includes('next'));
     if (!pager) {
       const numbered = controls.filter((el) => /^\d{1,4}$/.test((el.innerText || '').trim()));
       pager = numbered.find((el) => numbered.some((o) => o !== el && o.parentElement === el.parentElement));
@@ -829,10 +840,9 @@
         if (options.some((o) => isPageSizeLabel(o.textContent))) return true;
         return el.tagName === 'SELECT' && options.length > 0 && options.every((o) => sizeOptions.test(o.textContent.trim()));
       };
-      // A transparent size control (Ant's combobox input) still shows its label in the region text. "Hiển thị 1–10 trên 48" is a
-      // range, not a size label, so "Hiển thị" is left out of this text check (a control labelled "Hiển thị" still counts below).
+      // A transparent size control (Ant's combobox input) still shows its label in the region text.
       const sizeSel = 'select, [role="combobox"], [aria-haspopup="listbox"]';
-      const hasSize = isPageSizeLabel(regionText.replace(/hiển thị/giu, '')) ||parts.some((part) => Array.from(part.querySelectorAll(sizeSel)).concat(part.matches(sizeSel) ? [part] : []).some((el) => ctx.visible(el) && isSize(el)));
+      const hasSize = isPageSizeText(regionText) || parts.some((part) => Array.from(part.querySelectorAll(sizeSel)).concat(part.matches(sizeSel) ? [part] : []).some((el) => ctx.visible(el) && isSize(el)));
       if (!hasSize) missing.push('no page size next to the pager');
     }
     if (!missing.length) return;
@@ -1305,6 +1315,7 @@
     isNextPageName,
     isLoadMoreName,
     isPageSizeLabel,
+    isPageSizeText,
   };
   root.enterpriseAdminAudit = audit;
 })(typeof window !== 'undefined' ? window : globalThis);

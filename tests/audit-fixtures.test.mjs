@@ -80,3 +80,19 @@ test('list-pager-arrows: the pagination finding names both gaps, and script text
     await page.close();
   }
 });
+
+test('pager fixtures are measured, not clean because nothing was found', async () => {
+  for (const file of ['list-pager-ant.html', 'list-pager-mui4.html', 'list-pager-tfoot.html']) {
+    const fixture = fixtures.find((f) => f.file === file);
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    try {
+      await page.goto(pathToFileURL(fixture.path).href);
+      await page.addScriptTag({ path: AUDIT });
+      const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
+      assert.equal(result.metrics.applicable.pagination, 1, `${file}: pagination not measured`);
+      assert.deepEqual(result.violations.filter((v) => v.rule === 'pagination'), [], file);
+    } finally {
+      await page.close();
+    }
+  }
+});

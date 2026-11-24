@@ -130,3 +130,8 @@ test('isPageSizeLabel: page-size labels and options', () => {
   for (const text of ['Rows per page', 'Rows per page:', '25 per page', 'Page size', 'Items per page', '10 / page', '10 / trang', 'Số dòng', 'Số dòng mỗi trang', 'Hiển thị', 'Mỗi trang']) assert.equal(t.isPageSizeLabel(text), true, text);
   for (const text of ['Status', 'All statuses', 'Owner', '']) assert.equal(t.isPageSizeLabel(text), false, text);
 });
+
+test('isPageSizeText: explicit page-size wording only', () => {
+  for (const text of ['Rows per page:', '10 / page', '10 / trang', 'Số dòng mỗi trang', '25 per page', 'Page size']) assert.equal(t.isPageSizeText(text), true, text);
+  for (const text of ['Hiển thị 1–10 trên 48', 'Hiển thị', '1–25 of 128', 'Status', '']) assert.equal(t.isPageSizeText(text), false, text);
+});
