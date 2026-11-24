@@ -12,19 +12,19 @@ People use management software all day to find records, change them safely and s
 
 - These rules apply to screens behind a login in business apps. Marketing pages are out of scope.
 - If the project already has a design system or a customised component library (shadcn theme, Ant Design, MUI, an internal kit), keep its components and tokens and apply the layout, state and behaviour rules below.
-- Exception, when the task applies this skill to the whole app, redesigns it or asks for a new look: theme values the project defines itself (CSS variables, the Tailwind config, a theme file) that are template tells (`references/anti-patterns.md`: dark sidebar, gradients, glass, card shadows, oversized radius, one colour per status) are replaced with the Foundations values where they are defined (`references/tokens.md`). Keep the accent and any colour DESIGN.md or the user names as the brand; library defaults and installed kits stay. The reply lists what was replaced and names an accent nobody declared, offering `#1d4ed8`.
+- Exception, when the task covers the whole app (applying this skill to it, redesigning it or giving it a new look): theme values the project defines itself (CSS variables, the Tailwind config, a theme file, shared component classes) that are template tells (`references/anti-patterns.md`: dark sidebar, gradients, glass, card shadows, oversized radius, one colour per status) are replaced with the Foundations values where they are defined (`references/tokens.md`). A request about some screens keeps the theme. Keep the accent and any colour DESIGN.md or the user names as the brand; library defaults and installed kits stay. The reply lists what was replaced and names an accent nobody declared, offering `#1d4ed8`.
 - If the project has no design system, use `assets/tokens.css` (values under Foundations).
 - On app screens these rules take precedence over aesthetic skills for density, colour and decoration.
 
 ## Workflow
 
-1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md` before changing any screen, whatever the request is called (apply, improve, redesign). Fill product, roles, locale and status vocabulary from the user or the code. A single standalone file needs no DESIGN.md.
+1. **Read `DESIGN.md`** at the project root. If the project has no DESIGN.md and more than one screen, create it from `assets/DESIGN.template.md` before changing any screen, whatever the request is called (apply, improve, redesign). Fill product, roles, locale, status vocabulary and the accent the project uses from the user or the code. A single standalone file needs no DESIGN.md.
 2. **Shared patterns:** when the task builds, redesigns or applies this skill to two or more screens:
    - List how each screen does pagination, the filter bar, the page header, status badges, dates and table rows.
-   - Choose one implementation for each: DESIGN.md's Shared patterns, or its defaults.
+   - Choose one implementation for each: what DESIGN.md already records wins; otherwise use the defaults in its Shared patterns section, and add that section when an existing DESIGN.md lacks it.
    - Build each one once (one component, partial or shared script) and move every screen to it, behaviour included. A list with Load more gets the same pager as the others.
    - Keep a different pattern only when the product needs it (an API that pages by cursor only), and write the reason in DESIGN.md and the reply.
-   - A task on one screen gives that screen the Shared patterns, lists the screens that still differ in DESIGN.md and offers to move them, and leaves them alone.
+   - A task on one screen of a larger app uses the Shared patterns for what it builds or changes and leaves the rest of that screen and the other screens alone; the reply names the screens that differ and offers to move them.
 3. **Model the work:** the entity (orders, invoices, employees…), the roles using the screen, the 1–3 tasks they come to do, and how many records they see. Before adding an action that changes the workflow (Save draft, server-side export, approval, background job), check that the product supports it (a status, an endpoint, a permission). If it does not, leave the action out and say what is missing; never invent roles, calculations or status transitions.
 4. **Pick the page type** below and build its anatomy in order.
 5. **Apply** States, Saving, Tables and Foundations.
@@ -223,7 +223,7 @@ When the user asks to review or audit existing screens, report findings instead 
   - With Playwright, use `page.addScriptTag({ path })` then `page.evaluate(...)`.
   - Fix every ✗ error and review every ! warning.
 - **Manual checklist:**
-  - [ ] Every screen uses DESIGN.md's Shared patterns: the same pager, filter controls and page header; exceptions are written down
+  - [ ] Every screen uses the same pager, filter controls and page header (DESIGN.md's Shared patterns when the project has one); exceptions are written down
   - [ ] Every list and related list has first-use, no-results, loading and error states
   - [ ] Form fields sit one per row, except a pair that reads as one value
   - [ ] Save stays enabled until submit; the error summary and unsaved-changes warning exist

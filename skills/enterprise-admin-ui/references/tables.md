@@ -87,7 +87,7 @@ Read this when you build any data table: a list page, a related list on a detail
 ## Pagination and large data
 
 - Every list of the app uses the same pager component (DESIGN.md Shared patterns). Pagination sits at the bottom of the table [Carbon, Ant]. Layout: "1–50 of 1.284" on the left; page-size select (25, 50, 100) and Previous / page numbers / Next on the right.
-- Paginate once there are more than 50 rows [Polaris]. Every paged list shows the page-size select, so the pager is the same on every list, and a "Go to page" jumper beyond 5 pages [Ant].
+- Paginate once there are more than 50 rows [Polaris]. Every paged list shows the page-size select, so the pager is the same on every list. When lists can run past 5 pages, the shared pager gets a "Go to page" jumper [Ant].
 - Always show the total. When the exact count is expensive, show "50+" rather than nothing.
 - Up to about 200 rows a plain table renders fine. Beyond that, virtualise rows (`@tanstack/react-virtual`) with fixed row heights, which is one more reason for single-line 40px rows [Fiori].
 - Record lists use the pager, not Load more or infinite scroll; those suit feeds (activity, notifications). A feed with infinite scroll shows "50 of 1.284 loaded" and restores the scroll position when the user returns from a detail page [NN/g].

@@ -31,7 +31,7 @@ Rules:
 - Use the right control: multi-select with checkboxes for status, date-range picker for dates, number range for amounts, searchable select (combobox) when a list has more than about 10 options.
 - Do not put KPI cards or charts between the header and this bar. Summary figures go into tab counts or one text line above the table ("96 orders · 596.722.000 ₫").
 - The whole bar fits one row at 1280px. Wrapping is the sign that too many filters are promoted.
-- One app, one filter bar: a filter that appears on several lists (Status, Date, Owner) uses the same control in the same place on all of them; status tabs on one list and a Status select on another read as two products. Record the choice in DESIGN.md's Shared patterns.
+- One app, one filter bar: a filter that appears on several lists (Status, Date, Owner) uses the same control in the same place on all of them; status tabs on one list and a Status select on another read as two products. When the task covers several lists, record the choice in DESIGN.md's Shared patterns.
 
 ## Live vs Apply
 

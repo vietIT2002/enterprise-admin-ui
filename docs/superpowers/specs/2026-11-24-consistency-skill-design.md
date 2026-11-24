@@ -113,8 +113,8 @@ Amend the existing design-system line (SKILL.md:14) as follows:
 - Reason: the user rejected option C because it would break a company's real design system.
 
 **When it runs (my call after the builder check).**
-- Only when the task applies the skill to the app, redesigns it, or asks for a new look.
-- On a narrower task, such as "add a Status filter to Orders", the theme stays and the reply may name the tells it saw.
+- Only when the task covers the whole app: applying the skill to it, redesigning it, or giving it a new look. Shared component classes count as theme values.
+- On a narrower task, such as "add a Status filter to Orders", the theme stays and the reply may name the tells it saw. A request about some screens keeps the theme.
 - Reason: this follows R3's acceptance criterion "an existing theme survives a narrowly scoped change", and anti-goal 1.
 
 **READMEs.** The promise that the design system "always wins" changes to match this. It appears in `README.md` "What it is for" and in the FAQ "Will it fight my design system?", and in the same places in `README.vi.md` and `README.zh-CN.md`.
@@ -140,7 +140,7 @@ The later steps are renumbered.
 
 **One screen of an app whose screens disagree (my call after the builder check).**
 - The changed screen takes the target pattern from DESIGN.md's Shared patterns. When the section is new, that means its defaults.
-- DESIGN.md lists the screens not yet moved, and the reply offers to move them.
+- The reply names the screens that differ and offers to move them. DESIGN.md is not edited on a one-screen task.
 - The other screens stay as they are.
 - Reason: copying one of the disagreeing screens would pick a pattern at random. The `pagination` rule already points to the default, and the user asked for a change to one screen only.
 
@@ -254,7 +254,7 @@ These are proposed bars for the re-measurement, which uses the same prompts, mod
 - The accent kept in every run, and named in the reply when it was undeclared.
 
 **Scope and review (scenarios added in part 3):**
-- **One screen in a multi-screen app.** A request to change one screen changes that screen and `DESIGN.md` only (anti-goal 1).
+- **One screen in a multi-screen app.** A request to change one screen changes that screen only (anti-goal 1).
 - **R3's S1 and S3 re-run.** In S1 the change touches one file only. In S3, a review, nothing is modified (`tests/agent-eval/r3/scenarios.md`).
 - Part 3's design decides whether a cursor-only pager scenario (anti-goal 2) is worth its cost.
 

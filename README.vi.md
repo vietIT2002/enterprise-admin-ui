@@ -172,7 +172,7 @@ Skill dành cho các màn hình nằm sau màn hình đăng nhập:
 
 Skill không dành cho landing page hay website marketing. Với những trang đó, hãy dùng một skill về thẩm mỹ như `frontend-design`.
 
-Nếu dự án đã có design system, skill giữ nguyên component và token của bạn và áp dụng các quy tắc về bố cục, trạng thái và hành vi. Khi bạn áp dụng skill cho toàn bộ app hoặc yêu cầu thiết kế lại, skill thay các giá trị đặc trưng của template trong theme do chính dự án định nghĩa (sidebar tối, gradient, đổ bóng card, bo góc quá lớn), giữ màu nhấn và màu thương hiệu của bạn, và liệt kê những gì đã thay.
+Nếu dự án đã có design system, skill giữ nguyên component và token của bạn và áp dụng các quy tắc về bố cục, trạng thái và hành vi. Khi bạn áp dụng skill cho toàn bộ app hoặc yêu cầu thiết kế lại toàn bộ app, skill thay các dấu hiệu template trong theme do chính dự án định nghĩa (sidebar tối, gradient, đổ bóng card, bo góc quá lớn), giữ màu nhấn và màu thương hiệu của bạn, và liệt kê những gì đã thay.
 
 ## Bên trong có gì
 
@@ -313,7 +313,7 @@ Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm 
 
 ## Câu hỏi thường gặp
 
-**Skill có xung đột với design system của tôi không?** Không. Design system từ thư viện hoặc bộ kit nội bộ luôn được ưu tiên. Theme do chính dự án định nghĩa cũng được giữ, trừ các giá trị đặc trưng của template; skill chỉ thay chúng khi bạn áp dụng cho toàn bộ app hoặc yêu cầu thiết kế lại. Skill giữ màu nhấn của bạn và liệt kê những gì đã đổi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
+**Skill có xung đột với design system của tôi không?** Không. Design system từ thư viện hoặc bộ kit nội bộ luôn được ưu tiên. Theme do chính dự án định nghĩa cũng được giữ, trừ các dấu hiệu template; skill chỉ thay chúng khi bạn áp dụng cho toàn bộ app hoặc yêu cầu thiết kế lại toàn bộ app. Skill giữ màu nhấn và màu thương hiệu của bạn và liệt kê những gì đã đổi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
 
 **Skill tốn bao nhiêu token?** `SKILL.md` dài 257 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
 

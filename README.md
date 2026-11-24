@@ -172,7 +172,7 @@ The skill covers screens behind a login:
 
 It is not for landing pages or marketing sites. For those, use an aesthetics skill such as `frontend-design`.
 
-If your project already has a design system, the skill keeps your components and tokens and applies the layout, state and behaviour rules. When you apply it to the whole app or ask for a redesign, it replaces template-tell values in a theme your project defines itself (dark sidebar, gradients, card shadows, oversized radius), keeps your accent and brand colours, and lists what it replaced.
+If your project already has a design system, the skill keeps your components and tokens and applies the layout, state and behaviour rules. When you apply it to the whole app or ask to redesign the whole app, it replaces template-tell values in a theme your project defines itself (dark sidebar, gradients, card shadows, oversized radius), keeps your accent and brand colours, and lists what it replaced.
 
 ## What's inside
 
@@ -310,7 +310,7 @@ The skills work together. Use an aesthetics skill for the marketing site and thi
 
 ## FAQ
 
-**Will it fight my design system?** No. A design system from a library or an internal kit always wins. A theme your project defines itself is kept too, except template-tell values, which the skill replaces only when you apply it to the whole app or ask for a redesign. It keeps your accent and lists what it changed. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
+**Will it fight my design system?** No. A design system from a library or an internal kit always wins. A theme your project defines itself is kept too, except template-tell values, which the skill replaces only when you apply it to the whole app or ask to redesign the whole app. It keeps your accent and brand colours and lists what it changed. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
 
 **How many tokens does it cost?** `SKILL.md` is 257 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
 
