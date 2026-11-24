@@ -20,7 +20,7 @@
 
 **Đo trên các màn hình không ai tinh chỉnh skill cho chúng** (12 màn hình, checklist viết độc lập, chấm mù): các trang dựng với skill làm được **44%** những gì mỗi màn hình cần, so với **19%** khi không có skill. Theo nhóm: trạng thái trống, đang tải và lỗi 12% → 59%; tìm kiếm, bộ lọc và số đếm 16% → 54%; xác nhận trước khi xóa 25% → 63%. Skill giúp agent làm đúng nhiều hơn gấp đôi, và phần còn lại vẫn cần bạn kiểm tra. [Cách đo](#kết-quả).
 
-[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
+[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 23](https://img.shields.io/badge/audit%20rules-23-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
 ## Cài đặt
 
@@ -180,7 +180,7 @@ Nếu dự án đã có design system hoặc thư viện component tùy biến, 
 skills/enterprise-admin-ui/
 ├─ SKILL.md            249 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
 ├─ references/         17 file, chỉ nạp khi tác vụ cần
-├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 22 quy tắc, điểm 0–100
+├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 23 quy tắc, điểm 0–100
 ├─ scripts/audit-cli.mjs  chạy audit từ terminal bằng Chrome hoặc Edge chạy ngầm, không cần thư viện ngoài; --states và --checks kiểm tra trạng thái và hành vi
 └─ assets/
    ├─ templates/           tùy chọn: trang danh sách, chi tiết và form dạng một file HTML

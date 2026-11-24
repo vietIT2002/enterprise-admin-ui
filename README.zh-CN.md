@@ -20,7 +20,7 @@
 
 **在没人为它调优过的界面上实测**（12 个界面，清单独立编写，盲评）：使用本技能生成的页面完成了每个界面所需内容的 **44%**，不使用时为 **19%**。按主题：空、加载和错误状态 12% → 59%；搜索、筛选和计数 16% → 54%；删除前确认 25% → 63%。它让 Agent 做对的部分翻了一倍多，剩下的仍需你来检查。[测量方法](#效果)。
 
-[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
+[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：23](https://img.shields.io/badge/audit%20rules-23-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
 ## 安装
 
@@ -180,7 +180,7 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 skills/enterprise-admin-ui/
 ├─ SKILL.md            249 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         17 个文件，仅在任务需要时加载
-├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
+├─ scripts/audit.js    无依赖的浏览器审计脚本，23 条规则，评分 0–100
 ├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖；--states 和 --checks 检查状态与行为
 └─ assets/
    ├─ templates/           可选：单文件的列表、详情和表单页面

@@ -20,7 +20,7 @@
 
 **Measured on screens nobody tuned it for** (12 screens, checklists written independently, reviewed blind): pages built with the skill did **44%** of what each screen needed, against **19%** without it. By theme: empty, loading and error states 12% → 59%; search, filters and counts 16% → 54%; a confirmation before deleting 25% → 63%. It more than doubles what agents get right and leaves the rest for your review. [How this was measured](#results).
 
-[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 17](https://img.shields.io/badge/references-17-blue) ![Audit rules: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Version 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
+[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![License: MIT](https://img.shields.io/badge/license-MIT-blue) ![References: 17](https://img.shields.io/badge/references-17-blue) ![Audit rules: 23](https://img.shields.io/badge/audit%20rules-23-blue) ![Version 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
 ## Install
 
@@ -180,7 +180,7 @@ If your project already has a design system or a customised component library, t
 skills/enterprise-admin-ui/
 ├─ SKILL.md            249 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         17 files, loaded only when the task needs them
-├─ scripts/audit.js    dependency-free browser audit, 22 rules, score 0–100
+├─ scripts/audit.js    dependency-free browser audit, 23 rules, score 0–100
 ├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies; --states and --checks test the states and behaviour
 └─ assets/
    ├─ templates/           optional single-file list, detail and form pages
