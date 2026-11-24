@@ -172,13 +172,13 @@ The skill covers screens behind a login:
 
 It is not for landing pages or marketing sites. For those, use an aesthetics skill such as `frontend-design`.
 
-If your project already has a design system or a customised component library, the skill keeps your components and tokens and applies only the layout, state and behaviour rules.
+If your project already has a design system, the skill keeps your components and tokens and applies the layout, state and behaviour rules. When you apply it to the whole app or ask for a redesign, it replaces template-tell values in a theme your project defines itself (dark sidebar, gradients, card shadows, oversized radius), keeps your accent and brand colours, and lists what it replaced.
 
 ## What's inside
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            256 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
+├─ SKILL.md            257 lines: workflow, page recipes, states, saving, tables, foundations, Review mode
 ├─ references/         17 files, loaded only when the task needs them
 ├─ scripts/audit.js    dependency-free browser audit, 23 rules, score 0–100
 ├─ scripts/audit-cli.mjs  runs the audit from a terminal in headless Chrome or Edge, no dependencies; --states and --checks test the states and behaviour
@@ -310,9 +310,9 @@ The skills work together. Use an aesthetics skill for the marketing site and thi
 
 ## FAQ
 
-**Will it fight my design system?** No. A project design system or customised component library always wins; the skill then applies only layout, state and behaviour rules. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
+**Will it fight my design system?** No. A design system from a library or an internal kit always wins. A theme your project defines itself is kept too, except template-tell values, which the skill replaces only when you apply it to the whole app or ask for a redesign. It keeps your accent and lists what it changed. A `DESIGN.md` in the project records your accent, density and status vocabulary, and the skill reads it first.
 
-**How many tokens does it cost?** `SKILL.md` is 256 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
+**How many tokens does it cost?** `SKILL.md` is 257 lines (about 20 KB, roughly 5k tokens). References load only when the task needs them, for example `tables.md` for a table.
 
 **Does it handle Vietnamese and other locales?** Yes. Formatting goes through `Intl` with the project locale. `data-formatting.md` has a vi-VN profile:
 - `1.250.000 ₫`;

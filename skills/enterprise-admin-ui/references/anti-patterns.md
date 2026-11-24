@@ -23,6 +23,7 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
   - **Detect:** an audit rule from `scripts/audit.js` (run in a browser, see SKILL.md Verify), an `rg` command for the source, or both.
 - In each `rg` command, replace `src` with the screen's source folder or file. Most single-line patterns also work with `grep -rnE`; `rg -U` patterns span lines.
 - A pattern finds candidates. Open each hit and confirm it before you report it: a shadow on a menu or dialog, or initials for an employee, is correct.
+- In a project with its own theme, fix a tell where the theme defines it (a CSS variable, the Tailwind config, a shared component's classes), once, not on each page; SKILL.md Scope and precedence says when.
 
 ## Entries
 

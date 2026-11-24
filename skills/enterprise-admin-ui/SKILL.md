@@ -12,6 +12,7 @@ People use management software all day to find records, change them safely and s
 
 - These rules apply to screens behind a login in business apps. Marketing pages are out of scope.
 - If the project already has a design system or a customised component library (shadcn theme, Ant Design, MUI, an internal kit), keep its components and tokens and apply the layout, state and behaviour rules below.
+- Exception, when the task applies this skill to the whole app, redesigns it or asks for a new look: theme values the project defines itself (CSS variables, the Tailwind config, a theme file) that are template tells (`references/anti-patterns.md`: dark sidebar, gradients, glass, card shadows, oversized radius, one colour per status) are replaced with the Foundations values where they are defined (`references/tokens.md`). Keep the accent and any colour DESIGN.md or the user names as the brand; library defaults and installed kits stay. The reply lists what was replaced and names an accent nobody declared, offering `#1d4ed8`.
 - If the project has no design system, use `assets/tokens.css` (values under Foundations).
 - On app screens these rules take precedence over aesthetic skills for density, colour and decoration.
 

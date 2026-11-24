@@ -36,6 +36,7 @@ All notable changes to this project are documented here. The format follows [Kee
   It is not part of the workflow (benchmark SCREEN-A).
 
 ### Changed
+- Theme exception in SKILL.md Scope and precedence. When the task applies the skill to the whole app, redesigns it or asks for a new look, theme values the project defines itself (CSS variables, the Tailwind config, a theme file) that are template tells (dark sidebar, gradients, glass, card shadows, oversized radius, one colour per status) are replaced with the Foundations values where they are defined, once, never as page-level overrides. It keeps the accent and any colour DESIGN.md or the user names as the brand, and library defaults and installed kits stay. A narrowly scoped task keeps the theme. The reply lists what was replaced and names an accent nobody declared, offering `#1d4ed8`. `tokens.md` has a `## Replacing a template theme` section, and the anti-patterns How to use list says to fix a tell where the theme defines it.
 - DESIGN.md is created from the template whatever the request is called (apply, improve, redesign).
 - `tables.md` shows the page-size select on every paged list, not only above 50 rows.
 - Load more and infinite scroll are for feeds (activity, notifications), not record lists.
