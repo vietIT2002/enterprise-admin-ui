@@ -10,8 +10,9 @@ const t = audit._internals;
 
 const close = (actual, expected, digits = 2) => assert.equal(Number(actual.toFixed(digits)), expected);
 
-test('rules: 22 unique names, frozen, version is semver', () => {
-  assert.equal(audit.rules.length, 22);
+test('rules: 23 unique names, frozen, version is semver', () => {
+  assert.equal(audit.rules.length, 23);
+  assert.equal(audit.rules.indexOf('pagination'), audit.rules.indexOf('table-above-fold') + 1);
   assert.equal(new Set(audit.rules).size, audit.rules.length);
   assert.ok(Object.isFrozen(audit.rules));
   assert.match(audit.version, /^\d+\.\d+\.\d+$/);
@@ -106,4 +107,26 @@ test('median', () => {
   assert.equal(t.median([]), null);
   assert.equal(t.median([3, 1, 2]), 2);
   assert.equal(t.median([4, 1, 3, 2]), 2.5);
+});
+
+test('hasRangeOrTotal: range and total text in English and Vietnamese', () => {
+  for (const text of ['1–25 of 128', '1-25 of 128', '1–25 of 1,284', '1–25 trên 1.284', '1–25 / 128', '1 – 25 of 50+', 'Showing 1 to 10 of 57 entries', 'Total 128 items', '128 results', 'Tổng 128', 'Tổng: 1 284', 'Hiển thị 1–10 trên 57', '1-10 of 128 items', 'Tổng số: 128', 'Tổng cộng 128', 'Total of 128', '1–25 của 128', '1–25 trong 128']) {
+    assert.equal(t.hasRangeOrTotal(text), true, text);
+  }
+  for (const text of ['', 'Page 2', '25', 'Rows per page', 'Next', '2026']) assert.equal(t.hasRangeOrTotal(text), false, text);
+});
+
+test('isNextPageName: next-page controls', () => {
+  for (const name of ['Next', 'Next page', 'Go to next page', 'Next Page', 'Sau', 'Trang sau', 'TRANG SAU', 'Tiếp', 'Tiếp theo', '›', '»', '→', 'Next ›', 'Next →', 'Next »', 'Sau ›', 'Tiếp »', '› ', 'Kế tiếp', 'Trang kế tiếp', 'Tới trang tiếp theo']) assert.equal(t.isNextPageName(name), true, name);
+  for (const name of ['Next step', 'Continue', 'Save', 'Sau đó', '']) assert.equal(t.isNextPageName(name), false, name);
+});
+
+test('isLoadMoreName: load-more controls', () => {
+  for (const name of ['Load more', 'Show more', 'View more', 'Xem thêm', 'Xem Thêm', 'XEM THÊM', 'Tải thêm', 'Load more (10)', 'Load 20 more', 'Show 10 more', 'Xem thêm 10']) assert.equal(t.isLoadMoreName(name), true, name);
+  for (const name of ['More filters', 'More actions', 'Load', 'Show more filters', 'View more details', 'See more activity', 'Show more columns', '']) assert.equal(t.isLoadMoreName(name), false, name);
+});
+
+test('isPageSizeLabel: page-size labels and options', () => {
+  for (const text of ['Rows per page', 'Rows per page:', '25 per page', 'Page size', 'Items per page', '10 / page', '10 / trang', 'Số dòng', 'Số dòng mỗi trang', 'Hiển thị', 'Mỗi trang']) assert.equal(t.isPageSizeLabel(text), true, text);
+  for (const text of ['Status', 'All statuses', 'Owner', '']) assert.equal(t.isPageSizeLabel(text), false, text);
 });

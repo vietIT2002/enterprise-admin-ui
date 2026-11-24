@@ -35,6 +35,7 @@ Replace these template tells:
 
 Before you finish a screen, confirm:
 
+- Every screen uses the same pager, filter controls and page header (DESIGN.md's Shared patterns when the project has one); exceptions are written down
 - Every list and related list has first-use, no-results, loading and error states
 - Form fields sit one per row, except a pair that reads as one value
 - Save stays enabled until submit; the error summary and unsaved-changes warning exist

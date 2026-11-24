@@ -29,6 +29,7 @@
     'numeric-align',
     'tabular-nums',
     'table-above-fold',
+    'pagination',
     'icon-button-name',
     'target-size',
     'text-contrast',
@@ -46,6 +47,34 @@
   ]);
 
   // ------------------------------------------------------------------ pure helpers (no DOM; exported as audit._internals)
+
+  // "1–25 of 1,284", "1-10 trên 57", "Showing 1 to 10 of 57 entries", "Total 128 items", "Tổng: 1 284".
+  // A bare number or "Page 2" is not a range or a total.
+  function hasRangeOrTotal(text) {
+    const s = String(text || '');
+    if (/\d\s*(?:[–—-]|\bto\b)\s*\d[\d.,   ]*?\s*(?:of|của|trong|trên|\/)\s*\d/iu.test(s)) return true;
+    if (/(?:^|[^\p{L}])(?:total|tổng)(?:\s+(?:số|cộng|of))?[^\p{L}\d]*\d/iu.test(s)) return true;
+    return /\d\s*(?:results?|items?|entries|records?|kết quả|bản ghi|mục)(?![\p{L}])/iu.test(s);
+  }
+
+  // A control that goes to the next page: "Next", "Next ›", "Go to next page", "Trang sau", "Kế tiếp", "›". Arrow glyphs
+  // around the words are ignored. "Next step" is not one.
+  function isNextPageName(name) {
+    const s = String(name || '').trim();
+    if (/^[›»→>]$/.test(s)) return true;
+    const words = s.replace(/^[\s‹›«»←→<>]+|[\s‹›«»←→<>]+$/g, '');
+    return /^(?:go to )?next(?: page)?$|^(?:(?:tới|đến) )?(?:trang )?(?:sau|(?:kế )?tiếp(?: theo)?)$/iu.test(words);
+  }
+
+  // "Load more", "Load 20 more", "Show more (10)", "Xem thêm 10". "Show more filters" is a different control.
+  function isLoadMoreName(name) {
+    return /^(?:(?:load|show|view|see)\s+(?:\d+\s+)?more|xem thêm|tải thêm)(?:\s+\d+)?(?:\s*\([^)]*\))?[\s….]*$/iu.test(String(name || '').trim());
+  }
+
+  // "Rows per page", "25 per page", "10 / trang", "Số dòng mỗi trang", "Hiển thị".
+  function isPageSizeLabel(text) {
+    return /per page|page size|\/\s*(?:page|trang)|số dòng|hiển thị|mỗi trang/iu.test(String(text || ''));
+  }
 
   // Amounts, percents and counts. Rejects ids, phone numbers (leading 0) and dates.
   // Currency: symbol or code before (USD 1,250.00, $151,000) or after (1.250.000 VNĐ, 1.250,00 €), any case.
@@ -751,6 +780,73 @@
     }
   }
 
+  // A list pager shows the range and total, a page-size select and Previous / Next; "Load more" is for feeds, not records.
+  // A list with no pager (everything fits on one page, or rows are still loading) is not measured.
+  function checkPagination(ctx) {
+    if (ctx.opts.pageType !== 'list') return;
+    const table = Array.from(ctx.doc.querySelectorAll('table, [role="grid"], [role="table"], [role="treegrid"]')).find((t) => ctx.visible(t));
+    if (!table || !ctx.rows().some((r) => r.table === table)) return;
+    // Only the table's own page area counts (not a site footer), and a pager in the table's <tfoot> counts (MUI's TableFooter).
+    const scope = table.closest('main, [role="main"]') || ctx.doc.body;
+    const tfoot = table.querySelector(':scope > tfoot');
+    const after = (el) => (!table.contains(el) || (tfoot && tfoot.contains(el))) && !el.contains(table) && table.compareDocumentPosition(el) & 4; // DOCUMENT_POSITION_FOLLOWING
+    const controls = Array.from(scope.querySelectorAll('button, a, [role="button"]')).filter((el) => ctx.visible(el) && after(el));
+    const nameOf = (el) => accessibleName(ctx, el);
+
+    const loadMore = controls.find((el) => isLoadMoreName(nameOf(el)));
+    let pager = controls.find((el) => isNextPageName(nameOf(el)) || isNextPageName(el.getAttribute('title')) || (el.getAttribute('rel') || '').split(/\s+/).includes('next'));
+    if (!pager) {
+      const numbered = controls.filter((el) => /^\d{1,4}$/.test((el.innerText || '').trim()));
+      pager = numbered.find((el) => numbered.some((o) => o !== el && o.parentElement === el.parentElement));
+    }
+    if (!pager) {
+      pager = Array.from(scope.querySelectorAll('[aria-label], [class]')).find(
+        (el) => ctx.visible(el) && after(el) && /pagination|pager|phân trang/i.test((el.getAttribute('aria-label') || '') + ' ' + (el.getAttribute('class') || ''))
+      );
+    }
+    if (!pager && !loadMore) return;
+    measured(ctx, 'pagination', 1);
+
+    const missing = [];
+    if (loadMore) missing.push('Load more');
+    if (pager) {
+      // The pager's region: its highest ancestor that does not hold the table, plus what follows the table beside it.
+      let parts;
+      if (tfoot && tfoot.contains(pager)) parts = [tfoot];
+      else {
+        let top = pager;
+        while (top.parentElement && !top.parentElement.contains(table)) top = top.parentElement;
+        parts = Array.from(top.parentElement ? top.parentElement.children : [top]).filter((el) => el === top || (!el.contains(table) && after(el)));
+      }
+      // Only what is rendered counts: not hidden parts, and not script, style or template text.
+      parts = parts.filter((el) => ctx.visible(el) && !/^(?:script|style|template)$/i.test(el.tagName));
+      const regionText = parts.map((el) => el.innerText || '').join(' ');
+      if (!hasRangeOrTotal(regionText)) missing.push('no range or total');
+      const sizeOptions = /^\d+(?:\s*\/\s*(?:page|trang))?$/i;
+      const isSize = (el) => {
+        if (isPageSizeLabel(accessibleName(ctx, el)) || (el.parentElement && isPageSizeLabel(el.parentElement.innerText))) return true;
+        const options = Array.from(el.querySelectorAll('option'));
+        if (options.some((o) => isPageSizeLabel(o.textContent))) return true;
+        return el.tagName === 'SELECT' && options.length > 0 && options.every((o) => sizeOptions.test(o.textContent.trim()));
+      };
+      // A transparent size control (Ant's combobox input) still shows its label in the region text. "Hiển thị 1–10 trên 48" is a
+      // range, not a size label, so "Hiển thị" is left out of this text check (a control labelled "Hiển thị" still counts below).
+      const sizeSel = 'select, [role="combobox"], [aria-haspopup="listbox"]';
+      const hasSize = isPageSizeLabel(regionText.replace(/hiển thị/giu, '')) ||parts.some((part) => Array.from(part.querySelectorAll(sizeSel)).concat(part.matches(sizeSel) ? [part] : []).some((el) => ctx.visible(el) && isSize(el)));
+      if (!hasSize) missing.push('no page size next to the pager');
+    }
+    if (!missing.length) return;
+    report(
+      ctx,
+      'pagination',
+      'warn',
+      'List pagination shows the range and total ("1–25 of 128"), a Rows-per-page select and Previous / Next; record lists do not use Load more. A list that keeps another pager for a product reason (an API that pages by cursor only) writes the reason in DESIGN.md',
+      pager || loadMore,
+      missing.join('; '),
+      'range and total, Rows per page, Previous / Next'
+    );
+  }
+
   function checkTables(ctx) {
     const rows = ctx.rows();
     const rowMsg = 'Table rows: single-line 32–48px (40px default, 32px compact); two-line rows at most 64px';
@@ -1152,7 +1248,7 @@
     measured(ctx, 'contact-link', n);
   }
 
-  const CHECKS = [checkTypography, checkRadius, checkTables, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden, checkSticky, checkLabelPosition, checkInputTypes, checkContactLinks];
+  const CHECKS = [checkTypography, checkRadius, checkTables, checkPagination, checkControlNames, checkTargetSize, checkContrast, checkDecoration, checkPrimaryActions, checkHiddenOverridden, checkSticky, checkLabelPosition, checkInputTypes, checkContactLinks];
 
   // ------------------------------------------------------------------ entry point
 
@@ -1205,6 +1301,10 @@
     median,
     looksLikePhone,
     looksLikeEmail,
+    hasRangeOrTotal,
+    isNextPageName,
+    isLoadMoreName,
+    isPageSizeLabel,
   };
   root.enterpriseAdminAudit = audit;
 })(typeof window !== 'undefined' ? window : globalThis);

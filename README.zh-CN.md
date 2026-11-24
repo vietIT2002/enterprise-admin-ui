@@ -20,7 +20,7 @@
 
 **在没人为它调优过的界面上实测**（12 个界面，清单独立编写，盲评）：使用本技能生成的页面完成了每个界面所需内容的 **44%**，不使用时为 **19%**。按主题：空、加载和错误状态 12% → 59%；搜索、筛选和计数 16% → 54%；删除前确认 25% → 63%。它让 Agent 做对的部分翻了一倍多，剩下的仍需你来检查。[测量方法](#效果)。
 
-[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：22](https://img.shields.io/badge/audit%20rules-22-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
+[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![许可证：MIT](https://img.shields.io/badge/license-MIT-blue) ![参考文档：17](https://img.shields.io/badge/references-17-blue) ![审计规则：23](https://img.shields.io/badge/audit%20rules-23-blue) ![版本 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
 ## 安装
 
@@ -172,15 +172,15 @@ codex plugin marketplace add vietIT2002/enterprise-admin-ui
 
 它不适用于落地页或营销网站。这类页面请使用 `frontend-design` 等侧重视觉美感的技能。
 
-如果项目已有设计系统或定制过的组件库，本技能会保留你的组件和设计 token，只应用布局、状态和交互行为方面的规则。
+如果项目已有设计系统，本技能会保留你的组件和设计 token，并应用布局、状态和交互行为方面的规则。当你把它用于整个应用或要求重新设计整个应用时，它会替换项目自行定义的主题中的模板痕迹取值（深色侧边栏、渐变、卡片阴影、过大的圆角），保留你的强调色和品牌色，并列出替换了哪些内容。
 
 ## 包含内容
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            249 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
+├─ SKILL.md            257 行：工作流程、页面配方、状态、保存、表格、基础规范、审查模式
 ├─ references/         17 个文件，仅在任务需要时加载
-├─ scripts/audit.js    无依赖的浏览器审计脚本，22 条规则，评分 0–100
+├─ scripts/audit.js    无依赖的浏览器审计脚本，23 条规则，评分 0–100
 ├─ scripts/audit-cli.mjs  在终端中用无头 Chrome 或 Edge 运行审计，无需依赖；--states 和 --checks 检查状态与行为
 └─ assets/
    ├─ templates/           可选：单文件的列表、详情和表单页面
@@ -313,9 +313,9 @@ node <技能目录>/scripts/audit-cli.mjs http://localhost:3000/orders --type li
 
 ## 常见问题
 
-**它会和我的设计系统冲突吗？** 不会。项目自己的设计系统或定制组件库始终优先，此时本技能只应用布局、状态和交互行为方面的规则。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
+**它会和我的设计系统冲突吗？** 不会。来自组件库或内部套件的设计系统始终优先。项目自行定义的主题同样会保留，只有模板痕迹取值例外，本技能仅在你把它用于整个应用或要求重新设计整个应用时才会替换。它会保留你的强调色和品牌色，并列出改动了哪些内容。项目中的 `DESIGN.md` 记录了你的强调色、密度和状态用语，技能会首先读取它。
 
-**会消耗多少 token？** `SKILL.md` 共 249 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
+**会消耗多少 token？** `SKILL.md` 共 257 行（约 20 KB，大约 5k token）。参考文档只在任务需要时加载，例如做表格时才加载 `tables.md`。
 
 **支持越南语和其他语言区域吗？** 支持。格式化统一通过 `Intl` 并使用项目的 locale。`data-formatting.md` 中有一套 vi-VN 配置：
 - `1.250.000 ₫`；

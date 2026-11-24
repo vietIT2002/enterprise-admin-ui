@@ -4,7 +4,7 @@
 // Uses Playwright's Chromium (`npx playwright install chromium`), or an installed Google Chrome when that is missing.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 import { AUDIT, RULES, loadFixtures } from './fixture-pages.mjs';
 
@@ -49,4 +49,34 @@ test('every audit rule fails on at least one fixture, and at least one fixture i
   const covered = new Set(fixtures.flatMap((f) => f.expected));
   assert.deepEqual(RULES.filter((rule) => !covered.has(rule)), [], 'rules without a failing fixture');
   assert.ok(fixtures.some((f) => !f.expected.length), 'a fixture that expects no violations');
+});
+
+test('shipped list template: the pager passes the pagination rule', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.route((url) => url.hostname === 'cdn.tailwindcss.com', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }));
+    const template = fileURLToPath(new URL('../skills/enterprise-admin-ui/assets/templates/list.html', import.meta.url));
+    await page.goto(pathToFileURL(template).href);
+    await page.waitForFunction(() => document.getElementById('page-range')?.textContent.trim());
+    await page.addScriptTag({ path: AUDIT });
+    const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
+    assert.deepEqual(result.violations.filter((v) => v.rule === 'pagination'), []);
+    assert.equal(result.metrics.applicable.pagination, 1);
+  } finally {
+    await page.close();
+  }
+});
+
+test('list-pager-arrows: the pagination finding names both gaps, and script text is not a total', async () => {
+  const fixture = fixtures.find((f) => f.file === 'list-pager-arrows.html');
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.goto(pathToFileURL(fixture.path).href);
+    await page.addScriptTag({ path: AUDIT });
+    const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
+    const v = result.violations.find((x) => x.rule === 'pagination');
+    assert.equal(v.examples[0].actual, 'no range or total; no page size next to the pager');
+  } finally {
+    await page.close();
+  }
 });

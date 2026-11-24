@@ -66,6 +66,7 @@ Baseline without this skill: the record name was missing from breadcrumbs.
 - Separator is `/` or a chevron icon (`aria-hidden`); the container is `<nav aria-label="Breadcrumb">` with an ordered list.
 - Crumb targets are at least 24px high. Long names truncate with `max-w-[24ch] truncate` and the full text in `title`; the page title below keeps the whole name.
 - A top-level list page ("Orders") has no breadcrumb, or only the module ("Sales / Orders"); do not repeat the title as a one-item trail.
+- Pages at the same level are treated alike: if one top-level list shows the module crumb, every top-level list does.
 - The trail shows hierarchy, not history. The browser's Back button handles history.
 
 ## Record pages

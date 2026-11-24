@@ -20,7 +20,7 @@
 
 **Đo trên các màn hình không ai tinh chỉnh skill cho chúng** (12 màn hình, checklist viết độc lập, chấm mù): các trang dựng với skill làm được **44%** những gì mỗi màn hình cần, so với **19%** khi không có skill. Theo nhóm: trạng thái trống, đang tải và lỗi 12% → 59%; tìm kiếm, bộ lọc và số đếm 16% → 54%; xác nhận trước khi xóa 25% → 63%. Skill giúp agent làm đúng nhiều hơn gấp đôi, và phần còn lại vẫn cần bạn kiểm tra. [Cách đo](#kết-quả).
 
-[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 22](https://img.shields.io/badge/audit%20rules-22-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
+[![CI](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml/badge.svg)](https://github.com/vietIT2002/enterprise-admin-ui/actions/workflows/ci.yml) ![Giấy phép: MIT](https://img.shields.io/badge/license-MIT-blue) ![Tài liệu tham khảo: 17](https://img.shields.io/badge/references-17-blue) ![Quy tắc audit: 23](https://img.shields.io/badge/audit%20rules-23-blue) ![Phiên bản 0.5.10](https://img.shields.io/badge/version-0.5.10-blue)
 
 ## Cài đặt
 
@@ -172,15 +172,15 @@ Skill dành cho các màn hình nằm sau màn hình đăng nhập:
 
 Skill không dành cho landing page hay website marketing. Với những trang đó, hãy dùng một skill về thẩm mỹ như `frontend-design`.
 
-Nếu dự án đã có design system hoặc thư viện component tùy biến, skill giữ nguyên component và token của bạn, chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi.
+Nếu dự án đã có design system, skill giữ nguyên component và token của bạn và áp dụng các quy tắc về bố cục, trạng thái và hành vi. Khi bạn áp dụng skill cho toàn bộ app hoặc yêu cầu thiết kế lại toàn bộ app, skill thay các dấu hiệu template trong theme do chính dự án định nghĩa (sidebar tối, gradient, đổ bóng card, bo góc quá lớn), giữ màu nhấn và màu thương hiệu của bạn, và liệt kê những gì đã thay.
 
 ## Bên trong có gì
 
 ```
 skills/enterprise-admin-ui/
-├─ SKILL.md            249 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
+├─ SKILL.md            257 dòng: quy trình, công thức trang, trạng thái, lưu, bảng, nền tảng, Review mode
 ├─ references/         17 file, chỉ nạp khi tác vụ cần
-├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 22 quy tắc, điểm 0–100
+├─ scripts/audit.js    audit chạy trên trình duyệt, không cần thư viện ngoài, 23 quy tắc, điểm 0–100
 ├─ scripts/audit-cli.mjs  chạy audit từ terminal bằng Chrome hoặc Edge chạy ngầm, không cần thư viện ngoài; --states và --checks kiểm tra trạng thái và hành vi
 └─ assets/
    ├─ templates/           tùy chọn: trang danh sách, chi tiết và form dạng một file HTML
@@ -313,9 +313,9 @@ Các skill này dùng kết hợp được với nhau. Dùng một skill thẩm 
 
 ## Câu hỏi thường gặp
 
-**Skill có xung đột với design system của tôi không?** Không. Design system hoặc thư viện component tùy biến của dự án luôn được ưu tiên; khi đó skill chỉ áp dụng các quy tắc về bố cục, trạng thái và hành vi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
+**Skill có xung đột với design system của tôi không?** Không. Design system từ thư viện hoặc bộ kit nội bộ luôn được ưu tiên. Theme do chính dự án định nghĩa cũng được giữ, trừ các dấu hiệu template; skill chỉ thay chúng khi bạn áp dụng cho toàn bộ app hoặc yêu cầu thiết kế lại toàn bộ app. Skill giữ màu nhấn và màu thương hiệu của bạn và liệt kê những gì đã đổi. File `DESIGN.md` trong dự án ghi lại màu nhấn, mật độ và bộ từ vựng trạng thái của bạn, và skill đọc file này trước tiên.
 
-**Skill tốn bao nhiêu token?** `SKILL.md` dài 249 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
+**Skill tốn bao nhiêu token?** `SKILL.md` dài 257 dòng (khoảng 20 KB, tầm 5k token). Các file tham khảo chỉ được nạp khi tác vụ cần, ví dụ `tables.md` khi làm bảng.
 
 **Skill có hỗ trợ tiếng Việt và các locale khác không?** Có. Việc định dạng đi qua `Intl` với locale của dự án. `data-formatting.md` có sẵn bộ quy ước vi-VN:
 - `1.250.000 ₫`;
