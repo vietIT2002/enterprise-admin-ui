@@ -23,7 +23,6 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
   - **Detect:** an audit rule from `scripts/audit.js` (run in a browser, see SKILL.md Verify), an `rg` command for the source, or both.
 - In each `rg` command, replace `src` with the screen's source folder or file. Most single-line patterns also work with `grep -rnE`; `rg -U` patterns span lines.
 - A pattern finds candidates. Open each hit and confirm it before you report it: a shadow on a menu or dialog, or initials for an employee, is correct.
-- In a project with its own theme, fix a tell where the theme defines it (a CSS variable, the Tailwind config, a shared component's classes), once, not on each page; SKILL.md Scope and precedence says when.
 
 ## Entries
 
@@ -126,7 +125,7 @@ Read this when a screen looks generic or AI-built, before you hand a screen over
 ### navy-sidebar-indigo-accent
 - **Looks like:** `<aside class="w-64 bg-slate-900 text-slate-300">` with active items in `rounded-lg bg-indigo-600 text-white`, often under a gradient logo block.
 - **Why it reads as a template:** It is the stock admin-template shell: the dark block competes with the content and the accent spreads past actions; brand colour belongs on actions and selection, never on large surfaces [Fluent].
-- **Build instead:** `border-r border-sidebar-border bg-sidebar text-sidebar-foreground`; the active item `bg-sidebar-accent text-sidebar-accent-foreground font-medium` with `aria-current="page"` (`references/navigation-layout.md`). In a project's own theme, keep an indigo accent on actions and replace only the dark sidebar (SKILL.md Scope and precedence).
+- **Build instead:** `border-r border-sidebar-border bg-sidebar text-sidebar-foreground`; the active item `bg-sidebar-accent text-sidebar-accent-foreground font-medium` with `aria-current="page"` (`references/navigation-layout.md`).
 - **Detect:** `rg -n '<(aside|nav|Sidebar)\b[^>]*bg-(slate|gray|zinc|neutral|stone|indigo|blue)-(800|900|950)|indigo-[5-7]00' src`.
 
 ### sidebar-promo-card

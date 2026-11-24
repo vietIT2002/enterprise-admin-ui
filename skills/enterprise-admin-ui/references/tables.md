@@ -86,11 +86,11 @@ Read this when you build any data table: a list page, a related list on a detail
 
 ## Pagination and large data
 
-- Every list of the app uses the same pager component (DESIGN.md Shared patterns). Pagination sits at the bottom of the table [Carbon, Ant]. Layout: "1–50 of 1.284" on the left; page-size select (25, 50, 100) and Previous / page numbers / Next on the right.
-- Paginate once there are more than 50 rows [Polaris]. Every paged list shows the page-size select, so the pager is the same on every list. When lists can run past 5 pages, the shared pager gets a "Go to page" jumper [Ant].
+- Pagination sits at the bottom of the table [Carbon, Ant]. Layout: "1–50 of 1.284" on the left; page-size select (25, 50, 100) and Previous / page numbers / Next on the right.
+- Paginate once there are more than 50 rows [Polaris]. Show the page-size select above 50 rows and a "Go to page" jumper beyond 5 pages [Ant].
 - Always show the total. When the exact count is expensive, show "50+" rather than nothing.
 - Up to about 200 rows a plain table renders fine. Beyond that, virtualise rows (`@tanstack/react-virtual`) with fixed row heights, which is one more reason for single-line 40px rows [Fiori].
-- Record lists use the pager, not Load more or infinite scroll; those suit feeds (activity, notifications). A feed with infinite scroll shows "50 of 1.284 loaded" and restores the scroll position when the user returns from a detail page [NN/g].
+- Avoid infinite scroll for find-and-compare work. If you use it, show "50 of 1.284 loaded" and restore the scroll position when the user returns from a detail page [NN/g].
 - Changing a filter, search or page size resets to page 1 and clears the selection. Returning from a detail page restores the same page, sort and filters, which is why they live in the URL.
 - Keep the sticky header from hiding the focused cell when paging by keyboard [WCAG 2.4.11].
 

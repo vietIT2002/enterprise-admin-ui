@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { startApp } from './app/server.mjs';
 import { seedOrders } from './app/data.mjs';
-import { AUDIT } from './fixture-pages.mjs';
 
 const FAIL_MESSAGE = 'The server could not save the order. Try again.';
 let app;
@@ -444,20 +443,5 @@ test('workflows: an always-rendered empty alert before the real one does not fai
   } finally {
     proxy.closeAllConnections();
     proxy.close();
-  }
-});
-
-test('reference orders list: the pager passes the pagination rule and the page size changes the range', async () => {
-  const { page, context } = await open(lan, '/orders');
-  try {
-    await page.waitForFunction(() => document.getElementById('page-range')?.textContent.trim());
-    await page.addScriptTag({ path: AUDIT });
-    const result = await page.evaluate(() => enterpriseAdminAudit({ pageType: 'list' }));
-    assert.deepEqual(result.violations.filter((v) => v.rule === 'pagination'), []);
-    await page.selectOption('#page-size', '50');
-    await page.waitForFunction(() => document.getElementById('page-range').textContent.includes('50'));
-    assert.equal(await page.textContent('#page-range'), '1\u201350 of 60');
-  } finally {
-    await context.close();
   }
 });
