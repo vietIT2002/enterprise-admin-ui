@@ -60,9 +60,8 @@ const STATUS_OPTIONS = (selected) => STATUSES.map((s) => `<option${s === selecte
 const LIST_SCRIPT = `
 (function () {
   var CFG = __CFG__;
-  var SIZE = 20;
   var $ = function (id) { return document.getElementById(id); };
-  var state = { page: 1, total: 0, rows: [], ids: {}, allMatching: false };
+  var state = { page: 1, size: 20, total: 0, rows: [], ids: {}, allMatching: false };
   var forced = new URLSearchParams(location.search).get('state');
   var money = new Intl.NumberFormat('en-US');
   var date = function (iso) { var p = iso.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; };
@@ -103,9 +102,9 @@ const LIST_SCRIPT = `
   }
 
   function renderPager() {
-    var pages = Math.max(1, Math.ceil(state.total / SIZE));
-    var from = state.total ? (state.page - 1) * SIZE + 1 : 0;
-    $('page-range').textContent = from + '\\u2013' + Math.min(state.page * SIZE, state.total) + ' of ' + state.total;
+    var pages = Math.max(1, Math.ceil(state.total / state.size));
+    var from = state.total ? (state.page - 1) * state.size + 1 : 0;
+    $('page-range').textContent = from + '\\u2013' + Math.min(state.page * state.size, state.total) + ' of ' + state.total;
     $('prev').disabled = state.page <= 1;
     $('next').disabled = state.page >= pages;
   }
@@ -116,7 +115,7 @@ const LIST_SCRIPT = `
     show('loading');
     var p = query();
     p.set('page', state.page);
-    p.set('size', SIZE);
+    p.set('size', state.size);
     return fetch('/api/orders?' + p).then(function (r) {
       if (!r.ok) throw new Error('load');
       return r.json();
@@ -138,6 +137,7 @@ const LIST_SCRIPT = `
 
   var reset = function () { state.page = 1; state.ids = {}; state.allMatching = false; load(); };
   $('status').addEventListener('change', reset);
+  $('page-size').addEventListener('change', function () { state.size = Number($('page-size').value); reset(); });
   var timer;
   $('q').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(reset, 200); });
   $('clear-filters').addEventListener('click', function () { $('status').value = ''; $('q').value = ''; forced = null; reset(); });
@@ -314,6 +314,8 @@ export function ordersPage({ user, variant }) {
     <button type="button" class="btn secondary" id="retry">Retry</button>
   </div>
   <div class="pager">
+    <label for="page-size">Rows per page</label>
+    <select id="page-size"><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select>
     <span id="page-range" class="tnum"></span>
     <button type="button" class="btn secondary" id="prev" aria-label="Previous page">&lsaquo;</button>
     <button type="button" class="btn secondary" id="next" aria-label="Next page">&rsaquo;</button>
