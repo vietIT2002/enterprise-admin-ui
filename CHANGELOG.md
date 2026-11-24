@@ -5,6 +5,8 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [Unreleased]
 
 ### Added
+- Workflow step 2, Shared patterns: when a task covers two or more screens, the agent lists how each screen does pagination, the filter bar, the page header, status badges, dates and table rows, chooses one implementation for each, builds it once and moves every screen to it. A different pattern needs a reason in DESIGN.md. A one-screen task lists the screens that still differ and leaves them alone. Review mode compares the screens with each other, and the manual checklist has a Shared patterns item.
+- `## Shared patterns` in `assets/DESIGN.template.md`, a table with defaults for pagination, filter bar, page header, status badge, dates and numbers, table rows, and empty, loading and error states. The references `filters-search.md`, `tables.md` and `navigation-layout.md` say to choose each once per app.
 - Audit rule `pagination` (warn, list pages only, 23 rules now). A list pager (a Next control, two or more numbered buttons, or an element labelled pagination) must show the range or total ("1–25 of 128", "1–25 trên 1.284", "Total 128") and a page-size select ("Rows per page", "Số dòng mỗi trang", or options such as 25 / 50 / 100); a "Load more" or "Xem thêm" control below a record list is flagged. A list page with no pager, or with no visible rows yet, is not measured. The pager region is the pager's highest ancestor that does not hold the table, plus what follows the table beside it. Six fixtures cover it.
 - `audit-cli.mjs --cookie <name=value>` and `--expect-text <text>` (both repeatable) audit pages behind a login. `--cookie` sets the cookie in every tab the run opens (the page, each `--states` tab and each `--checks` tab) and takes http(s) URLs only (any other target is a usage error, exit 2); `--expect-text` names text the loaded page must show. When either flag is given, the CLI checks that it is on the page you meant, and these are setup failures, not graded: a server redirect to another path, a client-side redirect after load, or missing expected text. A setup failure is a page, state or check error (exit 2) and grades nothing, with the message `Setup: redirected to <final path> — sign in first (--cookie), or audit the page it redirected to` or `Setup: "<text>" not found on <path> — wrong user, role or page`. Without the flags nothing changes and redirects are still followed. Command lines are visible to other local processes, so use test sessions only.
 - Dev only, not shipped in the skill: a dependency-free app fixture in `tests/app/` and workflow checks in `tests/workflows/`.
@@ -34,6 +36,9 @@ All notable changes to this project are documented here. The format follows [Kee
   It is not part of the workflow (benchmark SCREEN-A).
 
 ### Changed
+- DESIGN.md is created from the template whatever the request is called (apply, improve, redesign).
+- `tables.md` shows the page-size select on every paged list, not only above 50 rows.
+- Load more and infinite scroll are for feeds (activity, notifications), not record lists.
 - Save draft is now optional. The old rule added it to any form with three or more sections; it is now offered only when the product stores drafts (a Draft status and an API that saves one) or the user asks. SKILL.md workflow step 2 also says to check that the product supports a workflow-changing action before adding it. In a 4-scenario A/B, the released skill added Save draft and an invented Draft status to a form whose product has no drafts. The candidate passed all four scenarios; report: `docs/superpowers/evals/2026-11-10-r3-ab.md`.
 
 ### Fixed
